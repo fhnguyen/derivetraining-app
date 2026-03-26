@@ -1166,7 +1166,7 @@ function migrateUsers(users) {
     if (!u.createdAt) { u.createdAt = '2024-01-01'; changed = true; }
   });
 
-  if (changed) saveUsers(users);
+  if (changed) localStorage.setItem('bloc_users', JSON.stringify(users)); // local only
   return users;
 }
 
@@ -1181,7 +1181,7 @@ async function migratePasswords(users) {
       changed = true;
     }
   }
-  if (changed) { saveUsers(users); console.log('Passwords migrated to hashed format.'); }
+  if (changed) { localStorage.setItem('bloc_users', JSON.stringify(users)); console.log('Passwords migrated to hashed format.'); }
 }
 
 // ── User storage — master DB first, localStorage as cache ────────────
@@ -1193,25 +1193,22 @@ function loadUsers() {
 }
 
 function saveUsers(users) {
-  // Always write to localStorage immediately (cache)
+  // localStorage ONLY — never pushes to master DB
+  // Master DB writes only happen via saveUsersAndSync (explicit admin actions)
   localStorage.setItem('bloc_users', JSON.stringify(users));
-  // Push to master DB in the background if configured
-  if (MASTER_SCRIPT_URL && MASTER_SECRET) {
-    pushUsersToMaster(users).catch(e => console.warn('Master DB push failed:', e.message));
-  }
 }
 
-// Awaitable version — use when you need to know the push succeeded
+// Safe write to master DB.
+// Always fetches latest master state first, applies the provided users list
+// (which came from a fresh sync + local edit), then pushes.
+// This prevents race conditions where stale local state overwrites master.
 async function saveUsersAndSync(users) {
+  // Write to local cache immediately
   localStorage.setItem('bloc_users', JSON.stringify(users));
-  if (MASTER_SCRIPT_URL && MASTER_SECRET) {
-    const result = await pushUsersToMaster(users);
-    if (result === false) {
-      showToast('Saved locally — master DB push failed', 'err');
-    } else if (result === true) {
-      showToast('Saved & synced to master DB', 'ok');
-    }
-    // null = no-cors fire-and-forget, assume ok
+  if (!MASTER_SCRIPT_URL || !MASTER_SECRET) return;
+  const result = await pushUsersToMaster(users);
+  if (result === false) {
+    showToast('Saved locally — master DB push failed', 'err');
   }
 }
 
@@ -1310,7 +1307,7 @@ async function pushUsersToMaster(users) {
 
 // Load from localStorage cache immediately (synchronous, fast)
 let USERS = loadUsers() || DEFAULT_USERS;
-if (!loadUsers()) saveUsers(USERS);
+if (!loadUsers()) localStorage.setItem('bloc_users', JSON.stringify(USERS)); // local cache only
 USERS = migrateUsers(USERS);
 migratePasswords(USERS);  // async — hashes any plain-text passwords
 
@@ -1623,6 +1620,13 @@ function extractSheetId(input) {
 
 async function saveUser() {
   const errEl = document.getElementById('m-user-err'); errEl.textContent = '';
+  // Always pull latest master state before modifying — prevents stale overwrites
+  if (MASTER_SCRIPT_URL && MASTER_SECRET) {
+    const latest = await syncUsersFromMaster();
+    if (latest) {
+      USERS = migrateUsers(latest);
+    }
+  }
   const name  = document.getElementById('m-name').value.trim();
   const email = document.getElementById('m-email').value.trim().toLowerCase();
   const passRaw = document.getElementById('m-pass').value;
@@ -1654,6 +1658,10 @@ async function saveUser() {
     const newScriptSecret = document.getElementById('m-script-secret').value.trim();
     const newTabNamesRaw = document.getElementById('m-sheet-gid').value.trim();
     const newTabNames    = newTabNamesRaw ? newTabNamesRaw.split(',').map(t=>t.trim()).filter(Boolean) : null;
+    // Check email doesn't already exist after fresh sync
+    if (USERS.find(u => (u.email||'').toLowerCase() === email && u.id !== editingUserId)) {
+      errEl.textContent = 'A user with this email already exists.'; return;
+    }
     USERS.push({ id:'u'+Date.now(), name, email, pass, role,
       spreadsheetId: spreadsheetId||'',
       sheetTabNames: newTabNames,
@@ -1668,7 +1676,22 @@ async function saveUser() {
 
 let deleteTargetId = null;
 function openDeleteUser(id){ const u=USERS.find(u=>u.id===id); if(!u) return; deleteTargetId=id; document.getElementById('m-del-name').textContent=u.name; openModal('m-delete'); }
-function confirmDelete(){ USERS=USERS.filter(u=>u.id!==deleteTargetId); saveUsersAndSync(USERS).then(()=>{ closeModal('m-delete'); renderUserTable(); showToast('User deleted','ok'); }); }
+function confirmDelete(){
+  // Pull latest master state first, then delete, then push
+  // This prevents deleting users added by another device since last sync
+  const doDelete = async () => {
+    if (MASTER_SCRIPT_URL && MASTER_SECRET) {
+      const latest = await syncUsersFromMaster();
+      if (latest) USERS = migrateUsers(latest);
+    }
+    USERS = USERS.filter(u => u.id !== deleteTargetId);
+    await saveUsersAndSync(USERS);
+    closeModal('m-delete');
+    renderUserTable();
+    showToast('User deleted', 'ok');
+  };
+  doDelete();
+}
 
 function switchAdmTab(name,btn){
   document.querySelectorAll('.adm-tab').forEach(t=>t.classList.remove('active'));
@@ -1692,7 +1715,7 @@ async function saveAdminPass(){
 function openResetData(){ document.getElementById('m-reset-confirm').value=''; openModal('m-reset'); }
 function confirmReset(){
   if(document.getElementById('m-reset-confirm').value!=='RESET'){showToast('Type RESET to confirm','err');return;}
-  USERS=[...DEFAULT_USERS]; saveUsers(USERS); localStorage.removeItem('bloc_admin_pass'); localStorage.removeItem('bloc_admin_hash');
+  USERS=[...DEFAULT_USERS]; localStorage.setItem('bloc_users', JSON.stringify(USERS)); localStorage.removeItem('bloc_admin_pass'); localStorage.removeItem('bloc_admin_hash');
   closeModal('m-reset'); renderUserTable(); showToast('Data reset to defaults','ok');
 }
 
@@ -2540,7 +2563,7 @@ async function saveAccountSettings() {
 
   USERS[idx] = updated;
   S.user = updated;
-  saveUsers(USERS);
+  localStorage.setItem('bloc_users', JSON.stringify(USERS)); // local only
 
   // Update header
   document.getElementById('h-name').textContent = updated.name;
@@ -2590,7 +2613,7 @@ async function adminRefreshUser(userId, btn) {
     ADM.cache[userId] = { dayMap, loadedAt: Date.now() };
     // Update last-synced timestamp on user
     const idx = USERS.findIndex(u => u.id === userId);
-    if (idx >= 0) { USERS[idx].lastSynced = Date.now(); saveUsers(USERS); }
+    if (idx >= 0) { USERS[idx].lastSynced = Date.now(); localStorage.setItem('bloc_users', JSON.stringify(USERS)); }
     // Update sync cell in table
     const syncEl = document.getElementById('sync-' + userId);
     if (syncEl) syncEl.innerHTML = '<span class="fresh">Just now</span>';
