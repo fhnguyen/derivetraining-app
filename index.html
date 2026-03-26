@@ -1232,37 +1232,20 @@ async function syncUsersFromMaster() {
     const masterUsers = data.users;
     const localUsers  = USERS || loadUsers() || [];
 
-    // Master is always the source of truth for the user list.
-    // We only add a local user to master if their EMAIL doesn't exist
-    // in master at all — email is the canonical identity, not id.
-    // This prevents duplicate accounts when a user was cached locally
-    // with a different id than the one created in the admin panel.
-    const masterEmails = new Set(masterUsers.map(u => (u.email || '').toLowerCase()));
-    const localOnly = localUsers.filter(u => {
-      const email = (u.email || '').toLowerCase();
-      // Skip DEFAULT_USERS demo account and any user already in master by email
-      if (email === 'athlete@example.com') return false;
-      return !masterEmails.has(email);
-    });
+    // Master DB is READ ONLY here — never push during a sync.
+    // Writes to master only happen from explicit admin save/delete actions.
+    // This prevents empty local state from ever overwriting the master sheet.
 
-    // If master is empty (no real users yet), seed it from local
-    if (masterUsers.length === 0 && localUsers.length > 0) {
-      console.log('Master DB empty — seeding from local');
-      await pushUsersToMaster(localUsers);
-      localStorage.setItem('bloc_users', JSON.stringify(localUsers));
-      return localUsers;
+    if (masterUsers.length === 0) {
+      // Master is empty — don't trust it, keep local cache
+      console.warn('Master DB returned 0 users — keeping local cache');
+      return false;
     }
 
-    const merged = localOnly.length > 0 ? [...masterUsers, ...localOnly] : masterUsers;
-
-    if (localOnly.length > 0) {
-      console.log('Found', localOnly.length, 'local-only users (by email) — pushing to master');
-      await pushUsersToMaster(merged);
-    }
-
-    localStorage.setItem('bloc_users', JSON.stringify(merged));
-    console.log('Synced', merged.length, 'users from master DB');
-    return merged;
+    // Master has users — use them as source of truth, update local cache
+    localStorage.setItem('bloc_users', JSON.stringify(masterUsers));
+    console.log('Synced', masterUsers.length, 'users from master DB');
+    return masterUsers;
   } catch (err) {
     console.warn('Master DB sync failed, using local cache:', err.message);
     return false;
@@ -1547,16 +1530,14 @@ async function adminSyncMaster() {
   const btn = document.getElementById('btn-sync-master');
   if (btn) { btn.disabled = true; btn.textContent = 'Syncing…'; }
 
-  // First push current local state up to master so nothing is lost
-  await pushUsersToMaster(USERS);
-
-  // Then pull the merged result back
+  // Pull only — never push during sync. Master DB is the source of truth.
+  // Writes only happen from explicit add/edit/delete actions.
   const synced = await syncUsersFromMaster();
   if (synced) {
     USERS = migrateUsers(synced);
     migratePasswords(USERS);
     renderUserTable();
-    showToast('Synced — ' + USERS.length + ' users in master DB', 'ok');
+    showToast('Synced — ' + USERS.length + ' users from master DB', 'ok');
   } else {
     showToast('Sync failed — check console', 'err');
   }
@@ -3436,44 +3417,39 @@ async function refreshDayView() {
 //                       sync master in background so login works once done
 // This guarantees zero flash-to-login for any user who was already logged in.
 
-const _hasExistingSession = !!localStorage.getItem('bloc_session') ||
-                            !!localStorage.getItem('bloc_admin_session');
+// ── Init ────────────────────────────────────────────────────────────────
+// Always sync from master DB before routing — this ensures users are always
+// available even after Safari cache clear, reinstall, or fresh device.
+// Master DB is the single source of truth. localStorage is just a fast cache.
 
-if (_hasExistingSession) {
-  // Show loading screen immediately — never flash login to a logged-in user
+(async () => {
+  const hasSession = !!localStorage.getItem('bloc_session') ||
+                     !!localStorage.getItem('bloc_admin_session');
+
+  // Show loading screen immediately — prevents any flash of login screen
   document.getElementById('s-login').classList.remove('active');
   document.getElementById('s-loading').classList.add('active');
 
-  // Sync master then route
-  const _doRoute = async () => {
-    if (getMasterUrl() && getMasterSecret()) {
+  // Always pull from master DB first
+  if (getMasterUrl() && getMasterSecret()) {
+    try {
       const synced = await syncUsersFromMaster();
       if (synced) {
         USERS = migrateUsers(synced);
         await migratePasswords(USERS);
       }
+    } catch(e) {
+      console.warn('Master sync failed on init:', e.message);
     }
-    parseHashAndRoute();
-    // Background re-sync for admin panel
-    const admUsers = document.getElementById('adm-users');
-    if (admUsers && admUsers.classList.contains('active')) renderUserTable();
-  };
-  _doRoute();
-} else {
-  // Fresh device or logged out — sync master first so all users are available,
-  // then show login.
-  if (getMasterUrl() && getMasterSecret()) {
-    syncUsersFromMaster().then(async synced => {
-      if (synced) {
-        USERS = migrateUsers(synced);
-        await migratePasswords(USERS);
-      }
-      parseHashAndRoute();
-    });
-  } else {
-    parseHashAndRoute();
   }
-}
+
+  // Now route — users are loaded from master regardless of localStorage state
+  parseHashAndRoute();
+
+  // Background re-sync for admin panel
+  const admUsers = document.getElementById('adm-users');
+  if (admUsers && admUsers.classList.contains('active')) renderUserTable();
+})();
 
 // ── Register Service Worker ──────────────────────────────────────
 if ('serviceWorker' in navigator) {
