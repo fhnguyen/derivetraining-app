@@ -1297,15 +1297,15 @@ async function pushUsersToMaster(users) {
 
   // Apps Script POSTs must go through a proxy — direct POST is blocked by CORS redirect
   const proxies = [
+    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
     'https://corsproxy.io/?url=' + encodeURIComponent(url),
     'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
-    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
   ];
 
   for (const proxyUrl of proxies) {
     try {
       const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 12000);
+      const tid = setTimeout(() => ctrl.abort(), 5000);
       const res = await fetch(proxyUrl, {
         method: 'POST', signal: ctrl.signal,
         headers: { 'Content-Type': 'application/json' },
@@ -1814,14 +1814,14 @@ async function scriptFetch(scriptUrl, secret, action, params = {}) {
     console.warn('Direct script fetch failed (' + err.message + '), trying via proxy...');
     const enc = encodeURIComponent(url);
     const proxies = [
+      'https://api.codetabs.com/v1/proxy?quest=' + enc,
       'https://corsproxy.io/?url=' + enc,
       'https://api.allorigins.win/raw?url=' + enc,
-      'https://api.codetabs.com/v1/proxy?quest=' + enc,
     ];
     for (const p of proxies) {
       try {
         const ctrl2 = new AbortController();
-        const tid2 = setTimeout(() => ctrl2.abort(), 12000);
+        const tid2 = setTimeout(() => ctrl2.abort(), 5000);
         const res2 = await fetch(p, { signal: ctrl2.signal });
         clearTimeout(tid2);
         if (!res2.ok) continue;
@@ -1847,9 +1847,9 @@ async function loadCSVViaScript(scriptUrl, secret, gid) {
 async function proxyFetch(url) {
   const enc = encodeURIComponent(url);
   const proxies = [
+    'https://api.codetabs.com/v1/proxy?quest=' + enc,
     'https://corsproxy.io/?url=' + enc,
     'https://api.allorigins.win/raw?url=' + enc,
-    'https://api.codetabs.com/v1/proxy?quest=' + enc,
     'https://thingproxy.freeboard.io/fetch/' + url,
     'https://cors.eu.org/' + url,
     'https://proxy.cors.sh/' + url,
@@ -2534,6 +2534,7 @@ async function autoSaveAll(silent=false) {
   };
 
   const proxies = [
+    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(scriptUrl),
     'https://corsproxy.io/?url=' + encodeURIComponent(scriptUrl),
     'https://api.allorigins.win/raw?url=' + encodeURIComponent(scriptUrl),
   ];
@@ -2541,7 +2542,7 @@ async function autoSaveAll(silent=false) {
   for (const proxyUrl of proxies) {
     try {
       const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 12000);
+      const tid = setTimeout(() => ctrl.abort(), 5000);
       const res = await fetch(proxyUrl, {
         method:'POST', signal: ctrl.signal,
         headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
