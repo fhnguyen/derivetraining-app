@@ -1,59 +1,52 @@
 // TRAINDERIVE Service Worker
-// Cache name includes a version — change this string on every deploy
-// to force all clients to fetch fresh files immediately.
-const CACHE = 'trainderive-v3';
+const CACHE = 'trainderive-v4';
 
-// Files to cache for offline use
-const PRECACHE = [
-  '/',
-  '/index.html',
-];
-
-// ── Install: cache core files ────────────────────────────────────
+// On install — skip waiting immediately, take control right away
 self.addEventListener('install', e => {
-  // Skip waiting so the new SW activates immediately
   self.skipWaiting();
-  e.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(PRECACHE))
-  );
 });
 
-// ── Activate: delete old caches ──────────────────────────────────
+// On activate — delete ALL old caches, claim all clients
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys.filter(k => k !== CACHE).map(k => caches.delete(k))
-      )
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 
-// ── Fetch: network-first strategy ────────────────────────────────
-// Always try the network first so updates are picked up immediately.
-// Only fall back to cache if the network is unavailable (offline).
+// Fetch strategy:
+// - index.html → ALWAYS network, never cache (ensures latest code)
+// - everything else → network first, cache fallback for offline
 self.addEventListener('fetch', e => {
-  // Only handle GET requests for same-origin or CDN resources
   if (e.request.method !== 'GET') return;
 
-  // Don't intercept Google Sheets API calls, Apps Script, or fonts
-  const url = e.request.url;
+  const url = new URL(e.request.url);
+
+  // Never intercept external APIs
   if (
-    url.includes('docs.google.com') ||
-    url.includes('script.google.com') ||
-    url.includes('googleapis.com') ||
-    url.includes('corsproxy.io') ||
-    url.includes('allorigins.win') ||
-    url.includes('codetabs.com')
+    url.hostname.includes('google') ||
+    url.hostname.includes('corsproxy') ||
+    url.hostname.includes('allorigins') ||
+    url.hostname.includes('codetabs') ||
+    url.hostname.includes('fonts.g')
   ) return;
 
+  // index.html — always fetch fresh, never serve from cache
+  if (url.pathname === '/' || url.pathname.endsWith('index.html')) {
+    e.respondWith(
+      fetch(e.request, { cache: 'no-store' }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Everything else (icons, manifest, sw) — network first, cache fallback
   e.respondWith(
     fetch(e.request)
       .then(res => {
-        // Cache a copy of the fresh response
         if (res.ok) {
           const clone = res.clone();
-          caches.open(CACHE).then(cache => cache.put(e.request, clone));
+          caches.open(CACHE).then(c => c.put(e.request, clone));
         }
         return res;
       })
