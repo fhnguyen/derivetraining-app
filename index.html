@@ -56,7 +56,7 @@ body {
 
 
 /* ── Screens ─────────────────────────────────────── */
-.screen { display:none; min-height:100dvh; flex-direction:column; background:var(--surf); }
+.screen { display:none; height:100dvh; flex-direction:column; background:var(--surf); overflow:hidden; }
 .screen.active { display:flex; }
 
 /* ── Login ───────────────────────────────────────── */
@@ -80,10 +80,7 @@ body {
   padding:2.5rem; border-radius:var(--r);
   box-shadow:0 2px 16px rgba(0,0,0,.07);
 }
-@media all and (display-mode: standalone) {
-  #s-login  { padding-top: env(safe-area-inset-top, 0px); }
-  #s-loading { padding-top: env(safe-area-inset-top, 0px); }
-}
+
 .login-logo { font-family:var(--disp); font-size:2.4rem; letter-spacing:.06em; margin-bottom:.2rem; }
 .login-sub  { font-family:var(--mono); font-size:.6rem; color:var(--muted2); letter-spacing:.14em; text-transform:uppercase; margin-bottom:2rem; }
 .fld { margin-bottom:1rem; }
@@ -131,12 +128,9 @@ body {
   .app-hd, .adm-hd {
     padding-top: calc(.85rem + env(safe-area-inset-top, 0px));
   }
-  .screen { min-height: 100dvh; }
   body { padding-top: 0; padding-bottom: 0; }
-  /* Re-apply safe area via the header and bottom of main content */
-  .app-main, .adm-main {
-    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
-  }
+  #s-login { padding-top: env(safe-area-inset-top, 0px); }
+  #s-loading { padding-top: env(safe-area-inset-top, 0px); }
 }
 .hd-logo { font-family:var(--disp); font-size:1.35rem; letter-spacing:.04em; }
 .hd-right { display:flex; align-items:center; gap:.7rem; }
@@ -153,7 +147,7 @@ html { touch-action: manipulation; }
 .btn-ghost:hover { border-color:var(--danger); color:var(--danger); }
 
 /* ── App main ────────────────────────────────────── */
-.app-main { flex:1; padding:1.25rem; max-width:860px; margin:0 auto; width:100%; }
+.app-main { flex:1; padding:1.25rem; max-width:860px; margin:0 auto; width:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px)); }
 
 /* ── Views ───────────────────────────────────────── */
 .view { display:none; }
@@ -464,7 +458,7 @@ html { touch-action: manipulation; }
 }
 .adm-logo { font-family:var(--disp); font-size:1.35rem; letter-spacing:.04em; }
 .adm-logo span { color:var(--danger); font-size:.9rem; margin-left:.4rem; font-family:var(--mono); letter-spacing:.12em; }
-.adm-main { flex:1; padding:1.25rem; max-width:960px; margin:0 auto; width:100%; }
+.adm-main { flex:1; padding:1.25rem; max-width:960px; margin:0 auto; width:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px)); }
 .adm-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:1.4rem; }
 .adm-tab {
   font-family:var(--mono); font-size:.63rem; letter-spacing:.12em; text-transform:uppercase;
@@ -750,9 +744,7 @@ html { touch-action: manipulation; }
 /* ── Mobile ──────────────────────────────────────── */
 @media(max-width:480px){
   .app-main,.adm-main {
-    padding:.75rem .75rem 0 .75rem;
-    /* Add bottom padding for iOS home indicator + a small buffer */
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + .5rem);
+    padding:.75rem;
   }
   .cc { min-height:38px; }
   .cn { font-size:.68rem; }
@@ -790,8 +782,7 @@ html { touch-action: manipulation; }
   .wn-d { display:none; }
   .wn-n { font-size:.72rem; }
   .app-main,.adm-main {
-    padding:.5rem .5rem 0 .5rem;
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + .25rem);
+    padding:.5rem;
   }
 }
 </style>
