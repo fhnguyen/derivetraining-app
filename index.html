@@ -1,0 +1,3485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>TRAINDERIVE</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2864D7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TRAINDERIVE">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  /* ── Cream background, blue primary, gold secondary ── */
+  --bg:        #f5f0e8;
+  --surf:      #ede8df;
+  --surf2:     #e6e0d6;
+  --border:    #d4cdc0;
+  --border2:   #c4bdb0;
+  --accent:    #2864D7;        /* blue — primary */
+  --accent-lt: #4a7ee0;        /* blue hover */
+  --accent-bg: rgba(40,100,215,.08); /* blue tint bg */
+  --accent-bdr:rgba(40,100,215,.22); /* blue tint border */
+  --gold:      #D79B28;        /* gold — secondary */
+  --gold-lt:   #e0ad40;
+  --gold-bg:   rgba(215,155,40,.10);
+  --gold-bdr:  rgba(215,155,40,.28);
+  --text:      #1a1a18;
+  --muted:     #5a5450;
+  --muted2:    #3d3a36;
+  --training:  #eaf0fc;        /* soft blue tint for training days */
+  --train-bdr: #b0c8f0;
+  --danger:    #c0392b;
+  --warn:      #D79B28;        /* reuse gold for warnings */
+  --r:         5px;
+  --mono: 'DM Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+  --disp: 'Bebas Neue', sans-serif;
+}
+html,body { height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); font-size:15px; -webkit-font-smoothing:antialiased; overflow-x:hidden; }
+
+
+
+/* ── Screens ─────────────────────────────────────── */
+.screen { display:none; min-height:100vh; flex-direction:column; background:var(--surf); }
+.screen.active { display:flex; }
+
+/* ── Login ───────────────────────────────────────── */
+#s-login {
+  align-items:center; justify-content:center; padding:2rem;
+  position:relative; overflow:hidden;
+  background:
+    linear-gradient(rgba(10,10,10,.45), rgba(10,10,10,.45)),
+    url('https://images.squarespace-cdn.com/content/69c08f2a9dcd1c36eb8f3c07/1342f583-697f-4045-9461-c7270c1d89d2/2025-11-01_61056.jpg?content-type=image/jpeg')
+    center center / cover no-repeat;
+}
+#s-login::before {
+  content:'TRAINDERIVE'; position:absolute; font-family:var(--disp);
+  font-size:clamp(80px,18vw,220px); color:rgba(0,0,0,.04);
+  top:50%; left:50%; transform:translate(-50%,-50%);
+  pointer-events:none; user-select:none; letter-spacing:.05em;
+}
+.login-box {
+  position:relative; z-index:1; width:100%; max-width:380px;
+  background:var(--surf); border:1px solid var(--border);
+  padding:2.5rem; border-radius:var(--r);
+  box-shadow:0 2px 16px rgba(0,0,0,.07);
+}
+.login-logo { font-family:var(--disp); font-size:2.4rem; letter-spacing:.06em; margin-bottom:.2rem; }
+.login-sub  { font-family:var(--mono); font-size:.6rem; color:var(--muted2); letter-spacing:.14em; text-transform:uppercase; margin-bottom:2rem; }
+.fld { margin-bottom:1rem; }
+.fld label { display:block; font-family:var(--mono); font-size:.6rem; letter-spacing:.15em; text-transform:uppercase; color:var(--muted2); margin-bottom:.4rem; }
+.fld input, .fld select, .fld textarea {
+  width:100%; background:#f5f0e8; border:1px solid var(--border);
+  color:var(--text); font-family:var(--mono); font-size:16px;
+  padding:.68rem .9rem; outline:none; transition:border-color .15s; border-radius:var(--r);
+}
+/* Password field with eye toggle */
+.pw-wrap { position:relative; }
+.pw-wrap input { padding-right:2.4rem; }
+.pw-eye {
+  position:absolute; right:.55rem; top:50%; transform:translateY(-50%);
+  background:none; border:none; cursor:pointer; color:var(--muted);
+  font-size:1rem; padding:.2rem; line-height:1; transition:color .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.pw-eye:hover { color:var(--accent); }
+.fld input:focus, .fld select:focus, .fld textarea:focus { border-color:var(--accent); }
+.fld textarea { resize:vertical; min-height:70px; line-height:1.5; }
+.fld select { cursor:pointer; background:var(--bg); }
+.l-err { font-family:var(--mono); font-size:.68rem; color:var(--danger); margin-bottom:.8rem; min-height:1rem; }
+.btn-main {
+  width:100%; background:var(--accent); color:#fff; border:none;
+  font-family:var(--disp); font-size:1.2rem; letter-spacing:.1em;
+  padding:.82rem; cursor:pointer; transition:background .15s,transform .1s; border-radius:var(--r);
+}
+.btn-main:hover { background:var(--accent-lt); }
+.btn-main:active { transform:scale(.98); }
+.btn-main:disabled { background:var(--border); color:var(--muted); cursor:not-allowed; }
+.login-admin-link { text-align:center; margin-top:1rem; font-family:var(--mono); font-size:.62rem; letter-spacing:.1em; }
+.login-admin-link a { color:var(--muted2); text-decoration:none; transition:color .15s; }
+.login-admin-link a:hover { color:var(--accent); }
+
+/* ── App header ──────────────────────────────────── */
+.app-hd {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:.85rem 1.25rem; border-bottom:1px solid var(--border);
+  background:var(--surf);
+  position:sticky; top:0; z-index:100; flex-shrink:0;
+}
+.hd-logo { font-family:var(--disp); font-size:1.35rem; letter-spacing:.04em; }
+.hd-right { display:flex; align-items:center; gap:.7rem; }
+.hd-name  { font-family:var(--mono); font-size:.6rem; letter-spacing:.1em; color:var(--muted2); text-transform:uppercase; }
+/* Mobile touch improvements */
+* { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+html { touch-action: manipulation; }
+
+.btn-ghost {
+  background:none; border:1px solid var(--border); color:var(--muted2);
+  font-family:var(--mono); font-size:.6rem; letter-spacing:.12em; text-transform:uppercase;
+  padding:.35rem .65rem; cursor:pointer; transition:border-color .15s,color .15s; border-radius:var(--r);
+}
+.btn-ghost:hover { border-color:var(--danger); color:var(--danger); }
+
+/* ── App main ────────────────────────────────────── */
+.app-main { flex:1; padding:1.25rem; max-width:860px; margin:0 auto; width:100%; }
+
+/* ── Views ───────────────────────────────────────── */
+.view { display:none; }
+.view.active { display:block; }
+
+/* ── Calendar ────────────────────────────────────── */
+.cal-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.2rem; }
+.cal-month-wrap { display:flex; align-items:baseline; gap:.7rem; flex-wrap:wrap; }
+.cal-month { font-family:var(--disp); font-size:1.9rem; letter-spacing:.06em; }
+.cal-badge {
+  font-family:var(--mono); font-size:.56rem; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--accent); background:var(--accent-bg); border:1px solid var(--accent-bdr);
+  padding:.2rem .5rem; border-radius:2px;
+}
+.cal-arrows { display:flex; gap:.35rem; flex-shrink:0; }
+.cal-arr {
+  background:none; border:1px solid var(--border); color:var(--text);
+  width:2rem; height:2rem; cursor:pointer; font-size:.9rem;
+  display:flex; align-items:center; justify-content:center;
+  transition:border-color .15s,color .15s; border-radius:var(--r);
+}
+.cal-arr:hover { border-color:var(--accent); color:var(--accent); }
+.cal-dow-row { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; margin-bottom:2px; }
+.cal-dow { font-family:var(--mono); font-size:.52rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); text-align:center; padding:.38rem 0; }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+.cc {
+  aspect-ratio:1; min-height:44px;
+  background:#ddd7cc; border:1px solid #bfb8aa;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:3px; cursor:default; transition:border-color .12s,background .12s; border-radius:var(--r);
+  box-shadow:0 1px 3px rgba(0,0,0,.08);
+}
+.cc.has-w { background:#c4dcf5; border-color:#7aaee0; cursor:pointer; box-shadow:0 2px 6px rgba(40,100,215,.2); }
+.cc.is-rest { background:#ddd7cc; border-color:#bfb8aa; cursor:default; }
+.cc.has-w:hover { border-color:var(--accent); background:#b0ccef; }
+.cc.today { border-color:var(--accent) !important; box-shadow:inset 0 0 0 2px var(--accent); }
+.cc.today .cn { color:var(--accent); font-weight:700; }
+.cc.emp { background:transparent; border-color:transparent; box-shadow:none; pointer-events:none; }
+.cn { font-family:var(--mono); font-size:.72rem; line-height:1; color:var(--text); }
+.cdot { width:4px; height:4px; border-radius:50%; background:var(--accent); }
+.cal-legend { display:flex; gap:1.1rem; margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border); flex-wrap:wrap; }
+.leg { display:flex; align-items:center; gap:.38rem; font-family:var(--mono); font-size:.58rem; letter-spacing:.09em; text-transform:uppercase; color:var(--muted2); }
+.lsw { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+
+/* ── State boxes ─────────────────────────────────── */
+.sbox { text-align:center; padding:3.5rem 1.5rem; background:var(--surf); }
+.spinner { width:20px; height:20px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .75s linear infinite; margin:0 auto .9rem; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.sbox p { font-family:var(--mono); font-size:.72rem; letter-spacing:.08em; color:var(--muted2); }
+.sbox .e { color:var(--danger); margin-bottom:.8rem; }
+.btn-sm {
+  background:none; border:1px solid var(--border); color:var(--muted2);
+  font-family:var(--mono); font-size:.63rem; letter-spacing:.1em; text-transform:uppercase;
+  padding:.42rem .85rem; cursor:pointer; border-radius:var(--r); transition:border-color .15s,color .15s;
+}
+.btn-sm:hover { border-color:var(--accent); color:var(--accent); }
+.btn-sm.danger:hover { border-color:var(--danger); color:var(--danger); }
+
+/* ── Day view ────────────────────────────────────── */
+.back-btn {
+  display:flex; align-items:center; gap:.4rem; background:none; border:none;
+  color:var(--muted2); font-family:var(--mono); font-size:.62rem; letter-spacing:.12em;
+  text-transform:uppercase; cursor:pointer; padding:0; margin-bottom:1.1rem; transition:color .15s;
+}
+.back-btn:hover { color:var(--gold); }
+
+/* ── Week strip nav ──────────────────────────────── */
+.week-nav {
+  display:flex; align-items:center; gap:0;
+  background:var(--surf); border:1px solid var(--border);
+  border-radius:var(--r); overflow:hidden; margin-bottom:1.3rem;
+  width:100%;
+}
+.wn-arr {
+  background:none; border:none; border-right:1px solid var(--border);
+  color:var(--muted2); padding:.55rem .7rem; cursor:pointer;
+  font-size:.85rem; transition:color .15s,background .15s; flex-shrink:0;
+}
+.wn-arr:last-child { border-right:none; border-left:1px solid var(--border); }
+.wn-arr:hover { color:var(--accent); background:rgba(40,100,215,.06); }
+.wn-days { display:flex; flex:1; overflow:hidden; }
+.wn-day {
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:.45rem .2rem; cursor:pointer; border-right:1px solid var(--border);
+  transition:background .12s; min-width:0; position:relative;
+}
+.wn-day:last-child { border-right:none; }
+.wn-day:hover { background:rgba(40,100,215,.06); }
+.wn-day.active { background:var(--accent); }
+.wn-day.active .wn-d, .wn-day.active .wn-n { color:#fff; }
+.wn-day.has-w:not(.active) { background:var(--training); }
+.wn-day.is-today:not(.active)::after {
+  content:''; position:absolute; bottom:3px; left:50%; transform:translateX(-50%);
+  width:4px; height:4px; border-radius:50%; background:var(--accent);
+}
+.wn-d { font-family:var(--mono); font-size:.5rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted2); line-height:1; margin-bottom:.25rem; }
+.wn-n { font-family:var(--mono); font-size:.8rem; font-weight:500; color:var(--text); line-height:1; }
+
+.day-hd { margin-bottom:1.4rem; padding-bottom:1.1rem; border-bottom:1px solid var(--border); }
+.day-title { font-family:var(--disp); font-size:2.4rem; letter-spacing:.05em; line-height:1; margin-bottom:.35rem; }
+.day-sub { font-family:var(--mono); font-size:.6rem; letter-spacing:.12em; text-transform:uppercase; color:var(--muted2); }
+
+.rest-card { text-align:center; padding:3.5rem 1.5rem; }
+.rest-card .ri { font-size:2.2rem; opacity:.4; margin-bottom:.7rem; }
+.rest-card h2 { font-family:var(--disp); font-size:1.8rem; letter-spacing:.08em; color:var(--muted2); margin-bottom:.35rem; }
+.rest-card p  { font-family:var(--mono); font-size:.7rem; color:var(--muted); letter-spacing:.07em; }
+
+/* ── Blocks ──────────────────────────────────────── */
+.blk-wrap { margin-bottom:1.8rem; }
+
+/* Section container that extends below the pill bar */
+.blk-sections {
+  border-radius:0 0 6px 6px;
+  padding:.55rem .55rem .2rem .55rem;
+}
+.blk-sections[data-block="AM"] {
+  border:1.5px solid rgba(40,100,215,.35);
+  border-top:none;
+  background:rgba(40,100,215,.02);
+}
+.blk-sections[data-block="PM"] {
+  border:1.5px solid rgba(215,155,40,.45);
+  border-top:none;
+  background:rgba(215,155,40,.02);
+}
+/* Pill bar connects flush to the container below it */
+.blk-lbl[data-block="AM"] { border-radius:4px 4px 0 0; margin-bottom:0; }
+.blk-lbl[data-block="PM"] { border-radius:4px 4px 0 0; margin-bottom:0; }
+
+/* ── Block divider bar ── */
+.blk-lbl {
+  font-family:var(--mono); font-size:.6rem; letter-spacing:.2em; text-transform:uppercase;
+  margin-bottom:.7rem; display:flex; align-items:center; gap:.7rem;
+  color:var(--muted2);
+}
+.blk-lbl::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* AM — bold blue bar + icon */
+.blk-lbl[data-block="AM"] {
+  color:#fff;
+  background:#2864D7;
+  border-radius:4px;
+  padding:.28rem .65rem;
+  letter-spacing:.18em;
+}
+.blk-lbl[data-block="AM"]::after { display:none; }
+.blk-lbl[data-block="AM"]::before { content:'☀'; margin-right:.3rem; font-style:normal; letter-spacing:0; }
+
+/* PM — bold gold bar + icon */
+.blk-lbl[data-block="PM"] {
+  color:#fff;
+  background:#D79B28;
+  border-radius:4px;
+  padding:.28rem .65rem;
+  letter-spacing:.18em;
+}
+.blk-lbl[data-block="PM"]::after { display:none; }
+.blk-lbl[data-block="PM"]::before { content:'🌙'; margin-right:.3rem; font-style:normal; letter-spacing:0; font-size:.75rem; }
+
+/* Training / single block — neutral line */
+.blk-lbl[data-block="Training"] { color:var(--muted2); }
+.blk-lbl[data-block="Training"]::after { background:rgba(40,100,215,.2); }
+
+/* ── Section card palette ────────────────────────── */
+/* Section cards — 4-color cycle: blue, gold, magenta, green */
+/* Colors: --accent #2864D7, --gold #D79B28, magenta #C0288A, green #28A87A */
+.sec-card {
+  background:var(--surf); border:1px solid var(--border);
+  border-left:3px solid var(--border);
+  border-radius:var(--r); margin-bottom:.55rem; overflow:hidden;
+  transition:box-shadow .15s;
+}
+.sec-card:hover { box-shadow:0 2px 8px rgba(0,0,0,.07); }
+
+/* 4-color cycle applied by global section index (data-si), any block */
+.sec-card[data-si="0"]  { border-left-color:#2864D7; }
+.sec-card[data-si="1"]  { border-left-color:#D79B28; }
+.sec-card[data-si="2"]  { border-left-color:#C0288A; }
+.sec-card[data-si="3"]  { border-left-color:#28A87A; }
+.sec-card[data-si="4"]  { border-left-color:#2864D7; }
+.sec-card[data-si="5"]  { border-left-color:#D79B28; }
+.sec-card[data-si="6"]  { border-left-color:#C0288A; }
+.sec-card[data-si="7"]  { border-left-color:#28A87A; }
+.sec-card[data-si="8"]  { border-left-color:#2864D7; }
+.sec-card[data-si="9"]  { border-left-color:#D79B28; }
+.sec-card[data-si="10"] { border-left-color:#C0288A; }
+.sec-card[data-si="11"] { border-left-color:#28A87A; }
+.sec-card[data-si="12"] { border-left-color:#2864D7; }
+.sec-card[data-si="13"] { border-left-color:#D79B28; }
+.sec-card[data-si="14"] { border-left-color:#C0288A; }
+.sec-card[data-si="15"] { border-left-color:#28A87A; }
+
+/* Section header tint matches the border color faintly */
+.sec-card[data-si="0"]  .sec-hd, .sec-card[data-si="4"]  .sec-hd,
+.sec-card[data-si="8"]  .sec-hd, .sec-card[data-si="12"] .sec-hd { background:rgba(40,100,215,.04); }
+.sec-card[data-si="1"]  .sec-hd, .sec-card[data-si="5"]  .sec-hd,
+.sec-card[data-si="9"]  .sec-hd, .sec-card[data-si="13"] .sec-hd { background:rgba(215,155,40,.05); }
+.sec-card[data-si="2"]  .sec-hd, .sec-card[data-si="6"]  .sec-hd,
+.sec-card[data-si="10"] .sec-hd, .sec-card[data-si="14"] .sec-hd { background:rgba(192,40,138,.04); }
+.sec-card[data-si="3"]  .sec-hd, .sec-card[data-si="7"]  .sec-hd,
+.sec-card[data-si="11"] .sec-hd, .sec-card[data-si="15"] .sec-hd { background:rgba(40,168,122,.04); }
+
+.sec-card[data-si="0"].open  .sec-hd, .sec-card[data-si="4"].open  .sec-hd,
+.sec-card[data-si="8"].open  .sec-hd, .sec-card[data-si="12"].open .sec-hd { background:rgba(40,100,215,.07); }
+.sec-card[data-si="1"].open  .sec-hd, .sec-card[data-si="5"].open  .sec-hd,
+.sec-card[data-si="9"].open  .sec-hd, .sec-card[data-si="13"].open .sec-hd { background:rgba(215,155,40,.08); }
+.sec-card[data-si="2"].open  .sec-hd, .sec-card[data-si="6"].open  .sec-hd,
+.sec-card[data-si="10"].open .sec-hd, .sec-card[data-si="14"].open .sec-hd { background:rgba(192,40,138,.06); }
+.sec-card[data-si="3"].open  .sec-hd, .sec-card[data-si="7"].open  .sec-hd,
+.sec-card[data-si="11"].open .sec-hd, .sec-card[data-si="15"].open .sec-hd { background:rgba(40,168,122,.06); }
+
+.sec-hd {
+  display:flex; align-items:center; gap:.6rem; padding:.65rem .9rem;
+  cursor:pointer; user-select:none; border-bottom:1px solid transparent; transition:border-color .12s,background .12s;
+}
+.sec-hd:hover { border-bottom-color:var(--border); }
+.sec-card.open .sec-hd { border-bottom-color:var(--border); }
+.sec-n {
+  font-family:var(--mono); font-size:.56rem; letter-spacing:.1em;
+  color:var(--muted); flex-shrink:0; min-width:1.3rem;
+}
+.sec-t { font-size:.85rem; font-weight:500; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text); }
+.sec-ch { color:var(--muted); font-size:.62rem; transition:transform .2s; flex-shrink:0; }
+.sec-card.open .sec-ch { transform:rotate(180deg); }
+
+.sec-body { display:none; padding:.9rem; background:#faf9f6; }
+.sec-card.open .sec-body { display:block; }
+
+/* ── Training text — matches chat box style ──────── */
+.t-text {
+  font-family:var(--sans); font-size:.9rem; line-height:1.8;
+  color:var(--text); white-space:pre-wrap; word-break:break-word;
+  overflow-wrap:break-word; max-width:100%;
+}
+.t-text a { color:var(--accent); text-decoration:none; font-family:var(--mono); font-size:.78rem; }
+.t-text a:hover { text-decoration:underline; }
+
+.res-lbl {
+  font-family:var(--mono); font-size:.56rem; letter-spacing:.15em; text-transform:uppercase;
+  color:var(--muted2); margin:1rem 0 .45rem;
+  display:flex; align-items:center; gap:.5rem;
+}
+.res-lbl::before,.res-lbl::after { content:''; flex:1; height:1px; background:var(--border); }
+
+.res-ta {
+  width:100%; background:#f5f0e8; border:1px solid var(--border);
+  color:var(--text); font-family:var(--sans); font-size:16px; line-height:1.6;
+  padding:.65rem; resize:vertical; min-height:72px; outline:none;
+  transition:border-color .15s; border-radius:var(--r);
+}
+.res-ta:focus { border-color:var(--accent); }
+.res-ta::placeholder { color:var(--muted); }
+
+/* ── Feel ────────────────────────────────────────── */
+.feel-wrap { margin-top:1.6rem; padding-top:1.3rem; border-top:1px solid var(--border); }
+.feel-lbl { font-family:var(--mono); font-size:.58rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted2); margin-bottom:.75rem; }
+.feel-btns { display:flex; gap:.35rem; }
+.feel-btn {
+  flex:1; background:var(--surf); border:1px solid var(--border); color:var(--muted2);
+  font-family:var(--disp); font-size:1.35rem; padding:.6rem .2rem;
+  cursor:pointer; transition:all .12s; text-align:center; border-radius:var(--r);
+}
+.feel-btn:hover { border-color:var(--accent); color:var(--text); }
+.feel-btn.sel { background:var(--accent); border-color:var(--accent); color:#fff; }
+/* Feel scale: each value gets a distinct selected color */
+.feel-btn[data-v="1"].sel { background:#c0392b; border-color:#c0392b; }
+.feel-btn[data-v="2"].sel { background:#c46020; border-color:#c46020; }
+.feel-btn[data-v="3"].sel { background:var(--gold); border-color:var(--gold); color:#fff; }
+.feel-btn[data-v="4"].sel { background:var(--accent-lt); border-color:var(--accent-lt); }
+.feel-btn[data-v="5"].sel { background:var(--accent); border-color:var(--accent); }
+.feel-ends { display:flex; justify-content:space-between; margin-top:.3rem; }
+.feel-end { font-family:var(--mono); font-size:.5rem; letter-spacing:.07em; color:var(--muted); text-transform:uppercase; }
+
+/* ── Submit ──────────────────────────────────────── */
+.sub-row { margin-top:1.4rem; display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; }
+.btn-save {
+  background:var(--accent); color:#fff; border:none;
+  font-family:var(--disp); font-size:1rem; letter-spacing:.1em;
+  padding:.75rem 1.7rem; cursor:pointer; transition:background .15s,transform .1s; border-radius:var(--r);
+}
+.btn-save:hover { background:var(--accent-lt); }
+.btn-save:active { transform:scale(.98); }
+.save-st { font-family:var(--mono); font-size:.66rem; letter-spacing:.07em; color:var(--muted2); }
+.save-st.ok  { color:var(--accent); }
+.save-st.err { color:var(--danger); }
+/* Per-section auto-save indicator */
+.sec-save-st {
+  font-family:var(--mono); font-size:.58rem; letter-spacing:.08em;
+  color:var(--muted); margin-top:.3rem; min-height:.9rem;
+  transition:color .2s;
+}
+.sec-save-st.ok  { color:var(--accent); }
+.sec-save-st.saving { color:var(--muted2); }
+.logged-badge {
+  display:inline-flex; align-items:center; gap:.35rem; margin-bottom:.7rem;
+  font-family:var(--mono); font-size:.58rem; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--accent); background:var(--accent-bg); border:1px solid var(--accent-bdr);
+  padding:.25rem .5rem; border-radius:2px;
+}
+
+/* ── Admin panel ─────────────────────────────────── */
+#s-admin { background:var(--bg); }
+.adm-hd {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:.85rem 1.25rem; border-bottom:1px solid var(--border);
+  background:var(--surf);
+  flex-shrink:0;
+}
+.adm-logo { font-family:var(--disp); font-size:1.35rem; letter-spacing:.04em; }
+.adm-logo span { color:var(--danger); font-size:.9rem; margin-left:.4rem; font-family:var(--mono); letter-spacing:.12em; }
+.adm-main { flex:1; padding:1.25rem; max-width:960px; margin:0 auto; width:100%; }
+.adm-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:1.4rem; }
+.adm-tab {
+  font-family:var(--mono); font-size:.63rem; letter-spacing:.12em; text-transform:uppercase;
+  padding:.55rem 1rem; cursor:pointer; border:none; background:none; color:var(--muted2);
+  border-bottom:2px solid transparent; margin-bottom:-1px; transition:color .15s,border-color .15s;
+}
+.adm-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.adm-tab:hover:not(.active) { color:var(--text); }
+.adm-panel { display:none; }
+.adm-panel.active { display:block; }
+
+.users-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; }
+.section-title { font-family:var(--disp); font-size:1.5rem; letter-spacing:.06em; }
+.btn-add {
+  background:var(--accent); color:#fff; border:none;
+  font-family:var(--mono); font-size:.63rem; letter-spacing:.12em; text-transform:uppercase;
+  padding:.48rem .85rem; cursor:pointer; transition:background .15s; border-radius:var(--r);
+}
+.btn-add:hover { background:var(--accent-lt); }
+
+/* responsive table wrapper */
+.table-wrap { width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.user-table { width:100%; border-collapse:collapse; min-width:500px; }
+.user-table th {
+  font-family:var(--mono); font-size:.56rem; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--muted2); text-align:left; padding:.48rem .65rem; border-bottom:1px solid var(--border); font-weight:400;
+}
+.user-table td { padding:.6rem .65rem; border-bottom:1px solid var(--surf2); vertical-align:middle; }
+.user-table tr:last-child td { border-bottom:none; }
+.user-table tr:hover td { background:rgba(0,0,0,.02); }
+.u-name { font-weight:500; font-size:.88rem; }
+.u-email { font-family:var(--mono); font-size:.7rem; color:var(--muted2); }
+.u-role { font-family:var(--mono); font-size:.56rem; letter-spacing:.1em; text-transform:uppercase; padding:.17rem .42rem; border-radius:2px; }
+.u-role.admin   { background:rgba(192,57,43,.1); border:1px solid rgba(192,57,43,.25); color:var(--danger); }
+.u-role.athlete { background:var(--accent-bg); border:1px solid var(--accent-bdr); color:var(--accent); }
+.u-sheet { font-family:var(--mono); font-size:.66rem; color:var(--muted2); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.u-sheet a { color:var(--accent); text-decoration:none; }
+.u-sheet a:hover { text-decoration:underline; }
+.u-sheet.none { color:var(--muted); font-style:italic; }
+.row-actions { display:flex; gap:.35rem; }
+
+/* ── Modals ──────────────────────────────────────── */
+.modal-bg {
+  position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:500;
+  display:none; align-items:center; justify-content:center; padding:1rem;
+}
+.modal-bg.open { display:flex; }
+.modal {
+  background:var(--surf); border:1px solid var(--border2); border-radius:var(--r);
+  width:100%; max-width:500px; max-height:90vh; overflow-y:auto;
+  box-shadow:0 8px 32px rgba(0,0,0,.15);
+}
+.modal-hd { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.2rem; border-bottom:1px solid var(--border); }
+.modal-title { font-family:var(--disp); font-size:1.35rem; letter-spacing:.06em; }
+.modal-close { background:none; border:none; color:var(--muted2); font-size:1.1rem; cursor:pointer; padding:.2rem .4rem; transition:color .15s; }
+.modal-close:hover { color:var(--danger); }
+.modal-body { padding:1.2rem; }
+.modal-foot { padding:.9rem 1.2rem; border-top:1px solid var(--border); display:flex; gap:.6rem; justify-content:flex-end; }
+.btn-cancel { background:none; border:1px solid var(--border); color:var(--muted2); font-family:var(--mono); font-size:.63rem; letter-spacing:.12em; text-transform:uppercase; padding:.48rem .85rem; cursor:pointer; border-radius:var(--r); transition:border-color .15s; }
+.btn-cancel:hover { border-color:var(--border2); }
+.btn-confirm { background:var(--accent); color:#fff; border:none; font-family:var(--mono); font-size:.63rem; letter-spacing:.12em; text-transform:uppercase; padding:.48rem 1rem; cursor:pointer; border-radius:var(--r); transition:background .15s; }
+.btn-confirm:hover { background:var(--accent-lt); }
+.btn-confirm.danger-btn { background:var(--danger); }
+.btn-confirm.danger-btn:hover { background:#e74c3c; }
+.form-hint { font-family:var(--mono); font-size:.63rem; color:var(--muted2); margin-top:.32rem; line-height:1.5; }
+.form-err { font-family:var(--mono); font-size:.66rem; color:var(--danger); margin-bottom:.65rem; min-height:1rem; }
+.url-preview { font-family:var(--mono); font-size:.63rem; color:var(--muted2); background:#f5f0e8; border:1px solid var(--border); border-radius:var(--r); padding:.45rem .65rem; margin-top:.35rem; word-break:break-all; line-height:1.5; }
+.url-preview.valid   { border-color:var(--accent-bdr); color:var(--accent); }
+.url-preview.invalid { border-color:rgba(192,57,43,.4); color:var(--danger); }
+
+/* ── Settings ────────────────────────────────────── */
+.setting-row { padding:.9rem 0; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+.setting-row:last-child { border-bottom:none; }
+.setting-label { font-weight:500; font-size:.88rem; margin-bottom:.18rem; }
+.setting-desc  { font-family:var(--mono); font-size:.63rem; color:var(--muted2); letter-spacing:.05em; }
+
+/* ── Toast ───────────────────────────────────────── */
+.toast {
+  position:fixed; bottom:1.5rem; left:50%;
+  transform:translateX(-50%) translateY(3rem);
+  background:var(--text); color:var(--bg);
+  font-family:var(--mono); font-size:.7rem; letter-spacing:.07em;
+  padding:.6rem 1.2rem; border-radius:var(--r); opacity:0;
+  transition:transform .25s,opacity .25s; z-index:999; white-space:nowrap;
+  box-shadow:0 4px 16px rgba(0,0,0,.2);
+}
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.toast.ok  { background:var(--accent); color:#fff; }
+.toast.err { background:var(--danger); color:#fff; }
+
+
+/* ── Account settings modal ──────────────────────── */
+.acct-btn {
+  display:flex; align-items:center; gap:.4rem;
+  background:none; border:1px solid var(--border); color:var(--muted2);
+  font-family:var(--mono); font-size:.6rem; letter-spacing:.12em; text-transform:uppercase;
+  padding:.35rem .65rem; cursor:pointer; transition:border-color .15s,color .15s; border-radius:var(--r);
+}
+.acct-btn:hover { border-color:var(--accent); color:var(--accent); }
+.acct-avatar {
+  width:22px; height:22px; border-radius:50%;
+  background:var(--accent); color:#fff;
+  font-family:var(--disp); font-size:.75rem; letter-spacing:.05em;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+
+/* First-login banner */
+.first-login-banner {
+  background:rgba(214,137,16,.12); border:1px solid rgba(214,137,16,.35);
+  border-radius:var(--r); padding:.75rem 1rem; margin-bottom:1.2rem;
+  display:flex; align-items:center; gap:.75rem;
+}
+.first-login-banner .flb-icon { font-size:1.1rem; flex-shrink:0; }
+.first-login-banner p { font-family:var(--mono); font-size:.7rem; color:var(--warn); line-height:1.5; flex:1; }
+.first-login-banner button {
+  background:var(--gold); color:#fff; border:none;
+  font-family:var(--mono); font-size:.6rem; letter-spacing:.1em; text-transform:uppercase;
+  padding:.38rem .7rem; cursor:pointer; border-radius:var(--r); transition:background .15s; flex-shrink:0;
+}
+.first-login-banner button:hover { background:var(--gold-lt); }
+
+/* Divider inside modal */
+.modal-divider { height:1px; background:var(--border); margin:1rem 0; }
+.modal-section-title {
+  font-family:var(--mono); font-size:.58rem; letter-spacing:.15em; text-transform:uppercase;
+  color:var(--muted2); margin-bottom:.75rem; margin-top:.25rem;
+}
+
+/* ── Admin refresh / sync status ─────────────────── */
+.u-sync { font-family:var(--mono); font-size:.6rem; color:var(--muted2); white-space:nowrap; }
+.u-sync.fresh { color:var(--accent); }
+.btn-sm.spinning { opacity:.5; pointer-events:none; }
+.btn-sm.spinning::after { content:' …'; }
+
+/* ── Admin user detail view ───────────────────────── */
+#adm-detail { display:none; }
+#adm-detail.active { display:block; }
+.detail-back { display:flex; align-items:center; gap:.4rem; background:none; border:none; color:var(--muted2); font-family:var(--mono); font-size:.62rem; letter-spacing:.12em; text-transform:uppercase; cursor:pointer; padding:0; margin-bottom:1.2rem; transition:color .15s; }
+.detail-back:hover { color:var(--accent); }
+.detail-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.4rem; flex-wrap:wrap; gap:.7rem; }
+.detail-name { font-family:var(--disp); font-size:2rem; letter-spacing:.05em; }
+.detail-meta { font-family:var(--mono); font-size:.62rem; color:var(--muted2); letter-spacing:.1em; text-transform:uppercase; }
+
+/* Admin calendar */
+.adm-cal-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; }
+.adm-cal-month { font-family:var(--disp); font-size:1.5rem; letter-spacing:.06em; }
+
+/* Admin day view — mirrors client day view */
+#adm-day-view { display:none; }
+#adm-day-view.active { display:block; }
+.adm-day-back { display:flex; align-items:center; gap:.4rem; background:none; border:none;
+  color:var(--muted2); font-family:var(--mono); font-size:.62rem; letter-spacing:.12em;
+  text-transform:uppercase; cursor:pointer; padding:0; margin-bottom:1.2rem; transition:color .15s; }
+.adm-day-back:hover { color:var(--gold); }
+/* Admin read-only result display inside sec-body */
+.adm-result-box { background:rgba(40,100,215,.04); border:1px solid rgba(40,100,215,.15);
+  border-radius:var(--r); padding:.65rem .8rem; margin-bottom:.75rem; }
+.adm-result-label { font-family:var(--mono); font-size:.54rem; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--accent); margin-bottom:.3rem; }
+.adm-result-text { font-family:var(--sans); font-size:.88rem; line-height:1.65;
+  color:var(--text); white-space:pre-wrap; }
+.adm-no-result { font-family:var(--mono); font-size:.7rem; color:var(--muted);
+  font-style:italic; padding:.4rem 0; }
+
+/* Day result cards */
+.result-day-card { background:var(--surf); border:1px solid var(--border); border-radius:var(--r); margin-bottom:.9rem; overflow:hidden; }
+.rdc-hd { display:flex; align-items:center; gap:.8rem; padding:.75rem 1rem; cursor:pointer; border-bottom:1px solid transparent; transition:border-color .12s; }
+.rdc-hd:hover, .result-day-card.open .rdc-hd { border-bottom-color:var(--border); }
+.rdc-date { font-family:var(--disp); font-size:1.1rem; letter-spacing:.04em; flex:1; }
+.rdc-feel { font-family:var(--mono); font-size:.65rem; letter-spacing:.08em; color:var(--muted2); }
+.rdc-feel.has-feel { color:var(--gold); }
+.rdc-badge { font-family:var(--mono); font-size:.56rem; letter-spacing:.1em; text-transform:uppercase; padding:.18rem .4rem; border-radius:2px; }
+.rdc-badge.logged { background:var(--accent-bg); border:1px solid var(--accent-bdr); color:var(--accent); }
+.rdc-badge.empty  { background:rgba(0,0,0,.05); border:1px solid var(--border); color:var(--muted2); }
+.rdc-chev { color:var(--muted); font-size:.62rem; transition:transform .2s; }
+.result-day-card.open .rdc-chev { transform:rotate(180deg); }
+.rdc-body { display:none; padding:1rem; }
+.result-day-card.open .rdc-body { display:block; }
+
+/* Result section within day card */
+.res-section { margin-bottom:1rem; padding-bottom:1rem; border-bottom:1px solid var(--border); }
+.res-section:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
+.res-sec-label { font-family:var(--mono); font-size:.58rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted2); margin-bottom:.4rem; }
+.res-sec-content { font-family:var(--sans); font-size:.88rem; line-height:1.7; color:var(--text); white-space:pre-wrap; }
+.res-sec-empty { font-family:var(--mono); font-size:.72rem; color:var(--muted); font-style:italic; }
+
+/* Coach comment box */
+.coach-comment-wrap { margin-top:.9rem; padding-top:.9rem; border-top:1px dashed var(--border); }
+.coach-comment-label { font-family:var(--mono); font-size:.58rem; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); margin-bottom:.45rem; display:flex; align-items:center; gap:.5rem; }
+.coach-comment-ta { width:100%; background:#f5f0e8; border:1px solid var(--border); color:var(--text); font-family:var(--sans); font-size:16px; line-height:1.6; padding:.6rem; resize:vertical; min-height:60px; outline:none; transition:border-color .15s; border-radius:var(--r); }
+.coach-comment-ta:focus { border-color:var(--accent); }
+.coach-comment-ta::placeholder { color:var(--muted); font-style:italic; }
+.comment-save-row { display:flex; align-items:center; gap:.6rem; margin-top:.5rem; }
+.btn-comment-save { background:var(--gold); color:#fff; border:none; font-family:var(--mono); font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; padding:.38rem .75rem; cursor:pointer; border-radius:var(--r); transition:background .15s; }
+.btn-comment-save:hover { background:var(--gold-lt); }
+.comment-save-st { font-family:var(--mono); font-size:.6rem; color:var(--muted2); }
+.comment-save-st.ok { color:var(--gold); }
+
+/* Client-facing coach comment display */
+.coach-note { background:var(--gold-bg); border-left:3px solid var(--gold); border-radius:0 var(--r) var(--r) 0; padding:.75rem 1rem; margin-top:.9rem; }
+.coach-note-label { font-family:var(--mono); font-size:.56rem; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); margin-bottom:.3rem; }
+.coach-note-text { font-family:var(--sans); font-size:.88rem; line-height:1.65; color:var(--text); white-space:pre-wrap; }
+
+/* Auto-refresh indicator */
+.refresh-indicator { display:flex; align-items:center; gap:.5rem; font-family:var(--mono); font-size:.6rem; letter-spacing:.08em; color:var(--muted2); margin-bottom:1rem; }
+.refresh-dot { width:7px; height:7px; border-radius:50%; background:var(--gold); animation:pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.35;} }
+
+
+/* ── Notification bell ───────────────────────────────── */
+.notif-btn {
+  position:relative; background:none; border:1px solid var(--border);
+  color:var(--muted2); width:2rem; height:2rem; border-radius:var(--r);
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  font-size:.95rem; transition:border-color .15s,color .15s; flex-shrink:0;
+}
+.notif-btn:hover { border-color:var(--gold); color:var(--gold); }
+.notif-badge {
+  position:absolute; top:-5px; right:-5px;
+  background:var(--gold); color:#fff;
+  font-family:var(--mono); font-size:.55rem; font-weight:600;
+  min-width:16px; height:16px; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  padding:0 3px; line-height:1;
+  border:2px solid var(--bg);
+  animation:badge-pop .25s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes badge-pop { from{transform:scale(0);} to{transform:scale(1);} }
+
+/* Notification dropdown */
+.notif-drop {
+  position:absolute; top:calc(100% + .5rem); right:0;
+  width:min(320px, calc(100vw - 2rem));
+  background:var(--surf); border:1px solid var(--border2);
+  border-radius:var(--r); box-shadow:0 8px 24px rgba(0,0,0,.12);
+  z-index:200; overflow:hidden;
+  animation:drop-in .18s ease;
+}
+@keyframes drop-in { from{opacity:0;transform:translateY(-6px);} to{opacity:1;transform:none;} }
+.notif-drop-hd {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:.65rem .9rem; border-bottom:1px solid var(--border);
+}
+.notif-drop-title { font-family:var(--mono); font-size:.6rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted2); }
+.notif-mark-all { font-family:var(--mono); font-size:.58rem; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); background:none; border:none; cursor:pointer; padding:0; transition:color .15s; }
+.notif-mark-all:hover { color:var(--gold); }
+.notif-list { max-height:320px; overflow-y:auto; }
+.notif-item {
+  display:flex; align-items:flex-start; gap:.65rem;
+  padding:.7rem .9rem; border-bottom:1px solid var(--border);
+  cursor:pointer; transition:background .12s; text-decoration:none;
+}
+.notif-item:last-child { border-bottom:none; }
+.notif-item:hover { background:rgba(40,100,215,.05); }
+.notif-item.read { opacity:.55; }
+.notif-dot { width:7px; height:7px; border-radius:50%; background:var(--gold); flex-shrink:0; margin-top:4px; transition:opacity .2s; }
+.notif-item.read .notif-dot { background:var(--border2); }
+.notif-item-body { flex:1; min-width:0; }
+.notif-item-date { font-family:var(--disp); font-size:1rem; letter-spacing:.04em; line-height:1; margin-bottom:.18rem; }
+.notif-item-text { font-family:var(--mono); font-size:.65rem; color:var(--muted2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.notif-empty { padding:1.5rem .9rem; text-align:center; font-family:var(--mono); font-size:.7rem; color:var(--muted); letter-spacing:.08em; }
+
+/* Calendar cell with unread note */
+.cc.has-note { box-shadow:0 0 0 2px var(--gold); }
+.cc.has-note.today { box-shadow:0 0 0 2px var(--accent), inset 0 0 0 1px var(--accent); }
+
+/* Unread banner inside day view */
+.unread-banner {
+  display:flex; align-items:center; gap:.65rem;
+  background:var(--gold-bg); border:1px solid var(--gold-bdr);
+  border-radius:var(--r); padding:.65rem .9rem; margin-bottom:1.1rem;
+  animation:fade-in .25s ease;
+}
+@keyframes fade-in { from{opacity:0;} to{opacity:1;} }
+.unread-banner-icon { font-size:1rem; flex-shrink:0; }
+.unread-banner-text { font-family:var(--mono); font-size:.68rem; color:var(--gold); line-height:1.45; flex:1; }
+.unread-banner-dismiss {
+  background:none; border:none; color:var(--gold); font-size:.8rem;
+  cursor:pointer; padding:.1rem .3rem; flex-shrink:0; opacity:.7; transition:opacity .15s;
+}
+.unread-banner-dismiss:hover { opacity:1; }
+
+/* ── Mobile ──────────────────────────────────────── */
+@media(max-width:480px){
+  .app-main,.adm-main {
+    padding:.75rem .75rem 0 .75rem;
+    /* Add bottom padding for iOS home indicator + a small buffer */
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + .5rem);
+  }
+  .cc { min-height:38px; }
+  .cn { font-size:.68rem; }
+  .day-title { font-size:1.9rem; }
+  .feel-btn { font-size:1.1rem; padding:.5rem .15rem; }
+  .hd-name { display:none; }
+  .t-text { font-size:.85rem; }
+  .sec-t { font-size:.82rem; }
+  /* Prevent any horizontal overflow */
+  .screen, .app-main, .adm-main { max-width:100vw; overflow-x:hidden; }
+  /* No excess bottom margin on last elements */
+  .app-main > *:last-child,
+  .adm-main > *:last-child { margin-bottom:0; }
+  .blk-wrap:last-child { margin-bottom:0; }
+  .sub-row { margin-bottom:0; padding-bottom:0; }
+  /* Login box full width on small screens */
+  .login-box { padding:1.5rem; }
+  /* Table scrolls horizontally instead of breaking layout */
+  .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  /* Modal full width on mobile */
+  .modal { margin:.5rem; width:calc(100vw - 1rem); max-width:none; }
+  /* Notif dropdown full width */
+  .notif-drop { width:calc(100vw - 2rem); right:-.5rem; }
+  /* Buttons don't overflow */
+  .btn-save, .btn-main { width:100%; }
+  .sub-row { flex-direction:column; align-items:stretch; }
+  /* Week nav days fit on small screens */
+  .wn-day { min-width:0; }
+  /* Feel buttons full row */
+  .feel-btns { gap:.25rem; }
+  /* Screen uses full height with safe area */
+  .screen { min-height: 100dvh; }
+}
+@media(max-width:360px){
+  .wn-d { display:none; }
+  .wn-n { font-size:.72rem; }
+  .app-main,.adm-main {
+    padding:.5rem .5rem 0 .5rem;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + .25rem);
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══════════════════════════════════════ -->
+<div id="s-loading" class="screen" style="flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);">
+  <div style="font-family:var(--disp);font-size:2rem;letter-spacing:.1em;margin-bottom:1.2rem;">
+    <span style="color:var(--accent)">TRAIN</span><span style="color:var(--gold)">DERIVE</span>
+  </div>
+  <div class="spinner" style="width:28px;height:28px;margin:0 0 .8rem 0;"></div>
+  <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted2)">Loading workouts…</div>
+</div>
+
+<div id="s-login" class="screen active">
+  <div class="login-box">
+    <div class="login-logo"><span style="color:var(--accent)">TRAIN</span><span style="color:var(--gold)">DERIVE</span></div>
+    <div class="login-sub">By Frank Nguyen</div>
+    <div class="fld"><label>Email</label><input type="email" id="l-email" placeholder="athlete@example.com" autocomplete="email"></div>
+    <div class="fld"><label>Password</label><div class="pw-wrap"><input type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
+    <div class="l-err" id="l-err"></div>
+    <button class="btn-main" id="l-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-admin-link"><a href="#" onclick="showAdminLogin();return false;">Admin access →</a></div>
+  </div>
+</div>
+
+<!-- ═══ ATHLETE APP ══════════════════════════════════ -->
+<div id="s-app" class="screen">
+  <header class="app-hd">
+    <div class="hd-logo"><span style="color:var(--accent)">TRAIN</span><span style="color:var(--gold)">DERIVE</span></div>
+    <div class="hd-right">
+      <!-- Notification bell -->
+      <div style="position:relative">
+        <button class="notif-btn" id="notif-btn" onclick="toggleNotifDrop(event)" title="Coach feedback" style="display:none">
+          🔔
+          <span class="notif-badge" id="notif-badge" style="display:none"></span>
+        </button>
+        <div class="notif-drop" id="notif-drop" style="display:none">
+          <div class="notif-drop-hd">
+            <span class="notif-drop-title">Coach Feedback</span>
+            <button class="notif-mark-all" onclick="markAllNotificationsRead()">Mark all read</button>
+          </div>
+          <div class="notif-list" id="notif-list"></div>
+        </div>
+      </div>
+      <button class="acct-btn" onclick="openAccountSettings()" title="Account settings">
+        <div class="acct-avatar" id="h-avatar">A</div>
+        <span class="hd-name" id="h-name"></span>
+      </button>
+      <button class="btn-ghost" onclick="doLogout()">Sign Out</button>
+    </div>
+  </header>
+  <main class="app-main">
+
+    <!-- Calendar View -->
+    <div id="v-cal" class="view active">
+      <div id="first-login-banner" class="first-login-banner" style="display:none">
+        <div class="flb-icon">👋</div>
+        <p>Welcome! Please set a personal email and password for your account.</p>
+        <button onclick="openAccountSettings()">Set Up Account</button>
+      </div>
+      <div class="cal-nav">
+        <div class="cal-month-wrap">
+          <div class="cal-month" id="cal-month"></div>
+          <div class="cal-badge" id="cal-badge" style="display:none"></div>
+        </div>
+        <div class="cal-arrows">
+          <button class="cal-arr" onclick="shiftMonth(-1)">&#8592;</button>
+          <button class="cal-arr" onclick="shiftMonth(1)">&#8594;</button>
+        </div>
+      </div>
+      <div id="cal-body"><div class="sbox"><div class="spinner"></div><p>Loading program…</p></div></div>
+    </div>
+
+    <!-- Day View -->
+    <div id="v-day" class="view">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.9rem;">
+        <button class="back-btn" onclick="navTo('cal')" style="margin-bottom:0">&#8592; &nbsp;Calendar</button>
+        <button class="btn-sm" id="day-refresh-btn" onclick="refreshDayView()" title="Refresh programming">&#x21BA; Refresh</button>
+      </div>
+
+      <!-- Week strip with prev/next week arrows -->
+      <div class="week-nav" id="week-nav"></div>
+
+      <div class="day-hd">
+        <div class="day-title" id="d-title"></div>
+        <div class="day-sub"   id="d-sub"></div>
+      </div>
+      <div id="d-content"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══ ADMIN PANEL ══════════════════════════════════ -->
+<div id="s-admin" class="screen">
+  <header class="adm-hd">
+    <div class="adm-logo"><span style="color:var(--accent)">TRAIN</span><span style="color:var(--gold)">DERIVE</span> <span>ADMIN</span></div>
+    <div class="hd-right">
+      <span class="hd-name" id="adm-hd-name"></span>
+      <button class="btn-ghost" onclick="doAdminLogout()">Sign Out</button>
+    </div>
+  </header>
+  <main class="adm-main">
+    <div class="adm-tabs">
+      <button class="adm-tab active" onclick="switchAdmTab('users',this)">Users</button>
+      <button class="adm-tab" onclick="switchAdmTab('settings',this)">Settings</button>
+    </div>
+    <div id="adm-users" class="adm-panel active">
+      <div class="users-hd">
+        <div class="section-title">Athletes</div>
+        <button class="btn-add" onclick="openAddUser()">+ Add User</button>
+      </div>
+      <div class="table-wrap">
+        <table class="user-table">
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Spreadsheet</th><th>Last Synced</th><th></th></tr></thead>
+          <tbody id="user-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="adm-settings" class="adm-panel">
+      <div class="section-title" style="margin-bottom:1.2rem">Settings</div>
+
+      <div class="setting-row">
+        <div><div class="setting-label">Sync Users</div><div class="setting-desc">Pull latest user list from master database</div></div>
+        <button class="btn-sm" id="btn-sync-master" onclick="adminSyncMaster()">Sync Now</button>
+      </div>
+      <div class="setting-row">
+        <div><div class="setting-label">Admin Password</div><div class="setting-desc">Change the password for admin access</div></div>
+        <button class="btn-sm" onclick="openChangeAdminPass()">Change</button>
+      </div>
+      <div class="setting-row">
+        <div><div class="setting-label">Reset All Data</div><div class="setting-desc">Clear all users and restore defaults. Cannot be undone.</div></div>
+        <button class="btn-sm danger" onclick="openResetData()">Reset</button>
+      </div>
+    </div>
+
+    <!-- ── Admin User Detail View ── -->
+    <div id="adm-detail">
+      <button class="detail-back" onclick="adminCloseDetail()">&#8592; &nbsp;All Athletes</button>
+      <div class="detail-hd">
+        <div>
+          <div class="detail-name" id="detail-name"></div>
+          <div class="detail-meta" id="detail-meta"></div>
+        </div>
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+          <div class="refresh-indicator" id="detail-refresh-ind" style="display:none">
+            <div class="refresh-dot"></div><span>Auto-refresh active</span>
+          </div>
+          <button class="btn-sm" id="detail-refresh-btn" onclick="adminRefreshDetail()">&#x21BA; Refresh Data</button>
+        </div>
+      </div>
+
+      <!-- Month navigator for admin -->
+      <div class="adm-cal-nav">
+        <div class="cal-month-wrap">
+          <div class="adm-cal-month" id="detail-month-label"></div>
+        </div>
+        <div class="cal-arrows">
+          <button class="cal-arr" onclick="adminShiftMonth(-1)">&#8592;</button>
+          <button class="cal-arr" onclick="adminShiftMonth(1)">&#8594;</button>
+        </div>
+      </div>
+
+      <!-- Calendar grid -->
+      <div id="detail-body"></div>
+
+      <!-- Day detail view (shown when clicking a calendar cell) -->
+      <div id="adm-day-view">
+        <button class="adm-day-back" onclick="adminCloseDay()">&#8592; &nbsp;Calendar</button>
+        <div class="week-nav" id="adm-week-nav"></div>
+        <div class="day-hd">
+          <div class="day-title" id="adm-day-title"></div>
+          <div class="day-sub" id="adm-day-sub"></div>
+        </div>
+        <div id="adm-day-content"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══ MODALS ═══════════════════════════════════════ -->
+<div class="modal-bg" id="m-user">
+  <div class="modal">
+    <div class="modal-hd"><div class="modal-title" id="m-user-title">Add User</div><button class="modal-close" onclick="closeModal('m-user')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-err" id="m-user-err"></div>
+      <div class="fld"><label>Full Name</label><input type="text" id="m-name" placeholder="Alex Rodriguez"></div>
+      <div class="fld"><label>Email</label><input type="email" id="m-email" placeholder="athlete@example.com"></div>
+      <div class="fld"><label>Password</label><div class="pw-wrap"><input type="password" id="m-pass" placeholder="Set a password"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
+      <div class="fld"><label>Role</label><select id="m-role"><option value="athlete">Athlete</option><option value="admin">Admin</option></select></div>
+      <div class="fld">
+        <label>Google Sheets URL or ID</label>
+        <input type="text" id="m-sheet-url" placeholder="https://docs.google.com/spreadsheets/d/…" oninput="previewSheetId()">
+        <div class="url-preview" id="m-sheet-preview" style="display:none"></div>
+        <div class="form-hint">Paste the full share link or just the spreadsheet ID. Must be shared as "Anyone with the link can view". Tabs are auto-discovered.</div>
+      </div>
+      <div class="fld">
+        <label>Tab Names <span style="font-weight:400;opacity:.6">(comma-separated programming tab names)</span></label>
+        <input type="text" id="m-sheet-gid" placeholder="e.g. 2026 Training, 2027 Training">
+        <div class="form-hint">Names of the tabs that contain programming. Add new tab names here when you create them. Leave blank to auto-scan all tabs.</div>
+      </div>
+      <div class="fld">
+        <label>Data From <span style="font-weight:400;opacity:.6">(load workouts from this date)</span></label>
+        <input type="date" id="m-created-at" value="2024-01-01">
+        <div class="form-hint">Only dates on or after this will be loaded for the client. Defaults to Jan 1 2026. Set to account creation date for new athletes.</div>
+      </div>
+      <div class="fld">
+        <label>Apps Script URL <span style="font-weight:400;opacity:.6">(optional — enables result syncing)</span></label>
+        <input type="text" id="m-script-url" placeholder="https://script.google.com/macros/s/…/exec">
+        <div class="form-hint">Deploy Code.gs as a Web App in your sheet and paste the URL here.</div>
+      </div>
+      <div class="fld">
+        <label>Script Secret <span style="font-weight:400;opacity:.6">(must match BLOC_SECRET in Code.gs)</span></label>
+        <input type="text" id="m-script-secret" placeholder="your-secret-token" autocomplete="off">
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn-cancel" onclick="closeModal('m-user')">Cancel</button><button class="btn-confirm" onclick="saveUser()">Save User</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="m-delete">
+  <div class="modal">
+    <div class="modal-hd"><div class="modal-title">Delete User</div><button class="modal-close" onclick="closeModal('m-delete')">✕</button></div>
+    <div class="modal-body"><p style="font-family:var(--mono);font-size:.8rem;line-height:1.6;color:var(--muted2)">Delete <strong id="m-del-name" style="color:var(--text)"></strong>? This cannot be undone.</p></div>
+    <div class="modal-foot"><button class="btn-cancel" onclick="closeModal('m-delete')">Cancel</button><button class="btn-confirm danger-btn" onclick="confirmDelete()">Delete</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="m-adminpass">
+  <div class="modal">
+    <div class="modal-hd"><div class="modal-title">Change Admin Password</div><button class="modal-close" onclick="closeModal('m-adminpass')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-err" id="m-ap-err"></div>
+      <div class="fld"><label>Current Password</label><div class="pw-wrap"><input type="password" id="m-ap-cur"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
+      <div class="fld"><label>New Password</label><div class="pw-wrap"><input type="password" id="m-ap-new"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
+      <div class="fld"><label>Confirm New Password</label><div class="pw-wrap"><input type="password" id="m-ap-conf"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
+    </div>
+    <div class="modal-foot"><button class="btn-cancel" onclick="closeModal('m-adminpass')">Cancel</button><button class="btn-confirm" onclick="saveAdminPass()">Update</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="m-reset">
+  <div class="modal">
+    <div class="modal-hd"><div class="modal-title">Reset All Data</div><button class="modal-close" onclick="closeModal('m-reset')">✕</button></div>
+    <div class="modal-body">
+      <p style="font-family:var(--mono);font-size:.8rem;line-height:1.6;color:var(--muted2);margin-bottom:1rem">Type <strong style="color:var(--danger)">RESET</strong> to confirm. All users will be deleted.</p>
+      <div class="fld"><input type="text" id="m-reset-confirm" placeholder="Type RESET"></div>
+    </div>
+    <div class="modal-foot"><button class="btn-cancel" onclick="closeModal('m-reset')">Cancel</button><button class="btn-confirm danger-btn" onclick="confirmReset()">Reset Everything</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="m-adminlogin">
+  <div class="modal">
+    <div class="modal-hd"><div class="modal-title">Admin Access</div><button class="modal-close" onclick="closeModal('m-adminlogin')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-err" id="m-al-err"></div>
+      <div class="fld"><label>Admin Password</label><div class="pw-wrap"><input type="password" id="m-al-pass" placeholder="••••••••"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
+    </div>
+    <div class="modal-foot"><button class="btn-cancel" onclick="closeModal('m-adminlogin')">Cancel</button><button class="btn-confirm" onclick="doAdminLogin()">Enter Admin</button></div>
+  </div>
+</div>
+
+
+<!-- Account Settings Modal -->
+<div class="modal-bg" id="m-account">
+  <div class="modal">
+    <div class="modal-hd">
+      <div class="modal-title">Account Settings</div>
+      <button class="modal-close" onclick="closeModal('m-account')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-err" id="m-acct-err"></div>
+
+      <div class="modal-section-title">Profile</div>
+      <div class="fld"><label>Display Name</label><input type="text" id="acct-name" placeholder="Your name"></div>
+
+      <div class="modal-divider"></div>
+      <div class="modal-section-title">Change Email</div>
+      <div class="fld"><label>New Email</label><input type="email" id="acct-email" placeholder="new@example.com" autocomplete="off"></div>
+
+      <div class="modal-divider"></div>
+      <div class="modal-section-title">Change Password</div>
+      <div class="fld"><label>Current Password</label><div class="pw-wrap"><input type="password" id="acct-cur-pass" placeholder="Current password" autocomplete="current-password"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
+      <div class="fld"><label>New Password</label><div class="pw-wrap"><input type="password" id="acct-new-pass" placeholder="New password" autocomplete="new-password"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
+      <div class="fld"><label>Confirm New Password</label><div class="pw-wrap"><input type="password" id="acct-conf-pass" placeholder="Confirm new password" autocomplete="new-password"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
+      <div class="form-hint">Leave password fields blank to keep your current password.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeModal('m-account')">Cancel</button>
+      <button class="btn-confirm" onclick="saveAccountSettings()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DATA STORE
+// ═══════════════════════════════════════════════════════════════
+const DEFAULT_ADMIN_PASS = 'D3riv@tiv3!';
+
+// ── Master database (shared across all devices/browsers) ─────────────
+// BAKED INTO CODE — available on every device without any configuration.
+// The admin Settings panel can override these with localStorage values,
+// but these hardcoded defaults ensure every fresh device can sync.
+const _MASTER_URL_DEFAULT    = 'https://script.google.com/macros/s/AKfycbzm0ZnfSmDmXfw8PV-INT0bYOg48hp5Bci5QjYdW9pq0Kmy1Ahm0bILUOwAjD8k_cJD/exec';
+const _MASTER_SECRET_DEFAULT = 'derive-master';
+
+function getMasterUrl()    { return _MASTER_URL_DEFAULT; }
+function getMasterSecret() { return _MASTER_SECRET_DEFAULT; }
+Object.defineProperty(window, 'MASTER_SCRIPT_URL', { get: getMasterUrl });
+Object.defineProperty(window, 'MASTER_SECRET',     { get: getMasterSecret });
+const DATA_VERSION = 6;  // Bump this whenever DEFAULT_USERS changes to force localStorage refresh
+
+// ── Password hashing (SHA-256 via Web Crypto) ─────────────────────────
+async function hashPass(plain) {
+  if (!plain) return '';
+  const buf = await crypto.subtle.digest('SHA-256',
+    new TextEncoder().encode(plain));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// Hash of DEFAULT_ADMIN_PASS — pre-computed so first-run comparison works
+// If you change DEFAULT_ADMIN_PASS, update this too by running:
+//   hashPass('yourpassword').then(console.log) in the browser console
+const DEFAULT_ADMIN_HASH = '7c4f0e3e8ac7ea7b8c9b4c3a6f1e2d5e9b0f3a2c8d4e1b6a9c7f2e5d8b3a4f1c';
+
+async function getAdminHash() {
+  const stored = localStorage.getItem('bloc_admin_hash');
+  if (stored) return stored;
+  // First run — hash the default password and store it
+  const h = await hashPass(DEFAULT_ADMIN_PASS);
+  localStorage.setItem('bloc_admin_hash', h);
+  return h;
+}
+
+async function setAdminPass(plain) {
+  const h = await hashPass(plain);
+  localStorage.setItem('bloc_admin_hash', h);
+}
+const DEFAULT_USERS = [
+{
+  id:'u1', name:'Athlete Demo', email:'athlete@example.com', pass:'d3ad9315b7be5dd53b31a273b3b3aba5defe700808305aa16a3062b76658a791', role:'athlete',
+  spreadsheetId:'1fNNn_Wh3oAzU6f_Au-14n8rgkX63kvmMVQdgWWIjDVY',
+  sheetGids:{'Sheet1':'0'},
+  scriptUrl:'',
+  scriptSecret:'',
+  createdAt:'2024-01-01',
+}
+];
+
+// ── Migrate existing users: add createdAt if missing ──────────────────
+// For any user without createdAt, default to 2026-01-01 so they don't
+// re-fetch historical data they've never had access to anyway.
+function migrateUsers(users) {
+  let changed = false;
+
+  // Version check — if stored version is behind, sync DEFAULT_USERS fields into storage.
+  // This ensures code changes (scriptUrl, sheetGids, etc.) propagate to existing browsers.
+  const storedVersion = parseInt(localStorage.getItem('bloc_data_version') || '0');
+  if (storedVersion < DATA_VERSION) {
+    DEFAULT_USERS.forEach(def => {
+      const idx = users.findIndex(u => u.id === def.id);
+      if (idx >= 0) {
+        // Preserve password and email the user may have changed; update everything else
+        const pass  = users[idx].pass;
+        const email = users[idx].email;
+        users[idx] = { ...def, pass, email };
+      } else {
+        users.push({...def});
+      }
+      changed = true;
+    });
+    localStorage.setItem('bloc_data_version', String(DATA_VERSION));
+    console.log('Users synced to version', DATA_VERSION);
+  }
+
+  users.forEach(u => {
+    if (!u.createdAt) { u.createdAt = '2024-01-01'; changed = true; }
+  });
+
+  if (changed) saveUsers(users);
+  return users;
+}
+
+// Hash any plain-text passwords still in storage (migration from old format)
+// Called once after USERS is loaded. Plain passwords are short & don't look like hex.
+async function migratePasswords(users) {
+  const HEX64 = /^[0-9a-f]{64}$/;
+  let changed = false;
+  for (const u of users) {
+    if (u.pass && !HEX64.test(u.pass)) {
+      u.pass = await hashPass(u.pass);
+      changed = true;
+    }
+  }
+  if (changed) { saveUsers(users); console.log('Passwords migrated to hashed format.'); }
+}
+
+// ── User storage — master DB first, localStorage as cache ────────────
+function loadUsers() {
+  try {
+    const r = localStorage.getItem('bloc_users');
+    return r ? JSON.parse(r) : null;
+  } catch { return null; }
+}
+
+function saveUsers(users) {
+  // Always write to localStorage immediately (cache)
+  localStorage.setItem('bloc_users', JSON.stringify(users));
+  // Push to master DB in the background if configured
+  if (MASTER_SCRIPT_URL && MASTER_SECRET) {
+    pushUsersToMaster(users).catch(e => console.warn('Master DB push failed:', e.message));
+  }
+}
+
+// Awaitable version — use when you need to know the push succeeded
+async function saveUsersAndSync(users) {
+  localStorage.setItem('bloc_users', JSON.stringify(users));
+  if (MASTER_SCRIPT_URL && MASTER_SECRET) {
+    const result = await pushUsersToMaster(users);
+    if (result === false) {
+      showToast('Saved locally — master DB push failed', 'err');
+    } else if (result === true) {
+      showToast('Saved & synced to master DB', 'ok');
+    }
+    // null = no-cors fire-and-forget, assume ok
+  }
+}
+
+// Fetch users from master DB.
+// Smart merge: if master has MORE users than local → master wins.
+// If local has MORE users → push local to master first, then return local.
+// This prevents a sync from erasing users added before master was configured.
+async function syncUsersFromMaster() {
+  if (!MASTER_SCRIPT_URL || !MASTER_SECRET) return false;
+  try {
+    const url = MASTER_SCRIPT_URL + '?action=getUsers&secret=' + encodeURIComponent(MASTER_SECRET);
+    const res = await fetch(url, { redirect: 'follow' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Master DB error');
+    if (!Array.isArray(data.users)) throw new Error('Invalid users response');
+
+    const masterUsers = data.users;
+    const localUsers  = USERS || loadUsers() || [];
+
+    // Master is always the source of truth for the user list.
+    // We only add a local user to master if their EMAIL doesn't exist
+    // in master at all — email is the canonical identity, not id.
+    // This prevents duplicate accounts when a user was cached locally
+    // with a different id than the one created in the admin panel.
+    const masterEmails = new Set(masterUsers.map(u => (u.email || '').toLowerCase()));
+    const localOnly = localUsers.filter(u => {
+      const email = (u.email || '').toLowerCase();
+      // Skip DEFAULT_USERS demo account and any user already in master by email
+      if (email === 'athlete@example.com') return false;
+      return !masterEmails.has(email);
+    });
+
+    // If master is empty (no real users yet), seed it from local
+    if (masterUsers.length === 0 && localUsers.length > 0) {
+      console.log('Master DB empty — seeding from local');
+      await pushUsersToMaster(localUsers);
+      localStorage.setItem('bloc_users', JSON.stringify(localUsers));
+      return localUsers;
+    }
+
+    const merged = localOnly.length > 0 ? [...masterUsers, ...localOnly] : masterUsers;
+
+    if (localOnly.length > 0) {
+      console.log('Found', localOnly.length, 'local-only users (by email) — pushing to master');
+      await pushUsersToMaster(merged);
+    }
+
+    localStorage.setItem('bloc_users', JSON.stringify(merged));
+    console.log('Synced', merged.length, 'users from master DB');
+    return merged;
+  } catch (err) {
+    console.warn('Master DB sync failed, using local cache:', err.message);
+    return false;
+  }
+}
+
+async function pushUsersToMaster(users) {
+  if (!MASTER_SCRIPT_URL || !MASTER_SECRET) return false;
+  const payload = { secret: MASTER_SECRET, action: 'saveUsers', users };
+  const url = MASTER_SCRIPT_URL;
+
+  // Apps Script POSTs must go through a proxy — direct POST is blocked by CORS redirect
+  const proxies = [
+    'https://corsproxy.io/?url=' + encodeURIComponent(url),
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+  ];
+
+  for (const proxyUrl of proxies) {
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 12000);
+      const res = await fetch(proxyUrl, {
+        method: 'POST', signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      clearTimeout(tid);
+      if (!res.ok) continue;
+      const text = await res.text();
+      try {
+        const data = JSON.parse(text);
+        if (data.ok) {
+          console.log('Users saved to master DB via proxy:', proxyUrl.split('?')[0]);
+          return true;
+        }
+      } catch(e) {
+        // Non-JSON response but 200 — treat as success (some proxies strip JSON)
+        console.log('Users pushed to master DB (non-JSON response)');
+        return true;
+      }
+    } catch(e) {
+      console.warn('Push via proxy failed:', proxyUrl.split('?')[0], e.message);
+    }
+  }
+
+  // Last resort: no-cors fire-and-forget (can't confirm success but write still happens)
+  try {
+    fetch(url, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    console.log('Users push sent (no-cors, unconfirmed)');
+    return null; // unknown — may have worked
+  } catch(e) {}
+
+  console.error('All push attempts failed');
+  return false;
+}
+// getAdminPass / setAdminPass replaced by async getAdminHash / setAdminPass above
+
+// Load from localStorage cache immediately (synchronous, fast)
+let USERS = loadUsers() || DEFAULT_USERS;
+if (!loadUsers()) saveUsers(USERS);
+USERS = migrateUsers(USERS);
+migratePasswords(USERS);  // async — hashes any plain-text passwords
+
+// Periodic background re-sync every 5 minutes to pick up changes from other devices
+setInterval(async () => {
+  if (!getMasterUrl() || !getMasterSecret()) return;
+  const synced = await syncUsersFromMaster();
+  if (synced) {
+    USERS = migrateUsers(synced);
+    await migratePasswords(USERS);
+    const adminPanel = document.getElementById('adm-users');
+    if (adminPanel && adminPanel.classList.contains('active')) renderUserTable();
+  }
+}, 5 * 60 * 1000);
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+const S = {
+  user:null, dayMap:{}, viewMonth:new Date(),
+  selDate:null, feel:null, secResults:{},
+};
+
+// ═══════════════════════════════════════════════════════════════
+// ROUTING — History API for back-button + deep links
+// Routes: #login  #cal  #day/YYYY-MM-DD  #admin
+// ═══════════════════════════════════════════════════════════════
+function navTo(route, opts={}) {
+  const hash = opts.date ? '#day/' + opts.date : '#' + route;
+  if (window.location.hash !== hash) {
+    history.pushState({ route, ...opts }, '', hash);
+  }
+  applyRoute(route, opts);
+}
+
+function applyRoute(route, opts={}) {
+  if (route === 'cal') {
+    showScreen('s-app');
+    document.getElementById('v-cal').classList.add('active');
+    document.getElementById('v-day').classList.remove('active');
+    S.viewMonth = opts.month ? new Date(opts.month + '-01T12:00:00') : S.viewMonth;
+    renderCal();
+  } else if (route === 'day') {
+    showScreen('s-app');
+    document.getElementById('v-cal').classList.remove('active');
+    document.getElementById('v-day').classList.add('active');
+    if (opts.date) _openDay(opts.date);
+  } else if (route === 'admin') {
+    showScreen('s-admin');
+    renderUserTable();
+  } else {
+    showScreen('s-login');
+  }
+}
+
+window.addEventListener('popstate', e => {
+  if (!e.state) { parseHashAndRoute(); return; }
+  // Guard: if navigating back to app routes without a session, redirect to login
+  if ((e.state.route === 'cal' || e.state.route === 'day') && !S.user) {
+    history.replaceState({route:'login'}, '', '#login');
+    showScreen('s-login'); return;
+  }
+  applyRoute(e.state.route, e.state);
+});
+
+function restoreSession() {
+  const savedId = localStorage.getItem('bloc_session');
+  if (!savedId) return false;
+  // First try live USERS array, then fall back to cached user object
+  let user = USERS.find(u => u.id === savedId && u.role === 'athlete');
+  if (!user) {
+    try {
+      const cached = JSON.parse(localStorage.getItem('bloc_session_user') || 'null');
+      if (cached && cached.id === savedId && cached.role === 'athlete') {
+        // Re-add to USERS if missing (e.g. after reset or first load on new device)
+        if (!USERS.find(u => u.id === cached.id)) USERS.push(cached);
+        user = cached;
+      }
+    } catch(e) {}
+  }
+  if (!user) { localStorage.removeItem('bloc_session'); localStorage.removeItem('bloc_session_user'); return false; }
+  // Sync latest user data from USERS if available
+  const live = USERS.find(u => u.id === savedId);
+  if (live) user = live;
+  S.user = user;
+  document.getElementById('h-name').textContent = user.name;
+  document.getElementById('h-avatar').textContent = user.name.charAt(0).toUpperCase();
+  const banner = document.getElementById('first-login-banner');
+  if (banner) banner.style.display = user.mustChangePassword ? 'flex' : 'none';
+  updateNotifUI();
+  return true;
+}
+
+function parseHashAndRoute() {
+  const hash = window.location.hash || '';
+
+  // Admin path — restore session if previously logged in
+  if (hash === '#admin') {
+    if (localStorage.getItem('bloc_admin_session')) {
+      document.getElementById('adm-hd-name').textContent = 'Administrator';
+      applyRoute('admin');
+    } else {
+      showAdminLogin();
+    }
+    return;
+  }
+
+  // Always attempt session restore first
+  const hasSession = S.user || restoreSession();
+
+  if (hash.startsWith('#day/')) {
+    const date = hash.slice(5);
+    if (hasSession) { loadAllSheets().then(() => applyRoute('day', { date })); }
+    else showScreen('s-login');
+  } else if (hash === '#cal') {
+    if (hasSession) { loadAllSheets().then(() => applyRoute('cal')); }
+    else showScreen('s-login');
+  } else {
+    // Check for admin session first
+    if (localStorage.getItem('bloc_admin_session')) {
+      document.getElementById('adm-hd-name').textContent = 'Administrator';
+      history.replaceState({ route:'admin' }, '', '#admin');
+      applyRoute('admin');
+    } else if (hasSession) {
+      history.replaceState({ route:'cal' }, '', '#cal');
+      loadAllSheets().then(() => applyRoute('cal'));
+    } else {
+      showScreen('s-login');
+    }
+  }
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  // Always hide loading screen when any real screen is shown
+  const loadEl = document.getElementById('s-loading');
+  if (loadEl && id !== 's-loading') loadEl.classList.remove('active');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════════════
+async function doLogin() {
+  const email = document.getElementById('l-email').value.trim().toLowerCase();
+  const pass  = document.getElementById('l-pass').value;
+  const errEl = document.getElementById('l-err');
+  const passHash = await hashPass(pass);
+  const user = USERS.find(u => u.email === email && u.pass === passHash && u.role === 'athlete');
+  if (!user) { errEl.textContent = 'Invalid email or password.'; return; }
+  S.user = user;
+  localStorage.setItem('bloc_session', user.id);
+  localStorage.setItem('bloc_session_user', JSON.stringify(user));  // cache full user
+  document.getElementById('h-name').textContent = user.name;
+  document.getElementById('h-avatar').textContent = user.name.charAt(0).toUpperCase();
+  updateNotifUI();
+  history.replaceState({ route:'cal' }, '', '#cal');
+  showScreen('s-app');
+  // Show first-login banner if this is a default/temp password
+  const banner = document.getElementById('first-login-banner');
+  if (user.mustChangePassword) {
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+  loadAllSheets();
+}
+document.getElementById('l-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+function doLogout() {
+  Object.assign(S, { user:null, dayMap:{}, viewMonth:new Date(), selDate:null, feel:null, secResults:{} });
+  localStorage.removeItem('bloc_session');
+  localStorage.removeItem('bloc_session_user');
+  stopClientChangePoll();
+  document.getElementById('cal-body').innerHTML = '<div class="sbox"><div class="spinner"></div><p>Loading program…</p></div>';
+  document.getElementById('cal-badge').style.display = 'none';
+  document.getElementById('l-err').textContent = '';
+  document.getElementById('l-pass').value = '';
+  document.getElementById('v-cal').classList.add('active');
+  document.getElementById('v-day').classList.remove('active');
+  history.pushState({ route:'login' }, '', '#login');
+  showScreen('s-login');
+}
+
+function showAdminLogin() {
+  document.getElementById('m-al-pass').value = '';
+  document.getElementById('m-al-err').textContent = '';
+  openModal('m-adminlogin');
+}
+
+async function doAdminLogin() {
+  const pass = document.getElementById('m-al-pass').value;
+  const entered = await hashPass(pass);
+  const stored  = await getAdminHash();
+  if (entered !== stored) { document.getElementById('m-al-err').textContent = 'Incorrect password.'; return; }
+  closeModal('m-adminlogin');
+  document.getElementById('adm-hd-name').textContent = 'Administrator';
+  localStorage.setItem('bloc_admin_session', '1');
+  history.pushState({ route:'admin' }, '', '#admin');
+  applyRoute('admin');
+}
+document.getElementById('m-al-pass').addEventListener('keydown', e => { if(e.key==='Enter') doAdminLogin(); });
+
+function doAdminLogout() {
+  localStorage.removeItem('bloc_admin_session');
+  history.pushState({ route:'login' }, '', '#login');
+  showScreen('s-login');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN — USER TABLE
+// ═══════════════════════════════════════════════════════════════
+async function adminSyncMaster() {
+  if (!MASTER_SCRIPT_URL || !MASTER_SECRET) {
+    showToast('Master DB not configured in code', 'err'); return;
+  }
+  const btn = document.getElementById('btn-sync-master');
+  if (btn) { btn.disabled = true; btn.textContent = 'Syncing…'; }
+
+  // First push current local state up to master so nothing is lost
+  await pushUsersToMaster(USERS);
+
+  // Then pull the merged result back
+  const synced = await syncUsersFromMaster();
+  if (synced) {
+    USERS = migrateUsers(synced);
+    migratePasswords(USERS);
+    renderUserTable();
+    showToast('Synced — ' + USERS.length + ' users in master DB', 'ok');
+  } else {
+    showToast('Sync failed — check console', 'err');
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Sync Now'; }
+}
+
+function renderUserTable() {
+  const tbody = document.getElementById('user-tbody');
+  tbody.innerHTML = '';
+  USERS.forEach(u => {
+    const hasSheet = !!u.spreadsheetId;
+    const sheetUrl = hasSheet ? 'https://docs.google.com/spreadsheets/d/' + u.spreadsheetId : '';
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><div class="u-name">' + escH(u.name) + '</div></td>' +
+      '<td><div class="u-email">' + escH(u.email) + '</div></td>' +
+      '<td><span class="u-role ' + u.role + '">' + u.role + '</span></td>' +
+      '<td>' + (hasSheet
+        ? '<div class="u-sheet"><a href="' + escH(sheetUrl) + '" target="_blank" rel="noopener">' + escH(u.spreadsheetId.slice(0,24)) + '…</a></div>'
+        : '<div class="u-sheet none">No sheet linked</div>') + '</td>' +
+      '<td><div class="row-actions">' +
+        '<button class="btn-sm" onclick="adminViewUser(\'' + u.id + '\')">⛶ View</button>' +
+        '<button class="btn-sm" id="rbtn-' + u.id + '" onclick="adminRefreshUser(\'' + u.id + '\', this)">↺ Refresh</button>' +
+        '<button class="btn-sm" onclick="openEditUser(\'' + u.id + '\')" >Edit</button>' +
+        '<button class="btn-sm danger" onclick="openDeleteUser(\'' + u.id + '\')" >Delete</button>' +
+      '</div></td>';
+    tbody.appendChild(tr);
+  });
+}
+
+let editingUserId = null;
+
+function openAddUser() {
+  editingUserId = null;
+  document.getElementById('m-user-title').textContent = 'Add User';
+  ['m-name','m-email','m-pass','m-sheet-url','m-sheet-gid','m-script-url','m-script-secret'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('m-created-at').value = isoToday();  // new athletes default to today
+  document.getElementById('m-role').value = 'athlete';
+  document.getElementById('m-user-err').textContent = '';
+  document.getElementById('m-sheet-preview').style.display = 'none';
+  document.getElementById('m-pass').placeholder = 'Set a password';
+  openModal('m-user');
+}
+
+function openEditUser(id) {
+  const u = USERS.find(u => u.id === id); if (!u) return;
+  editingUserId = id;
+  document.getElementById('m-user-title').textContent = 'Edit User';
+  document.getElementById('m-name').value  = u.name;
+  document.getElementById('m-email').value = u.email;
+  document.getElementById('m-pass').value  = '';
+  document.getElementById('m-pass').placeholder = 'Leave blank to keep current';
+  document.getElementById('m-role').value  = u.role;
+  document.getElementById('m-sheet-url').value = u.spreadsheetId
+    ? 'https://docs.google.com/spreadsheets/d/' + u.spreadsheetId + '/edit' : '';
+  document.getElementById('m-script-url').value    = u.scriptUrl    || '';
+  document.getElementById('m-script-secret').value = u.scriptSecret || '';
+  document.getElementById('m-created-at').value    = u.createdAt    || '2024-01-01';
+  // Populate tab names field
+  const tabNamesArr = u.sheetTabNames || (u.sheetGids ? Object.keys(u.sheetGids) : []);
+  document.getElementById('m-sheet-gid').value = tabNamesArr.join(', ');
+  document.getElementById('m-user-err').textContent = '';
+  previewSheetId();
+  openModal('m-user');
+}
+
+function previewSheetId() {
+  const raw  = document.getElementById('m-sheet-url').value.trim();
+  const prev = document.getElementById('m-sheet-preview');
+  if (!raw) { prev.style.display='none'; return; }
+  const id = extractSheetId(raw);
+  prev.style.display = 'block';
+  prev.textContent = id ? 'ID: ' + id : 'Could not extract a valid spreadsheet ID';
+  prev.className = 'url-preview ' + (id ? 'valid' : 'invalid');
+}
+
+function extractSheetId(input) {
+  const m = input.match(/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/);
+  if (m) return m[1];
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(input.trim())) return input.trim();
+  return null;
+}
+
+async function saveUser() {
+  const errEl = document.getElementById('m-user-err'); errEl.textContent = '';
+  const name  = document.getElementById('m-name').value.trim();
+  const email = document.getElementById('m-email').value.trim().toLowerCase();
+  const passRaw = document.getElementById('m-pass').value;
+  const pass = passRaw ? await hashPass(passRaw) : null;
+  const role  = document.getElementById('m-role').value;
+  const sheetRaw = document.getElementById('m-sheet-url').value.trim();
+  if (!name)  { errEl.textContent = 'Name is required.'; return; }
+  if (!email) { errEl.textContent = 'Email is required.'; return; }
+  if (!editingUserId && !pass) { errEl.textContent = 'Password is required for new users.'; return; }
+  if (USERS.find(u => u.email === email && u.id !== editingUserId)) { errEl.textContent = 'Email already in use.'; return; }
+  const spreadsheetId = sheetRaw ? extractSheetId(sheetRaw) : '';
+  if (sheetRaw && !spreadsheetId) { errEl.textContent = 'Could not parse spreadsheet ID.'; return; }
+  if (editingUserId) {
+    const idx = USERS.findIndex(u => u.id === editingUserId); if (idx < 0) return;
+    const scriptUrl    = document.getElementById('m-script-url').value.trim();
+    const scriptSecret = document.getElementById('m-script-secret').value.trim();
+    const createdAt    = document.getElementById('m-created-at').value.trim() || '2024-01-01';
+    const tabNamesRaw  = document.getElementById('m-sheet-gid').value.trim();
+    const tabNames     = tabNamesRaw ? tabNamesRaw.split(',').map(t=>t.trim()).filter(Boolean) : null;
+    USERS[idx] = { ...USERS[idx], name, email, role,
+      spreadsheetId: spreadsheetId || USERS[idx].spreadsheetId,
+      sheetTabNames: tabNames || USERS[idx].sheetTabNames || null,
+      createdAt,
+      ...(scriptUrl    ? {scriptUrl}    : {}),
+      ...(scriptSecret ? {scriptSecret} : {}),
+      ...(pass ? {pass, mustChangePassword:true} : {}) };
+  } else {
+    const newScriptUrl    = document.getElementById('m-script-url').value.trim();
+    const newScriptSecret = document.getElementById('m-script-secret').value.trim();
+    const newTabNamesRaw = document.getElementById('m-sheet-gid').value.trim();
+    const newTabNames    = newTabNamesRaw ? newTabNamesRaw.split(',').map(t=>t.trim()).filter(Boolean) : null;
+    USERS.push({ id:'u'+Date.now(), name, email, pass, role,
+      spreadsheetId: spreadsheetId||'',
+      sheetTabNames: newTabNames,
+      scriptUrl: newScriptUrl, scriptSecret: newScriptSecret,
+      mustChangePassword: true,
+      createdAt: isoToday(),
+    });
+  }
+  saveUsersAndSync(USERS).then(()=>{ closeModal('m-user'); renderUserTable(); showToast('User saved','ok'); });
+  showToast(editingUserId ? 'User updated' : 'User added', 'ok');
+}
+
+let deleteTargetId = null;
+function openDeleteUser(id){ const u=USERS.find(u=>u.id===id); if(!u) return; deleteTargetId=id; document.getElementById('m-del-name').textContent=u.name; openModal('m-delete'); }
+function confirmDelete(){ USERS=USERS.filter(u=>u.id!==deleteTargetId); saveUsersAndSync(USERS).then(()=>{ closeModal('m-delete'); renderUserTable(); showToast('User deleted','ok'); }); }
+
+function switchAdmTab(name,btn){
+  document.querySelectorAll('.adm-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.adm-panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active'); document.getElementById('adm-'+name).classList.add('active');
+
+}
+function openChangeAdminPass(){ ['m-ap-cur','m-ap-new','m-ap-conf'].forEach(id=>document.getElementById(id).value=''); document.getElementById('m-ap-err').textContent=''; openModal('m-adminpass'); }
+async function saveAdminPass(){
+  const cur=document.getElementById('m-ap-cur').value, nw=document.getElementById('m-ap-new').value, conf=document.getElementById('m-ap-conf').value;
+  const e=document.getElementById('m-ap-err'); e.textContent='';
+  const curHash = await hashPass(cur);
+  const storedHash = await getAdminHash();
+  if(curHash!==storedHash){e.textContent='Current password incorrect.';return;}
+  if(!nw||nw.length<6){e.textContent='New password must be at least 6 characters.';return;}
+  if(nw!==conf){e.textContent='Passwords do not match.';return;}
+  await setAdminPass(nw);
+  localStorage.removeItem('bloc_admin_pass');
+  closeModal('m-adminpass'); showToast('Password updated','ok');
+}
+function openResetData(){ document.getElementById('m-reset-confirm').value=''; openModal('m-reset'); }
+function confirmReset(){
+  if(document.getElementById('m-reset-confirm').value!=='RESET'){showToast('Type RESET to confirm','err');return;}
+  USERS=[...DEFAULT_USERS]; saveUsers(USERS); localStorage.removeItem('bloc_admin_pass'); localStorage.removeItem('bloc_admin_hash');
+  closeModal('m-reset'); renderUserTable(); showToast('Data reset to defaults','ok');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SHEET LOADING
+// ═══════════════════════════════════════════════════════════════
+// ── Direct fetch via Apps Script (no proxy needed) ───────────────────────
+// When a user has a scriptUrl configured, we fetch CSV through their own
+// Apps Script instead of a public CORS proxy. This is reliable, fast,
+// and not subject to proxy blocking.
+
+async function scriptFetch(scriptUrl, secret, action, params = {}) {
+  const qs = new URLSearchParams({ action, secret, ...params }).toString();
+  const url = scriptUrl + '?' + qs;
+
+  // Apps Script web apps issue a 302 redirect to a googleusercontent.com URL.
+  // We must follow it. Try direct fetch first, then fall back to proxy which
+  // also handles the redirect transparently.
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), 20000);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal, redirect: 'follow' });
+    clearTimeout(tid);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    if (text && text.length > 0) return text;
+    throw new Error('Empty response');
+  } catch(err) {
+    clearTimeout(tid);
+    // Fall back: route the Apps Script URL through a proxy which follows
+    // the redirect server-side and returns the final content
+    console.warn('Direct script fetch failed (' + err.message + '), trying via proxy...');
+    const enc = encodeURIComponent(url);
+    const proxies = [
+      'https://corsproxy.io/?url=' + enc,
+      'https://api.allorigins.win/raw?url=' + enc,
+      'https://api.codetabs.com/v1/proxy?quest=' + enc,
+    ];
+    for (const p of proxies) {
+      try {
+        const ctrl2 = new AbortController();
+        const tid2 = setTimeout(() => ctrl2.abort(), 12000);
+        const res2 = await fetch(p, { signal: ctrl2.signal });
+        clearTimeout(tid2);
+        if (!res2.ok) continue;
+        const text2 = await res2.text();
+        if (text2 && text2.length > 0) return text2;
+      } catch(e2) { /* try next */ }
+    }
+    throw new Error('Script unreachable via direct and proxy: ' + err.message);
+  }
+}
+
+async function loadTabsViaScript(scriptUrl, secret) {
+  const text = await scriptFetch(scriptUrl, secret, 'tabs');
+  const json = JSON.parse(text);
+  if (!json.ok) throw new Error(json.error || 'tabs failed');
+  return json.tabs; // [{title, gid}, ...]
+}
+
+async function loadCSVViaScript(scriptUrl, secret, gid) {
+  return await scriptFetch(scriptUrl, secret, 'csv', { gid: String(gid) });
+}
+
+async function proxyFetch(url) {
+  const enc = encodeURIComponent(url);
+  const proxies = [
+    'https://corsproxy.io/?url=' + enc,
+    'https://api.allorigins.win/raw?url=' + enc,
+    'https://api.codetabs.com/v1/proxy?quest=' + enc,
+    'https://thingproxy.freeboard.io/fetch/' + url,
+    'https://cors.eu.org/' + url,
+    'https://proxy.cors.sh/' + url,
+  ];
+  let lastErr;
+  for (const p of proxies) {
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 8000);  // 8s timeout per proxy
+      const res = await fetch(p, { signal: ctrl.signal });
+      clearTimeout(tid);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
+      if (text.length > 10) return text;
+      throw new Error('Empty response');
+    } catch(err) {
+      lastErr = err;
+      if (err.name !== 'AbortError') {
+        console.warn('Proxy failed:', p.split('?')[0], '-', err.message);
+      }
+    }
+  }
+  throw new Error('All proxies failed: ' + (lastErr&&lastErr.message));
+}
+
+// Discover all tabs by fetching the HTML preview of the spreadsheet
+// and extracting sheet GIDs from the tab bar — works on any publicly shared sheet
+// without requiring it to be "published to web".
+async function discoverTabs(spreadsheetId) {
+  // Method: feeds API via proxy (works if sheet is published to web)
+  try {
+    const feedUrl = 'https://spreadsheets.google.com/feeds/worksheets/' + spreadsheetId + '/public/basic?alt=json';
+    const text = await proxyFetch(feedUrl);
+    const json = JSON.parse(text);
+    const tabs = (json.feed?.entry || []).map(e => {
+      const selfLink = e.link?.find(l => l.rel === 'self');
+      const gid = selfLink ? selfLink.href.split('/').pop() : null;
+      return { title: e.title?.['$t'] || 'Tab', gid };
+    }).filter(t => t.gid);
+    if (tabs.length) {
+      console.log('Feeds discovery found:', tabs.map(t=>t.title).join(', '));
+      return tabs;
+    }
+  } catch(e) { console.warn('Feeds discovery failed:', e.message); }
+  return null;
+}
+
+// Scan all GIDs that exist in a spreadsheet by trying exports
+// Returns tabs that respond with actual CSV content
+async function scanAllGids(spreadsheetId, setStatus) {
+  // Common GID patterns: 0 (first sheet always), then random large numbers
+  // We fetch the sheet's HTML to extract GIDs without needing feeds API
+  const candidateGids = ['0'];
+
+  // Try fetching the sheet HTML directly to get GIDs from the DOM
+  try {
+    const html = await proxyFetch('https://docs.google.com/spreadsheets/d/' + spreadsheetId + '/edit');
+    const gidMatches = [...html.matchAll(/"gid\\u003d([0-9]+)"/g)];
+    const gidMatches2 = [...html.matchAll(/\\"gid=([0-9]+)\\"/g)];
+    const gidMatches3 = [...html.matchAll(/sheetId.{1,5}([0-9]{5,})/g)];
+    const found = new Set(['0']);
+    for (const m of [...gidMatches, ...gidMatches2, ...gidMatches3]) found.add(m[1]);
+    if (found.size > 1) {
+      console.log('GIDs from HTML scan:', [...found].join(', '));
+      return [...found].map(g => ({ gid: g, title: 'Tab' }));
+    }
+  } catch(e) { console.warn('HTML GID scan failed:', e.message); }
+
+  return candidateGids.map(g => ({ gid: g, title: 'Sheet' }));
+}
+
+async function loadAllSheets() {
+  const { spreadsheetId, sheetGids, sheetTabNames } = S.user;
+  S.dayMap = {};
+
+  if (!spreadsheetId) {
+    document.getElementById('cal-body').innerHTML =
+      '<div class="sbox"><p class="e">No spreadsheet linked.</p><p>Contact your coach.</p></div>';
+    navTo('cal'); return;
+  }
+
+  const setStatus = msg => {
+    document.getElementById('cal-body').innerHTML =
+      '<div class="sbox"><div class="spinner"></div><p>' + escH(msg) + '</p></div>';
+  };
+
+  const cutoff = S.user.createdAt || null;
+  setStatus('Loading your program…');
+
+  try {
+    // ── Strategy 1: fetch by tab NAME (most reliable, GID-independent) ──
+    // If the admin has specified tab names, fetch each one directly by name.
+    // Google Sheets export supports ?sheet=TabName which always works on
+    // publicly shared sheets regardless of GID.
+    const tabNames = sheetTabNames && sheetTabNames.length ? sheetTabNames : null;
+
+    if (tabNames) {
+      console.log('Fetching by tab names:', tabNames.join(', '));
+      await Promise.all(tabNames.map(async tabName => {
+        try {
+          const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
+                      '/export?format=csv&sheet=' + encodeURIComponent(tabName);
+          const csv = await proxyFetch(url);
+          if (csvHasTrainingBlock(csv)) {
+            parseSheetCSV(csv, tabName, cutoff);
+            console.log('Parsed by name:', tabName, '— days:', Object.keys(S.dayMap).length);
+          } else {
+            console.log('Skipped (no Training row):', tabName);
+          }
+        } catch(err) { console.warn('Tab by name failed:', tabName, err.message); }
+      }));
+
+      // If we got data, done
+      if (Object.keys(S.dayMap).length > 0) { _finishLoad(); return; }
+      console.warn('Named tabs returned no data, falling back to GID scan');
+    }
+
+    // ── Strategy 2: discover tabs via feeds API (requires published sheet) ──
+    let tabs = await discoverTabs(spreadsheetId);
+
+    // ── Strategy 3: use stored sheetGids as fallback ──────────────────────
+    if (!tabs || !tabs.length) {
+      if (sheetGids && Object.keys(sheetGids).length) {
+        tabs = Object.entries(sheetGids).map(([title, gid]) => ({ title, gid }));
+        console.log('Using stored sheetGids:', tabs.map(t=>t.title).join(', '));
+      }
+    }
+
+    // ── Strategy 4: blind scan of first sheet (gid=0) ────────────────────
+    if (!tabs || !tabs.length) {
+      tabs = [{ title: 'Sheet', gid: '0' }];
+    }
+
+    setStatus('Loading ' + tabs.length + ' tab' + (tabs.length !== 1 ? 's' : '') + '…');
+
+    await Promise.all(tabs.map(async ({ title, gid }) => {
+      try {
+        const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
+                    '/export?format=csv&gid=' + gid;
+        const csv = await proxyFetch(url);
+        if (csvHasTrainingBlock(csv)) {
+          parseSheetCSV(csv, title, cutoff);
+          console.log('Parsed by GID:', title, gid);
+        } else {
+          console.log('Skipped:', title);
+        }
+      } catch(err) { console.warn('Tab failed:', title, err.message); }
+    }));
+
+    _finishLoad();
+
+  } catch(err) {
+    console.error('loadAllSheets error:', err);
+    document.getElementById('cal-body').innerHTML =
+      '<div class="sbox"><p class="e">' + escH(err.message) + '</p>' +
+      '<p style="margin-bottom:.8rem">Make sure the sheet is shared as “Anyone with the link can view”.</p>' +
+      '<button class="btn-sm" onclick="loadAllSheets()">Retry</button></div>';
+    navTo('cal');
+  }
+
+  function _finishLoad() {
+    console.log('Load complete. Total days:', Object.keys(S.dayMap).length);
+    window._clientLastLoaded = Date.now();
+    startClientChangePoll();
+    initNotificationsFromDayMap();
+    const todayISO = isoToday();
+    if (S.dayMap[todayISO] && !S.dayMap[todayISO].isRestDay) {
+      // Today has training — go straight to it
+      navTo('day', { date: todayISO });
+    } else {
+      // Find the nearest training day (look forward up to 7 days, then backward)
+      let found = null;
+      for (let i = 1; i <= 7 && !found; i++) {
+        const d = new Date(todayISO + 'T12:00:00');
+        d.setDate(d.getDate() + i);
+        const iso = isoFmt(d);
+        if (S.dayMap[iso] && !S.dayMap[iso].isRestDay) found = iso;
+      }
+      if (!found) {
+        for (let i = 1; i <= 7 && !found; i++) {
+          const d = new Date(todayISO + 'T12:00:00');
+          d.setDate(d.getDate() - i);
+          const iso = isoFmt(d);
+          if (S.dayMap[iso] && !S.dayMap[iso].isRestDay) found = iso;
+        }
+      }
+      if (found) {
+        navTo('day', { date: found });
+      } else {
+        // No training days near today — show calendar at most recent month
+        const dates = Object.keys(S.dayMap).sort();
+        if (dates.length) {
+          const d = new Date(dates[dates.length - 1] + 'T12:00:00');
+          S.viewMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+        }
+        navTo('cal');
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CSV + PARSERS
+// ═══════════════════════════════════════════════════════════════
+// ── Date header pattern ───────────────────────────────────────────────────
+// A valid date header must match one of these forms (case-insensitive):
+//   Mon, 03-16    Tue, 03/16    Wed 03-16    03-16    03/16
+//   Mon, 3-16     3/16          Mon,03-16
+// It must NOT match arbitrary text like "Notes", "Week Total", "1-2 sets", etc.
+// The strict allowlist regex is the ONLY gate — sheetDateToISO is only called
+// after a cell passes this check, so no non-date content ever gets parsed.
+const DATE_HEADER_RE = /^(?:[a-z]{2,3},?\s*)?\d{1,2}[-\/]\d{1,2}$/i;
+
+function isDateHeader(s) {
+  if (!s) return false;
+  const trimmed = s.trim();
+  // Must match the allowlist pattern
+  if (!DATE_HEADER_RE.test(trimmed)) return false;
+  // Extract the MM-DD part and validate the numbers are calendar-plausible
+  const numPart = trimmed.replace(/^[a-z]{2,3},?\s*/i, '');
+  const parts   = numPart.split(/[-\/]/);
+  const month   = parseInt(parts[0], 10);
+  const day     = parseInt(parts[1], 10);
+  return month >= 1 && month <= 12 && day >= 1 && day <= 31;
+}
+
+// Quick check: does this CSV contain at least one Training row?
+// Used to skip utility/template tabs without doing a full parse.
+function csvHasTrainingBlock(csv) {
+  // Matches sheets with explicit "Training" label OR sheets where a row
+  // has multiple date headers (Duda-style sheets with blank col A)
+  if (/^training[,\r\n]/im.test(csv)) return true;
+  // Check for a row with 2+ date-like headers (Mon, 03-16 pattern)
+  return (csv.match(/(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s*\d{1,2}-\d{1,2}/gi) || []).length >= 2;
+}
+
+// Detect if a row is a "date row" — has 2+ valid date headers across its columns
+function isDateRow(row) {
+  let count = 0;
+  for (let i = 0; i < row.length; i++) {
+    if (isDateHeader((row[i]||'').trim())) count++;
+    if (count >= 2) return true;
+  }
+  return false;
+}
+
+// cutoff: ISO date string (e.g. '2024-01-01') — days before this are skipped.
+// Pass null/undefined to load everything (admin view).
+function parseSheetCSV(csv, tabName, cutoff) {
+  const rows = parseCSV(csv);
+
+  // ── Strategy 1: explicit "Training" label in col A (Allison-style) ──
+  const trainingRows = [];
+  for (let i = 0; i < rows.length; i++) {
+    if (/^training$/i.test((rows[i][0]||'').trim())) trainingRows.push(i);
+  }
+
+  // ── Strategy 2: date-row detection (Duda-style — blank col A) ──────
+  // Find rows with 2+ date headers, treat the row below as training
+  // and the row 2 below as results.
+  const dateRows = [];
+  for (let i = 0; i < rows.length; i++) {
+    if (isDateRow(rows[i])) dateRows.push(i);
+  }
+
+  // Build a unified list of {dateRowIdx, trainingRowIdx, resultsRowIdx, feelRowIdx}
+  const blocks = [];
+
+  // From explicit Training labels
+  for (const tIdx of trainingRows) {
+    const resultsRow = rows[tIdx+1]||[];
+    const colA = (resultsRow[0]||'').trim();
+    // Accept "Results" in col A, OR blank col A (Duda-style)
+    if (/^results$/i.test(colA) || colA === '') {
+      blocks.push({ dateRowIdx: tIdx-1, trainingRowIdx: tIdx, resultsRowIdx: tIdx+1, feelRowIdx: tIdx+2 });
+    }
+  }
+
+  // From date rows (only add if not already covered by a Training label)
+  for (const dIdx of dateRows) {
+    const alreadyCovered = blocks.some(b => b.dateRowIdx === dIdx);
+    if (!alreadyCovered) {
+      blocks.push({ dateRowIdx: dIdx, trainingRowIdx: dIdx+1, resultsRowIdx: dIdx+2, feelRowIdx: dIdx+3 });
+    }
+  }
+
+  // ── Parse each block ────────────────────────────────────────────────
+  for (const { dateRowIdx, trainingRowIdx, resultsRowIdx, feelRowIdx } of blocks) {
+    const dateRow    = rows[dateRowIdx]    || [];
+    const trainingRow= rows[trainingRowIdx]|| [];
+    const resultsRow = rows[resultsRowIdx] || [];
+    const feelRow    = rows[feelRowIdx]    || [];
+
+    for (let col = 0; col < dateRow.length; col++) {
+      const dateStr = (dateRow[col]||'').trim();
+      if (!isDateHeader(dateStr)) continue;
+      const isoDate = sheetDateToISO(dateStr, tabName);
+      if (!isoDate) continue;
+      if (cutoff && isoDate < cutoff) continue;
+
+      const rawTraining = (trainingRow[col]||'').trim();
+      const rawResults  = (resultsRow[col]||'').trim();
+      const feel        = (feelRow[col]||'').trim();
+
+      // Skip if this date already exists with more data
+      if (S.dayMap[isoDate] && !S.dayMap[isoDate].isRestDay && !rawTraining) continue;
+
+      S.dayMap[isoDate] = {
+        isoDate, dateStr, tabName,
+        colIndex: col,
+        resultsRowIdx: resultsRowIdx,
+        isRestDay: !rawTraining,
+        blocks: rawTraining ? parseTrainingBlocks(rawTraining) : [],
+        results: rawResults ? parseResultSections(rawResults) : [],
+        feel
+      };
+    }
+  }
+}
+
+function sheetDateToISO(s, tabHint) {
+  if (!s) return null;
+  const dowMatch = s.match(/^([a-z]{2,3}),?\s*/i);
+  const dowStr   = dowMatch ? dowMatch[1].toLowerCase() : null;
+  const clean    = s.replace(/^[a-z]+,?\s*/i,'').trim();
+  const m        = clean.match(/^(\d{1,2})[-\/](\d{1,2})$/);
+  if (!m) return null;
+  const month=parseInt(m[1],10), day=parseInt(m[2],10);
+  if(month<1||month>12||day<1||day>31) return null;
+  if (tabHint) { const yt=tabHint.match(/\b(20\d{2})\b/); if(yt){ const y=parseInt(yt[1],10),d=new Date(y,month-1,day); if(d.getMonth()===month-1) return y+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0'); } }
+  const DOW={sun:0,mon:1,tue:2,wed:3,thu:4,fri:5,sat:6};
+  const thisYear=new Date().getFullYear(), candidates=[thisYear-1,thisYear,thisYear+1,thisYear-2,thisYear+2];
+  if (dowStr&&DOW[dowStr]!==undefined) {
+    for (const y of candidates) { const d=new Date(y,month-1,day); if(d.getMonth()===month-1&&d.getDay()===DOW[dowStr]) return y+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0'); }
+  }
+  let bestYear=thisYear,bestDiff=Infinity; const now=new Date();
+  for(const y of candidates){ const d=new Date(y,month-1,day); if(d.getMonth()!==month-1) continue; const diff=Math.abs(now-d); if(diff<bestDiff){bestDiff=diff;bestYear=y;} }
+  return bestYear+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+}
+
+function parseTrainingBlocks(raw) {
+  const DIVIDER=/^_{5,}$/,SECTION=/^\+\s*$/,NAMES=['AM','PM'];
+  const lines=raw.split('\n'),blocks=[];
+  let bIdx=0,cur={label:NAMES[0],sections:[]},sec=[];
+  const flushSec=()=>{const t=sec.join('\n').trim();if(t)cur.sections.push(t);sec=[];};
+  const flushBlock=()=>{flushSec();if(cur.sections.length)blocks.push(cur);};
+  for(const line of lines){const t=line.trim();if(DIVIDER.test(t)){flushBlock();bIdx++;cur={label:NAMES[bIdx]||'Block '+(bIdx+1),sections:[]};}else if(SECTION.test(t)){flushSec();}else{sec.push(line);}}
+  flushBlock();
+  if(blocks.length===1&&blocks[0].label==='AM')blocks[0].label='Training';
+  return blocks;
+}
+
+function parseResultSections(raw) {
+  const SECTION=/^\+\s*$/,lines=raw.split('\n'),secs=[];
+  let cur=[],idx=0;
+  const flush=()=>{const t=cur.join('\n').trim();if(t)secs.push({label:toAlpha(idx),content:t});idx++;cur=[];};
+  for(const line of lines){if(SECTION.test(line.trim()))flush();else cur.push(line);}
+  flush(); return secs;
+}
+
+function parseCSV(text) {
+  const rows=[];let row=[],field='',inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i],n=text[i+1];
+    if(inQ){if(c==='"'&&n==='"'){field+='"';i++;}else if(c==='"'){inQ=false;}else{field+=c;}}
+    else{if(c==='"'){inQ=true;}else if(c===','){row.push(field);field='';}else if(c==='\r'&&n==='\n'){row.push(field);rows.push(row);row=[];field='';i++;}else if(c==='\n'||c==='\r'){row.push(field);rows.push(row);row=[];field='';}else{field+=c;}}
+  }
+  if(field||row.length){row.push(field);rows.push(row);}return rows;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CALENDAR
+// ═══════════════════════════════════════════════════════════════
+function renderCal() {
+  const d=S.viewMonth,year=d.getFullYear(),month=d.getMonth(),today=isoToday();
+  document.getElementById('cal-month').textContent=d.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const tabs=[...new Set(Object.values(S.dayMap).map(v=>v.tabName))];
+  const badge=document.getElementById('cal-badge');
+  if(tabs.length){badge.textContent=tabs[0];badge.style.display='';}else{badge.style.display='none';}
+  const first=new Date(year,month,1).getDay(),numDays=new Date(year,month+1,0).getDate();
+  let h='<div class="cal-dow-row">'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>'<div class="cal-dow">'+d+'</div>').join('')+'</div><div class="cal-grid">';
+  for(let i=0;i<first;i++) h+='<div class="cc emp"></div>';
+  for(let day=1;day<=numDays;day++){
+    const iso=year+'-'+String(month+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+    const data=S.dayMap[iso],isToday=iso===today;
+    let cls='cc',dot='',click='';
+    if(data){if(data.isRestDay){cls+=' is-rest';}else{cls+=' has-w';dot='<div class="cdot"></div>';click='onclick="navTo(\'day\',{date:\''+iso+'\'})"';}}
+    if(isToday)cls+=' today';
+    if(S.user&&data&&!data.isRestDay){const _dc=loadComments(S.user.id,iso);const _hu=Object.keys(_dc).some(function(i){return isCommentUnread(S.user.id,iso,parseInt(i));});if(_hu)cls+=' has-note';}
+    h+='<div class="'+cls+'" '+click+'>'+dot+'<div class="cn">'+day+'</div></div>';
+  }
+  h+='</div><div class="cal-legend"><div class="leg"><div class="lsw" style="background:var(--training);border:1px solid var(--train-bdr)"></div>Training</div><div class="leg"><div class="lsw" style="background:var(--surf);border:1px solid var(--border)"></div>Rest</div><div class="leg"><div class="lsw" style="border:1px solid var(--accent);background:transparent"></div>Today</div></div>';
+  document.getElementById('cal-body').innerHTML=h;
+}
+
+function shiftMonth(dir){const d=S.viewMonth;S.viewMonth=new Date(d.getFullYear(),d.getMonth()+dir,1);renderCal();}
+
+// ═══════════════════════════════════════════════════════════════
+// WEEK STRIP NAV
+// Shows Sun–Sat of the selected date's week; arrows shift week
+// ═══════════════════════════════════════════════════════════════
+function renderWeekNav(selISO) {
+  const sel   = new Date(selISO + 'T12:00:00');
+  const dow   = sel.getDay(); // 0=Sun
+  // Start of week (Sunday)
+  const weekStart = new Date(sel); weekStart.setDate(sel.getDate() - dow);
+  const today = isoToday();
+  const DAY_LABELS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  let inner = '<button class="wn-arr" onclick="shiftWeek(\'' + selISO + '\',-1)">&#8592;</button><div class="wn-days">';
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
+    const iso = isoFmt(d);
+    const data = S.dayMap[iso];
+    let cls = 'wn-day';
+    if (iso === selISO) cls += ' active';
+    else if (data && !data.isRestDay) cls += ' has-w';
+    if (iso === today) cls += ' is-today';
+    const clickable = data && !data.isRestDay && iso !== selISO;
+    const click = clickable ? 'onclick="navTo(\'day\',{date:\'' + iso + '\'})"' : '';
+    inner += '<div class="' + cls + '" ' + click + '>';
+    inner += '<div class="wn-d">' + DAY_LABELS[i] + '</div>';
+    inner += '<div class="wn-n">' + d.getDate() + '</div>';
+    inner += '</div>';
+  }
+  inner += '</div><button class="wn-arr" onclick="shiftWeek(\'' + selISO + '\',1)">&#8594;</button>';
+  document.getElementById('week-nav').innerHTML = inner;
+}
+
+function shiftWeek(fromISO, dir) {
+  const d = new Date(fromISO + 'T12:00:00');
+  d.setDate(d.getDate() + dir * 7);
+  const newISO = isoFmt(d);
+  // Find nearest training day in the new week
+  const weekStart = new Date(d); weekStart.setDate(d.getDate() - d.getDay());
+  for (let i = 0; i < 7; i++) {
+    const candidate = new Date(weekStart); candidate.setDate(weekStart.getDate() + i);
+    const iso = isoFmt(candidate);
+    if (S.dayMap[iso] && !S.dayMap[iso].isRestDay) {
+      navTo('day', { date: iso }); return;
+    }
+  }
+  // No training day found in that week — just navigate to the same weekday
+  navTo('day', { date: newISO });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DAY VIEW
+// ═══════════════════════════════════════════════════════════════
+function _openDay(iso) {
+  const day = S.dayMap[iso];
+  S.selDate = iso;
+  S.feel = day?.feel ? parseFloat(day.feel) : null;
+  S.secResults = {};
+  if (day?.results?.length) day.results.forEach((r,i)=>{ if(r.content) S.secResults[i]=r.content; });
+  // Restore any unsaved draft from localStorage (survives refresh)
+  const draft = loadDraft(iso);
+  if (draft) {
+    if (draft.secResults) Object.assign(S.secResults, draft.secResults);
+    if (draft.feel && !S.feel) S.feel = draft.feel;
+  }
+
+  const dateObj = new Date(iso + 'T12:00:00');
+  document.getElementById('d-title').textContent = dateObj.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  document.getElementById('d-sub').textContent = day
+    ? day.tabName + '  ·  ' + (day.isRestDay ? 'Rest Day' : 'Training Day')
+    : 'No programming for this date';
+
+  // Sync calendar month to match this date
+  S.viewMonth = new Date(dateObj.getFullYear(), dateObj.getMonth(), 1);
+
+  renderWeekNav(iso);
+  renderDayContent(day);
+  window.scrollTo(0, 0);
+}
+
+function renderDayContent(day) {
+  const el = document.getElementById('d-content'); el.innerHTML = '';
+  if (!day || day.isRestDay) {
+    el.innerHTML = '<div class="rest-card"><div class="ri">🌿</div><h2>Rest Day</h2><p>Recovery is part of the program.</p></div>'; return;
+  }
+  if (day.results?.length && day.results.some(r=>r.content)) {
+    const b=document.createElement('div'); b.className='logged-badge'; b.innerHTML='✓ &nbsp;Results logged'; el.appendChild(b);
+  }
+  let gIdx = 0;
+  day.blocks.forEach(block => {
+    const bw=document.createElement('div'); bw.className='blk-wrap';
+    const bl=document.createElement('div'); bl.className='blk-lbl';
+    bl.dataset.block=block.label; bl.textContent=block.label; bw.appendChild(bl);
+    // Sections container — bordered for AM/PM, plain for Training
+    const sc=document.createElement('div');
+    sc.className='blk-sections';
+    if(block.label==='AM'||block.label==='PM') sc.dataset.block=block.label;
+    let bSecIdx=0;
+    block.sections.forEach(t=>{ sc.appendChild(buildSecCard(t,gIdx,block.label,bSecIdx)); gIdx++; bSecIdx++; });
+    bw.appendChild(sc);
+    el.appendChild(bw);
+  });
+  const fd=document.createElement('div'); fd.className='feel-wrap';
+  fd.innerHTML='<div class="feel-lbl">How did you feel today?</div><div class="feel-btns">'+
+    [1,2,3,4,5].map(n=>'<button class="feel-btn'+(S.feel===n?' sel':'')+'" data-v="'+n+'" onclick="pickFeel('+n+')">'+n+'</button>').join('')+
+    '</div><div class="feel-ends"><span class="feel-end">Rough</span><span class="feel-end">Great</span></div>';
+  el.appendChild(fd);
+  const sr=document.createElement('div'); sr.className='sub-row';
+  sr.innerHTML='<button class="btn-save" onclick="saveResults()">Save Results</button><span class="save-st" id="save-st"></span>';
+  el.appendChild(sr);
+
+  // Inject any coach notes left by admin
+  requestAnimationFrame(() => {
+    injectCoachNotes(day, el, gIdx);
+    renderUnreadBanner(day, el);
+  });
+}
+
+function buildSecCard(text, idx, blockLabel, secIdx) {
+  const card=document.createElement('div'); card.className='sec-card';
+  // data-block and data-si drive CSS color palette
+  card.dataset.block = blockLabel || 'Training';
+  card.dataset.si    = String((secIdx !== undefined ? secIdx : idx) % 8);
+  const lines=text.trim().split('\n'), title=lines[0].trim();
+  const hd=document.createElement('div'); hd.className='sec-hd';
+  hd.innerHTML='<span class="sec-n">'+toAlpha(idx)+'</span><span class="sec-t">'+escH(title)+'</span><span class="sec-ch">▼</span>';
+  hd.addEventListener('click',()=>card.classList.toggle('open'));
+  const body=document.createElement('div'); body.className='sec-body';
+  const pre=document.createElement('div'); pre.className='t-text'; pre.innerHTML=linkify(escH(text));
+  const rl=document.createElement('div'); rl.className='res-lbl'; rl.textContent='Your Results';
+  const ta=document.createElement('textarea'); ta.className='res-ta';
+  ta.placeholder='Log weights, reps, times, notes…'; ta.value=S.secResults[idx]||'';
+
+  // Per-section save status indicator
+  const secSt=document.createElement('div'); secSt.className='sec-save-st';
+
+  // Auto-save: debounce 1.5s after user stops typing
+  let _autoTimer=null;
+  ta.addEventListener('input', e => {
+    S.secResults[idx] = e.target.value;
+    clearTimeout(_autoTimer);
+    secSt.textContent='Unsaved…'; secSt.className='sec-save-st saving';
+    _autoTimer = setTimeout(() => autoSaveSection(idx, secSt), 1500);
+  });
+
+  body.appendChild(pre); body.appendChild(rl); body.appendChild(ta);
+  body.appendChild(secSt);
+  card.appendChild(hd); card.appendChild(body);
+  if(idx===0||S.secResults[idx]) card.classList.add('open');
+  return card;
+}
+
+function pickFeel(n){
+  S.feel=n;
+  document.querySelectorAll('.feel-btn').forEach(b=>b.classList.toggle('sel',parseInt(b.dataset.v)===n));
+  // Auto-save immediately when feel is picked + persist draft
+  if (S.selDate) saveDraft(S.selDate);
+  autoSaveAll(true);
+}
+
+// Draft persistence keys
+function draftKey(userId, isoDate) { return 'bloc_draft_' + userId + '_' + isoDate; }
+
+function saveDraft(isoDate) {
+  if (!S.user) return;
+  const draft = { secResults: S.secResults, feel: S.feel };
+  localStorage.setItem(draftKey(S.user.id, isoDate), JSON.stringify(draft));
+}
+
+function loadDraft(isoDate) {
+  if (!S.user) return null;
+  try { return JSON.parse(localStorage.getItem(draftKey(S.user.id, isoDate)) || 'null'); }
+  catch { return null; }
+}
+
+function clearDraft(isoDate) {
+  if (!S.user) return;
+  localStorage.removeItem(draftKey(S.user.id, isoDate));
+}
+
+// Auto-save a single section result locally + sync to sheet
+async function autoSaveSection(sectionIdx, statusEl) {
+  const day = S.dayMap[S.selDate]; if (!day) return;
+  // Update local state
+  day.results = day.results || [];
+  const totalSecs = day.blocks.reduce((n,b)=>n+b.sections.length, 0);
+  while (day.results.length < totalSecs) day.results.push({label:'',content:''});
+  day.results[sectionIdx] = { label:toAlpha(sectionIdx), content: S.secResults[sectionIdx]||'' };
+
+  // Persist draft to localStorage so refresh doesn't lose it
+  saveDraft(S.selDate);
+
+  if (statusEl) { statusEl.textContent='Saved \u2713'; statusEl.className='sec-save-st ok'; }
+
+  // Update logged badge
+  const loggedBadge = document.querySelector('.logged-badge');
+  const anyContent = Object.values(S.secResults).some(v=>v&&v.trim());
+  if (anyContent && !loggedBadge) {
+    const b=document.createElement('div'); b.className='logged-badge';
+    b.innerHTML='\u2713 &nbsp;Results logged';
+    const cont=document.getElementById('d-content');
+    if (cont) cont.insertBefore(b, cont.firstChild);
+  }
+
+  // Sync to sheet — same full path as the main Save button
+  if (statusEl) { statusEl.textContent='Syncing…'; statusEl.className='sec-save-st saving'; }
+  const synced = await autoSaveAll(true);
+  if (statusEl) {
+    statusEl.textContent = synced === false ? 'Saved locally' : 'Synced ✓';
+    statusEl.className = 'sec-save-st ok';
+  }
+}
+
+// Auto-save all sections (used by feel pick and main save button)
+async function autoSaveAll(silent=false) {
+  const day=S.dayMap[S.selDate]; if(!day) return false;
+  const totalSecs=day.blocks.reduce((n,b)=>n+b.sections.length,0);
+  const secArr=Array.from({length:totalSecs},(_,i)=>S.secResults[i]||'');
+  day.feel=String(S.feel||'');
+  day.results=secArr.map((c,i)=>({label:toAlpha(i),content:c}));
+  saveDraft(S.selDate);
+
+  if (!silent) {
+    const stEl=document.getElementById('save-st');
+    if (stEl) { stEl.textContent='Saving…'; stEl.className='save-st'; }
+  }
+
+  const scriptUrl    = S.user.scriptUrl    || '';
+  const scriptSecret = S.user.scriptSecret || '';
+  if (!scriptUrl) {
+    if (!silent) {
+      const stEl=document.getElementById('save-st');
+      if (stEl) { stEl.textContent='Saved ✓'; stEl.className='save-st ok'; }
+    }
+    return null; // no script — local only
+  }
+
+  const payload = {
+    secret: scriptSecret, sheetName: day.tabName,
+    resultsRowIdx: day.resultsRowIdx, colIndex: day.colIndex,
+    sectionResults: secArr, feel: S.feel,
+  };
+
+  const proxies = [
+    'https://corsproxy.io/?url=' + encodeURIComponent(scriptUrl),
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(scriptUrl),
+  ];
+
+  for (const proxyUrl of proxies) {
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 12000);
+      const res = await fetch(proxyUrl, {
+        method:'POST', signal: ctrl.signal,
+        headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+      });
+      clearTimeout(tid);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data.ok) {
+        if (!silent) {
+          const stEl=document.getElementById('save-st');
+          if (stEl) { stEl.textContent='Synced ✓'; stEl.className='save-st ok'; }
+        }
+        return true;
+      }
+    } catch(e) { /* try next proxy */ }
+  }
+
+  // Last resort: no-cors fire-and-forget
+  try {
+    fetch(scriptUrl,{method:'POST',mode:'no-cors',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(()=>{});
+  } catch(e){}
+  if (!silent) {
+    const stEl=document.getElementById('save-st');
+    if (stEl) { stEl.textContent='Saved ✓'; stEl.className='save-st ok'; }
+  }
+  return null;
+}
+
+async function saveResults(){
+  const stEl=document.getElementById('save-st');
+  stEl.textContent='Saving\u2026'; stEl.className='save-st';
+  await autoSaveAll(false);
+  if (S.selDate) clearDraft(S.selDate);
+  showToast('Results saved!','ok');
+  renderCal();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════
+function isoToday(){ const n=new Date(); return isoFmt(n); }
+function togglePw(btn) {
+  const input = btn.previousElementSibling;
+  const show  = input.type === 'password';
+  input.type  = show ? 'text' : 'password';
+  btn.textContent = show ? '🙈' : '👁';
+}
+function toAlpha(i){
+  // 0→A, 1→B, ..., 25→Z, 26→AA, 27→AB ...
+  let s='', n=i;
+  do { s=String.fromCharCode(65+(n%26))+s; n=Math.floor(n/26)-1; } while(n>=0);
+  return s;
+}
+function isoFmt(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function escH(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function linkify(html){ return html.replace(/(https?:\/\/[^\s"<>]+)/g,'<a href="$1" target="_blank" rel="noopener">▶ Watch video</a>'); }
+function showToast(msg,type=''){
+  const t=document.getElementById('toast'); t.textContent=msg; t.className='toast '+type+' show';
+  setTimeout(()=>{t.className='toast '+type;},2800);
+}
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-bg').forEach(bg=>{
+  bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.remove('open');});
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+// ACCOUNT SETTINGS
+// ═══════════════════════════════════════════════════════════════
+function openAccountSettings() {
+  const u = S.user; if (!u) return;
+  document.getElementById('acct-name').value     = u.name;
+  document.getElementById('acct-email').value    = u.email;
+  document.getElementById('acct-cur-pass').value = '';
+  document.getElementById('acct-new-pass').value = '';
+  document.getElementById('acct-conf-pass').value= '';
+  document.getElementById('m-acct-err').textContent = '';
+  openModal('m-account');
+}
+
+async function saveAccountSettings() {
+  const errEl   = document.getElementById('m-acct-err');
+  errEl.textContent = '';
+
+  const newName  = document.getElementById('acct-name').value.trim();
+  const newEmail = document.getElementById('acct-email').value.trim().toLowerCase();
+  const curPass  = document.getElementById('acct-cur-pass').value;
+  const newPass  = document.getElementById('acct-new-pass').value;
+  const confPass = document.getElementById('acct-conf-pass').value;
+
+  if (!newName)  { errEl.textContent = 'Name cannot be empty.'; return; }
+  if (!newEmail) { errEl.textContent = 'Email cannot be empty.'; return; }
+
+  // Email format check
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(newEmail)) {
+    errEl.textContent = 'Please enter a valid email address.'; return;
+  }
+
+  // Check email not taken by another user
+  const conflict = USERS.find(u => u.email === newEmail && u.id !== S.user.id);
+  if (conflict) { errEl.textContent = 'That email is already in use.'; return; }
+
+  // Password change requested?
+  const changingPassword = newPass || curPass || confPass;
+  if (changingPassword) {
+    if (!curPass) { errEl.textContent = 'Enter your current password to set a new one.'; return; }
+    const curHash = await hashPass(curPass);
+    if (curHash !== S.user.pass) { errEl.textContent = 'Current password is incorrect.'; return; }
+    if (!newPass) { errEl.textContent = 'New password cannot be empty.'; return; }
+    if (newPass.length < 6) { errEl.textContent = 'New password must be at least 6 characters.'; return; }
+    if (newPass !== confPass) { errEl.textContent = 'New passwords do not match.'; return; }
+  }
+
+  // Apply changes to USERS array
+  const idx = USERS.findIndex(u => u.id === S.user.id);
+  if (idx < 0) { errEl.textContent = 'User not found.'; return; }
+
+  const updated = {
+    ...USERS[idx],
+    name:  newName,
+    email: newEmail,
+    mustChangePassword: false,
+    ...(changingPassword ? { pass: await hashPass(newPass) } : {}),
+  };
+
+  USERS[idx] = updated;
+  S.user = updated;
+  saveUsers(USERS);
+
+  // Update header
+  document.getElementById('h-name').textContent = updated.name;
+  document.getElementById('h-avatar').textContent = updated.name.charAt(0).toUpperCase();
+
+  // Hide first-login banner
+  document.getElementById('first-login-banner').style.display = 'none';
+
+  closeModal('m-account');
+  showToast('Account updated', 'ok');
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN — PER-USER REFRESH + AUTO-REFRESH
+// ═══════════════════════════════════════════════════════════════
+
+// Cache of loaded day maps per user: { userId: { dayMap, loadedAt } }
+const ADM = {
+  cache: {},
+  detailUserId: null,
+  detailMonth: new Date(),
+  autoRefreshTimers: {},   // userId → intervalId
+};
+
+const AUTO_REFRESH_MS   = 60 * 60 * 1000; // 1 hour full re-fetch
+const POLL_INTERVAL_MS  = 5  * 60 * 1000; // 5 min change-check
+const ADM_POLL_TIMERS   = {};              // userId -> pollIntervalId
+
+function formatSyncTime(ts) {
+  if (!ts) return '<span style="color:var(--muted);font-style:italic">Never</span>';
+  const d = new Date(ts);
+  const now = new Date();
+  const diff = Math.floor((now - d) / 1000);
+  if (diff < 60)  return '<span class="fresh">Just now</span>';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+}
+
+async function adminRefreshUser(userId, btn) {
+  const u = USERS.find(u => u.id === userId);
+  if (!u || !u.spreadsheetId) { showToast('No spreadsheet linked', 'err'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = '\u21BA Loading\u2026'; }
+  try {
+    const dayMap = await loadUserSheets(u);
+    ADM.cache[userId] = { dayMap, loadedAt: Date.now() };
+    // Update last-synced timestamp on user
+    const idx = USERS.findIndex(u => u.id === userId);
+    if (idx >= 0) { USERS[idx].lastSynced = Date.now(); saveUsers(USERS); }
+    // Update sync cell in table
+    const syncEl = document.getElementById('sync-' + userId);
+    if (syncEl) syncEl.innerHTML = '<span class="fresh">Just now</span>';
+    // If this user is currently open in detail, re-render
+    if (ADM.detailUserId === userId) renderDetailBody();
+    showToast('Refreshed: ' + u.name, 'ok');
+  } catch(err) {
+    showToast('Refresh failed: ' + err.message, 'err');
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '\u21BA Refresh'; }
+}
+
+function startAutoRefresh(userId) {
+  stopAutoRefresh(userId);
+  // Full re-fetch every hour
+  ADM.autoRefreshTimers[userId] = setInterval(() => {
+    const btn = document.getElementById('rbtn-' + userId);
+    adminRefreshUser(userId, btn);
+  }, AUTO_REFRESH_MS);
+  // Poll for sheet changes every 5 min
+  startChangePoll(userId);
+}
+
+function stopAutoRefresh(userId) {
+  if (ADM.autoRefreshTimers[userId]) {
+    clearInterval(ADM.autoRefreshTimers[userId]);
+    delete ADM.autoRefreshTimers[userId];
+  }
+  stopChangePoll(userId);
+}
+
+// ── Change polling: GETs the script URL every 5 min ──────────────
+// The Apps Script doGet() returns a lastChanged timestamp.
+// If it's newer than our last load, we trigger a refresh.
+function startChangePoll(userId) {
+  stopChangePoll(userId);
+  const u = USERS.find(u => u.id === userId);
+  if (!u || !u.scriptUrl) return;
+  ADM_POLL_TIMERS[userId] = setInterval(() => pollForChanges(userId), POLL_INTERVAL_MS);
+  // Also do an immediate check
+  pollForChanges(userId);
+}
+
+function stopChangePoll(userId) {
+  if (ADM_POLL_TIMERS[userId]) {
+    clearInterval(ADM_POLL_TIMERS[userId]);
+    delete ADM_POLL_TIMERS[userId];
+  }
+}
+
+async function pollForChanges(userId) {
+  const u = USERS.find(u => u.id === userId);
+  if (!u || !u.scriptUrl) return;
+  try {
+    const enc = encodeURIComponent(u.scriptUrl);
+    const res = await fetch('https://corsproxy.io/?url=' + enc);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.ok || !data.lastChanged) return;
+    const cached = ADM.cache[userId];
+    // If sheet changed after our last load, trigger a refresh
+    if (cached && data.lastChanged > cached.loadedAt) {
+      console.log('Sheet change detected for', u.name, '- refreshing');
+      const btn = document.getElementById('rbtn-' + userId);
+      adminRefreshUser(userId, btn);
+    }
+  } catch(err) { /* silent — polling failures are non-critical */ }
+}
+
+// Also poll for the ATHLETE's own sheet on the client side
+// Checks every 5 min while logged in; re-fetches if sheet changed
+function startClientChangePoll() {
+  if (!S.user || !S.user.scriptUrl) return;
+  stopClientChangePoll();
+  window._clientPollTimer = setInterval(async () => {
+    if (!S.user || !S.user.scriptUrl) return;
+    try {
+      const enc = encodeURIComponent(S.user.scriptUrl);
+      const res = await fetch('https://corsproxy.io/?url=' + enc);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.ok || !data.lastChanged) return;
+      if (!window._clientLastLoaded) return;
+      if (data.lastChanged > window._clientLastLoaded) {
+        console.log('Sheet updated by coach - refreshing client view');
+        window._clientLastLoaded = Date.now();
+        // Re-fetch sheets silently and re-render current view
+        const savedDate = S.selDate;
+        await loadAllSheets();
+        if (savedDate && S.dayMap[savedDate]) {
+          _openDay(savedDate);
+        }
+      }
+    } catch(err) { /* silent */ }
+  }, POLL_INTERVAL_MS);
+}
+
+function stopClientChangePoll() {
+  if (window._clientPollTimer) {
+    clearInterval(window._clientPollTimer);
+    delete window._clientPollTimer;
+  }
+}
+
+// Load all sheets for any user (reuses proxyFetch + parsers)
+async function loadUserSheets(u) {
+  const dayMap = {};
+  if (!u.spreadsheetId) return dayMap;
+
+  const sid = u.spreadsheetId;
+
+  // Strategy 1: fetch by tab name (same as client path — GID-independent)
+  const tabNames = u.sheetTabNames && u.sheetTabNames.length ? u.sheetTabNames : null;
+  if (tabNames) {
+    await Promise.all(tabNames.map(async tabName => {
+      try {
+        const url = 'https://docs.google.com/spreadsheets/d/' + sid +
+                    '/export?format=csv&sheet=' + encodeURIComponent(tabName);
+        const csv = await proxyFetch(url);
+        if (!csvHasTrainingBlock(csv)) return;
+        const savedMap = S.dayMap; S.dayMap = dayMap;
+        parseSheetCSV(csv, tabName, null);
+        S.dayMap = savedMap;
+      } catch(e) { console.warn('Admin tab by name failed:', tabName, e.message); }
+    }));
+    if (Object.keys(dayMap).length) return dayMap;
+  }
+
+  // Strategy 2: feeds API discovery
+  let tabs = await discoverTabs(sid);
+
+  // Strategy 3: stored sheetGids fallback
+  if (!tabs || !tabs.length) {
+    const gids = u.sheetGids || {};
+    if (Object.keys(gids).length) {
+      tabs = Object.entries(gids).map(([title,gid]) => ({title,gid}));
+    } else {
+      tabs = [{ title: 'Sheet', gid: '0' }];
+    }
+  }
+
+  await Promise.all(tabs.map(async ({title, gid}) => {
+    try {
+      const url = 'https://docs.google.com/spreadsheets/d/' + sid +
+                  '/export?format=csv&gid=' + gid;
+      const csv = await proxyFetch(url);
+      if (!csvHasTrainingBlock(csv)) return;
+      const savedMap = S.dayMap; S.dayMap = dayMap;
+      parseSheetCSV(csv, title, null);
+      S.dayMap = savedMap;
+    } catch(err) { console.warn('Admin tab failed:', title, err.message); }
+  }));
+  return dayMap;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN — USER DETAIL VIEW
+// ═══════════════════════════════════════════════════════════════
+async function adminViewUser(userId) {
+  const u = USERS.find(u => u.id === userId);
+  if (!u) return;
+  ADM.detailUserId = userId;
+
+  // Show detail panel, hide tabs
+  document.querySelectorAll('.adm-tab, .adm-panel').forEach(el => el.classList.remove('active'));
+  document.getElementById('adm-detail').style.display = 'block';
+
+  document.getElementById('detail-name').textContent = u.name;
+  document.getElementById('detail-meta').textContent = u.email + (u.spreadsheetId ? '  ·  ' + u.spreadsheetId.slice(0,20) + '…' : '');
+
+  // Show auto-refresh indicator
+  const ind = document.getElementById('detail-refresh-ind');
+  ind.style.display = u.spreadsheetId ? 'flex' : 'none';
+
+  // Load data if not cached
+  if (!ADM.cache[userId]) {
+    document.getElementById('detail-body').innerHTML = '<div class="sbox"><div class="spinner"></div><p>Loading ' + escH(u.name) + '\'s program\u2026</p></div>';
+    try {
+      const dayMap = await loadUserSheets(u);
+      ADM.cache[userId] = { dayMap, loadedAt: Date.now() };
+      // Start auto-refresh
+      if (u.spreadsheetId) startAutoRefresh(userId);
+    } catch(err) {
+      document.getElementById('detail-body').innerHTML = '<div class="sbox"><p class="e">Failed to load: ' + escH(err.message) + '</p></div>';
+      return;
+    }
+  }
+
+  // Always open at current month
+  ADM.detailMonth = new Date();
+
+  renderDetailBody();
+}
+
+function adminCloseDetail() {
+  document.getElementById('adm-detail').style.display = 'none';
+  ADM.detailUserId = null;
+  // Re-show users tab
+  document.querySelector('.adm-tab').classList.add('active');
+  document.getElementById('adm-users').classList.add('active');
+}
+
+function adminShiftMonth(dir) {
+  ADM.detailMonth = new Date(ADM.detailMonth.getFullYear(), ADM.detailMonth.getMonth() + dir, 1);
+  renderDetailBody();
+}
+
+async function adminRefreshDetail() {
+  if (!ADM.detailUserId) return;
+  const btn = document.getElementById('detail-refresh-btn');
+  btn.textContent = 'Loading\u2026'; btn.disabled = true;
+  const u = USERS.find(u => u.id === ADM.detailUserId);
+  if (u) {
+    try {
+      const dayMap = await loadUserSheets(u);
+      ADM.cache[ADM.detailUserId] = { dayMap, loadedAt: Date.now() };
+      renderDetailBody();
+      showToast('Data refreshed', 'ok');
+    } catch(err) { showToast('Refresh failed', 'err'); }
+  }
+  btn.textContent = '\u21BA Refresh Data'; btn.disabled = false;
+}
+
+// ── Admin calendar view ──────────────────────────────────────────────────
+function renderDetailBody() {
+  if (!ADM.detailUserId) return;
+  const dm = ADM.cache[ADM.detailUserId]?.dayMap || {};
+  const d = ADM.detailMonth, year = d.getFullYear(), month = d.getMonth();
+  const today = isoToday();
+
+  document.getElementById('detail-month-label').textContent =
+    d.toLocaleDateString('en-US', {month:'long', year:'numeric'});
+
+  // Hide day view, show calendar
+  document.getElementById('adm-day-view').classList.remove('active');
+  document.getElementById('detail-body').style.display = '';
+
+  const first = new Date(year, month, 1).getDay();
+  const numDays = new Date(year, month+1, 0).getDate();
+
+  let h = '<div class="cal-dow-row">' +
+    ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>'<div class="cal-dow">'+d+'</div>').join('') +
+    '</div><div class="cal-grid">';
+
+  for (let i = 0; i < first; i++) h += '<div class="cc emp"></div>';
+
+  for (let day = 1; day <= numDays; day++) {
+    const iso = year+'-'+String(month+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+    const data = dm[iso];
+    const isToday = iso === today;
+    const hasResults = data && data.results && data.results.some(r=>r.content);
+    const comments = data ? loadComments(ADM.detailUserId, iso) : {};
+    const hasComment = Object.values(comments).some(c=>c&&c.trim());
+
+    let cls = 'cc';
+    let dot = '';
+    let click = '';
+
+    if (data) {
+      if (data.isRestDay) {
+        cls += ' is-rest';
+      } else {
+        cls += ' has-w';
+        // Result dot — gold if logged, accent if not
+        dot = '<div class="cdot" style="background:' + (hasResults ? 'var(--gold)' : 'var(--accent)') + '"></div>';
+        click = 'onclick="adminOpenDay(\'' + iso + '\')"';
+        // Comment indicator
+        if (hasComment) dot += '<div class="cdot" style="background:var(--gold);width:3px;height:3px;margin-top:1px"></div>';
+      }
+    }
+    if (isToday) cls += ' today';
+
+    h += '<div class="' + cls + '" ' + click + '>' + dot + '<div class="cn">' + day + '</div></div>';
+  }
+
+  h += '</div>';
+  // Legend
+  h += '<div class="cal-legend">' +
+    '<div class="leg"><div class="lsw" style="background:var(--training);border:1px solid var(--train-bdr)"></div>Training</div>' +
+    '<div class="leg"><div class="lsw" style="background:var(--surf);border:1px solid var(--border)"></div>Rest</div>' +
+    '<div class="leg"><div style="width:6px;height:6px;border-radius:50%;background:var(--gold);display:inline-block;margin-right:4px"></div>Results logged</div>' +
+    '<div class="leg"><div style="width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:4px"></div>No results yet</div>' +
+    '</div>';
+
+  document.getElementById('detail-body').innerHTML = h;
+}
+
+// ── Admin day view ────────────────────────────────────────────────────────
+function adminOpenDay(iso) {
+  const dm = ADM.cache[ADM.detailUserId]?.dayMap || {};
+  const day = dm[iso];
+  if (!day || day.isRestDay) return;
+
+  ADM.selDate = iso;
+
+  // Hide calendar, show day view
+  document.getElementById('detail-body').style.display = 'none';
+  document.getElementById('adm-day-view').classList.add('active');
+
+  const dateObj = new Date(iso + 'T12:00:00');
+  document.getElementById('adm-day-title').textContent =
+    dateObj.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
+  document.getElementById('adm-day-sub').textContent =
+    day.tabName + '  ·  Training Day';
+
+  // Render week strip (same as client)
+  adminRenderWeekNav(iso);
+
+  // Render programming + results + comment boxes
+  adminRenderDayContent(day);
+
+  document.getElementById('adm-day-view').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function adminCloseDay() {
+  document.getElementById('adm-day-view').classList.remove('active');
+  document.getElementById('detail-body').style.display = '';
+}
+
+function adminRenderWeekNav(selISO) {
+  const dm = ADM.cache[ADM.detailUserId]?.dayMap || {};
+  const sel = new Date(selISO + 'T12:00:00');
+  const dow = sel.getDay();
+  const weekStart = new Date(sel); weekStart.setDate(sel.getDate() - dow);
+  const today = isoToday();
+  const DAY_LABELS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  let inner = '<button class="wn-arr" onclick="adminShiftWeek(\'' + selISO + '\',-1)">&#8592;</button><div class="wn-days">';
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart); d.setDate(weekStart.getDate() + i);
+    const iso = isoFmt(d);
+    const data = dm[iso];
+    let cls = 'wn-day';
+    if (iso === selISO) cls += ' active';
+    else if (data && !data.isRestDay) cls += ' has-w';
+    if (iso === today) cls += ' is-today';
+    const clickable = data && !data.isRestDay && iso !== selISO;
+    const click = clickable ? 'onclick="adminOpenDay(\'' + iso + '\')"' : '';
+    inner += '<div class="' + cls + '" ' + click + '>';
+    inner += '<div class="wn-d">' + DAY_LABELS[i] + '</div>';
+    inner += '<div class="wn-n">' + d.getDate() + '</div>';
+    inner += '</div>';
+  }
+  inner += '</div><button class="wn-arr" onclick="adminShiftWeek(\'' + selISO + '\',1)">&#8594;</button>';
+  document.getElementById('adm-week-nav').innerHTML = inner;
+}
+
+function adminShiftWeek(fromISO, dir) {
+  const dm = ADM.cache[ADM.detailUserId]?.dayMap || {};
+  const d = new Date(fromISO + 'T12:00:00');
+  d.setDate(d.getDate() + dir * 7);
+  const weekStart = new Date(d); weekStart.setDate(d.getDate() - d.getDay());
+  for (let i = 0; i < 7; i++) {
+    const candidate = new Date(weekStart); candidate.setDate(weekStart.getDate() + i);
+    const iso = isoFmt(candidate);
+    if (dm[iso] && !dm[iso].isRestDay) { adminOpenDay(iso); return; }
+  }
+  adminOpenDay(isoFmt(d));
+}
+
+function adminRenderDayContent(day) {
+  const el = document.getElementById('adm-day-content');
+  el.innerHTML = '';
+  if (!day || day.isRestDay) {
+    el.innerHTML = '<div class="rest-card"><div class="ri">🌿</div><h2>Rest Day</h2></div>';
+    return;
+  }
+
+  const hasResults = day.results && day.results.some(r=>r.content);
+  if (hasResults) {
+    const b = document.createElement('div');
+    b.className = 'logged-badge';
+    b.innerHTML = '✓ &nbsp;Results logged';
+    el.appendChild(b);
+  }
+
+  let gIdx = 0;
+  let bSecIdx = 0;
+  day.blocks.forEach(block => {
+    const bw = document.createElement('div'); bw.className = 'blk-wrap';
+    const bl = document.createElement('div'); bl.className = 'blk-lbl';
+    bl.dataset.block = block.label; bl.textContent = block.label; bw.appendChild(bl);
+    const sc = document.createElement('div');
+    sc.className = 'blk-sections';
+    if (block.label === 'AM' || block.label === 'PM') sc.dataset.block = block.label;
+    bSecIdx = 0;
+    block.sections.forEach(secText => {
+      sc.appendChild(adminBuildSecCard(secText, gIdx, block.label, bSecIdx, day));
+      gIdx++; bSecIdx++;
+    });
+    bw.appendChild(sc);
+    el.appendChild(bw);
+  });
+}
+
+function adminBuildSecCard(text, idx, blockLabel, secIdx, day) {
+  const card = document.createElement('div');
+  card.className = 'sec-card';
+  card.dataset.block = blockLabel || 'Training';
+  card.dataset.si = String(secIdx % 8);
+
+  const lines = text.trim().split('\n');
+  const title = lines[0].trim();
+
+  const hd = document.createElement('div'); hd.className = 'sec-hd';
+  hd.innerHTML = '<span class="sec-n">' + toAlpha(idx) + '</span>' +
+    '<span class="sec-t">' + escH(title) + '</span><span class="sec-ch">▼</span>';
+  hd.addEventListener('click', () => card.classList.toggle('open'));
+
+  const body = document.createElement('div'); body.className = 'sec-body';
+
+  // Training text
+  const pre = document.createElement('div'); pre.className = 't-text';
+  pre.innerHTML = linkify(escH(text));
+  body.appendChild(pre);
+
+  // Client result (read-only)
+  const result = day.results && day.results[idx];
+  const resBox = document.createElement('div'); resBox.className = 'adm-result-box';
+  if (result && result.content) {
+    resBox.innerHTML = '<div class="adm-result-label">Client Result</div>' +
+      '<div class="adm-result-text">' + escH(result.content) + '</div>';
+  } else {
+    resBox.innerHTML = '<div class="adm-no-result">No result logged yet</div>';
+  }
+  body.appendChild(resBox);
+
+  // Coach comment box
+  const comments = loadComments(ADM.detailUserId, day.isoDate);
+  const commentKey = day.isoDate + '-' + idx;
+  const existingComment = comments[idx] || '';
+  const commentWrap = document.createElement('div');
+  commentWrap.className = 'coach-comment-wrap';
+  commentWrap.innerHTML =
+    '<div class="coach-comment-label">💬 Coach Note</div>' +
+    '<textarea class="coach-comment-ta" id="cc-' + ADM.detailUserId + '-' + commentKey + '" ' +
+    'placeholder="Leave feedback for this section…">' + escH(existingComment) + '</textarea>' +
+    '<div class="comment-save-row">' +
+    '<button class="btn-comment-save" onclick="saveComment(\'' + ADM.detailUserId + '\',\'' + day.isoDate + '\',' + idx + ')">Save Note</button>' +
+    '<span class="comment-save-st" id="cst-' + ADM.detailUserId + '-' + commentKey + '"></span>' +
+    '</div>';
+  body.appendChild(commentWrap);
+
+  card.appendChild(hd);
+  card.appendChild(body);
+
+  // Auto-open first section or sections with results/comments
+  if (idx === 0 || (result && result.content) || existingComment) card.classList.add('open');
+  return card;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COACH COMMENTS — stored in localStorage per user+date+section
+// ═══════════════════════════════════════════════════════════════
+function commentKey(userId, isoDate) {
+  return 'bloc_comments_' + userId + '_' + isoDate;
+}
+
+function loadComments(userId, isoDate) {
+  try { return JSON.parse(localStorage.getItem(commentKey(userId, isoDate)) || '{}'); } catch { return {}; }
+}
+
+function saveComment(userId, isoDate, sectionIdx) {
+  const taId = 'cc-' + userId + '-' + isoDate + '-' + sectionIdx;
+  const stId = 'cst-' + userId + '-' + isoDate + '-' + sectionIdx;
+  const ta = document.getElementById(taId);
+  const st = document.getElementById(stId);
+  if (!ta || !st) return;
+
+  const text = ta.value.trim();
+  const comments = loadComments(userId, isoDate);
+  if (text) { comments[sectionIdx] = text; } else { delete comments[sectionIdx]; }
+  localStorage.setItem(commentKey(userId, isoDate), JSON.stringify(comments));
+
+  st.textContent = 'Saved \u2713'; st.className = 'comment-save-st ok';
+  setTimeout(() => { st.textContent = ''; st.className = 'comment-save-st'; }, 2500);
+  showToast('Coach note saved', 'ok');
+  // Mark as unread for the athlete so they get notified
+  if (text) { markCommentUnread(userId, isoDate, sectionIdx); }
+  else       { markCommentRead(userId, isoDate, sectionIdx); }
+  updateNotifUI();
+
+  // Also sync to sheet if the user has Apps Script configured
+  const u = USERS.find(u => u.id === userId);
+  if (u && u.scriptUrl) {
+    const dm = ADM.cache[userId]?.dayMap;
+    const day = dm && dm[isoDate];
+    if (day) syncCommentToSheet(u, day, sectionIdx, text);
+  }
+}
+
+// Push coach comment to sheet via Apps Script.
+// The script appends it to the same Results cell as the athlete's
+// results, formatted as red italic "COACH FEEDBACK: ..." text.
+// We pass the full combined comment for all sections of this day.
+async function syncCommentToSheet(u, day, sectionIdx, comment) {
+  // Build the full coach note for this day by reading all saved
+  // section comments and combining them into one string.
+  const allComments = loadComments(u.id, day.isoDate);
+  // Update the in-memory map with the latest value before building
+  if (comment) { allComments[sectionIdx] = comment; }
+  else          { delete allComments[sectionIdx]; }
+
+  // Combine all section comments into one block:
+  // "Section 1: ... / Section 2: ..." etc.
+  const totalSecs = day.blocks.reduce((n,b) => n + b.sections.length, 0);
+  const parts = [];
+  for (let i = 0; i < totalSecs; i++) {
+    if (allComments[i] && allComments[i].trim()) {
+      parts.push('Section ' + (i + 1) + ': ' + allComments[i].trim());
+    }
+  }
+  const combinedComment = parts.join('\n');
+
+  const payload = {
+    secret:        u.scriptSecret || '',
+    action:        'comment',
+    sheetName:     day.tabName,
+    resultsRowIdx: day.resultsRowIdx,
+    colIndex:      day.colIndex,
+    comment:       combinedComment,
+  };
+
+  try {
+    const enc = encodeURIComponent(u.scriptUrl);
+    const res = await fetch('https://corsproxy.io/?url=' + enc, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+  } catch(err) {
+    // Fire-and-forget fallback
+    fetch(u.scriptUrl, {method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)}).catch(()=>{});
+  }
+}
+
+// Show coach notes on the CLIENT side (injected into day view)
+// Notes appear inside the section body, clearly labelled.
+function injectCoachNotes(day, container, totalSections) {
+  if (!S.user) return;
+  const comments = loadComments(S.user.id, day.isoDate);
+  if (!Object.keys(comments).length) return;
+
+  const secCards = container.querySelectorAll('.sec-card');
+  secCards.forEach((card, idx) => {
+    const comment = comments[idx];
+    if (!comment || !comment.trim()) return;
+    // Open the card so the note is visible
+    card.classList.add('open');
+    const noteDiv = document.createElement('div');
+    noteDiv.className = 'coach-note';
+    noteDiv.innerHTML =
+      '<div class="coach-note-label">&#x1F4AC; Coach Feedback</div>' +
+      '<div class="coach-note-text">' + escH(comment.trim()) + '</div>';
+    const secBody = card.querySelector('.sec-body');
+    if (secBody) secBody.appendChild(noteDiv);
+
+    // Mark as read when this section's header is clicked
+    const hd = card.querySelector('.sec-hd');
+    if (hd) {
+      hd.addEventListener('click', () => {
+        markSectionRead(day.isoDate, idx);
+      }, { once: true });
+    }
+    // Also mark read immediately if card is already open
+    if (card.classList.contains('open')) {
+      markSectionRead(day.isoDate, idx);
+    }
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// NOTIFICATION SYSTEM
+// Tracks unread coach comments per athlete.
+// Storage keys:
+//   bloc_notif_{userId}_{isoDate}_{sectionIdx} → 'unread' | 'read'
+// ═══════════════════════════════════════════════════════════════
+
+function notifKey(userId, isoDate, sectionIdx) {
+  return 'bloc_notif_' + userId + '_' + isoDate + '_' + sectionIdx;
+}
+
+// Mark a coach comment as unread (called when admin saves a note)
+function markCommentUnread(userId, isoDate, sectionIdx) {
+  localStorage.setItem(notifKey(userId, isoDate, sectionIdx), 'unread');
+}
+
+// Mark one notification as read
+function markCommentRead(userId, isoDate, sectionIdx) {
+  localStorage.setItem(notifKey(userId, isoDate, sectionIdx), 'read');
+}
+
+// Mark ALL unread comments for a user as read
+function markAllNotificationsRead() {
+  if (!S.user) return;
+  const prefix = 'bloc_notif_' + S.user.id + '_';
+  const keys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(prefix)) keys.push(k);
+  }
+  keys.forEach(k => localStorage.setItem(k, 'read'));
+  updateNotifUI();
+  closeNotifDrop();
+  showToast('All feedback marked as read', 'ok');
+}
+
+// Check if a specific note is unread
+function isCommentUnread(userId, isoDate, sectionIdx) {
+  return localStorage.getItem(notifKey(userId, isoDate, sectionIdx)) === 'unread';
+}
+
+// Get all unread notifications for the current user, sorted newest first
+function getUnreadNotifications() {
+  if (!S.user) return [];
+  const prefix = 'bloc_notif_' + S.user.id + '_';
+  const unread = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith(prefix)) continue;
+    // Key format: bloc_notif_{userId}_{isoDate}_{sectionIdx}
+    const parts = k.slice(prefix.length).split('_');
+    if (parts.length < 2) continue;
+    const isoDate    = parts[0];
+    const sectionIdx = parseInt(parts[1]);
+    const state      = localStorage.getItem(k);
+    const comment    = loadComments(S.user.id, isoDate)[sectionIdx] || '';
+    if (comment) unread.push({ isoDate, sectionIdx, state, comment });
+  }
+  // Sort newest date first
+  return unread.sort((a,b) => b.isoDate.localeCompare(a.isoDate));
+}
+
+// Rebuild the bell badge + dropdown list
+function updateNotifUI() {
+  if (!S.user) return;
+  const all    = getUnreadNotifications();
+  const unread = all.filter(n => n.state === 'unread');
+
+  // Bell visibility
+  const btn   = document.getElementById('notif-btn');
+  const badge = document.getElementById('notif-badge');
+  if (!btn) return;
+
+  if (all.length === 0) {
+    btn.style.display = 'none';
+    closeNotifDrop();
+    return;
+  }
+  btn.style.display = 'flex';
+
+  // Badge count
+  if (unread.length > 0) {
+    badge.textContent = unread.length > 9 ? '9+' : String(unread.length);
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+
+  // Rebuild dropdown list
+  const list = document.getElementById('notif-list');
+  if (!list) return;
+  list.innerHTML = '';
+
+  if (all.length === 0) {
+    list.innerHTML = '<div class="notif-empty">No coach feedback yet</div>';
+    return;
+  }
+
+  all.forEach(n => {
+    const dateObj  = new Date(n.isoDate + 'T12:00:00');
+    const dateLabel = dateObj.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+    const preview   = n.comment.length > 60 ? n.comment.slice(0,60) + '…' : n.comment;
+    const isRead    = n.state === 'read';
+
+    const item = document.createElement('div');
+    item.className = 'notif-item' + (isRead ? ' read' : '');
+    item.innerHTML =
+      '<div class="notif-dot"></div>' +
+      '<div class="notif-item-body">' +
+        '<div class="notif-item-date">' + escH(dateLabel) + '</div>' +
+        '<div class="notif-item-text">Section ' + (n.sectionIdx + 1) + ': ' + escH(preview) + '</div>' +
+      '</div>';
+
+    item.addEventListener('click', () => {
+      markCommentRead(S.user.id, n.isoDate, n.sectionIdx);
+      updateNotifUI();
+      closeNotifDrop();
+      // Navigate to that day
+      navTo('day', { date: n.isoDate });
+    });
+    list.appendChild(item);
+  });
+}
+
+// Toggle dropdown open/close
+function toggleNotifDrop(e) {
+  e.stopPropagation();
+  const drop = document.getElementById('notif-drop');
+  if (!drop) return;
+  const isOpen = drop.style.display !== 'none';
+  if (isOpen) { closeNotifDrop(); }
+  else {
+    updateNotifUI(); // refresh list
+    drop.style.display = 'block';
+  }
+}
+
+function closeNotifDrop() {
+  const drop = document.getElementById('notif-drop');
+  if (drop) drop.style.display = 'none';
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', e => {
+  const drop = document.getElementById('notif-drop');
+  const btn  = document.getElementById('notif-btn');
+  if (drop && btn && !btn.contains(e.target) && !drop.contains(e.target)) {
+    closeNotifDrop();
+  }
+});
+
+// Scan dayMap and mark any days with coach notes as having notifications
+// (called after sheets load — creates unread entries if not already tracked)
+function initNotificationsFromDayMap() {
+  if (!S.user) return;
+  const userId = S.user.id;
+  Object.values(S.dayMap).forEach(day => {
+    if (!day || day.isRestDay) return;
+    const comments = loadComments(userId, day.isoDate);
+    Object.entries(comments).forEach(([idx, comment]) => {
+      if (!comment || !comment.trim()) return;
+      const key = notifKey(userId, day.isoDate, parseInt(idx));
+      // Only set to unread if never tracked before
+      if (!localStorage.getItem(key)) {
+        localStorage.setItem(key, 'unread');
+      }
+    });
+  });
+  updateNotifUI();
+}
+
+// Show unread banner at top of day view if this day has unread notes
+function renderUnreadBanner(day, container) {
+  if (!S.user || !day) return;
+  const comments = loadComments(S.user.id, day.isoDate);
+  const unreadSections = Object.keys(comments).filter(idx =>
+    comments[idx] && isCommentUnread(S.user.id, day.isoDate, parseInt(idx))
+  );
+  if (!unreadSections.length) return;
+
+  const count  = unreadSections.length;
+  const banner = document.createElement('div');
+  banner.className = 'unread-banner';
+  banner.id = 'unread-banner-' + day.isoDate;
+  banner.innerHTML =
+    '<div class="unread-banner-icon">💬</div>' +
+    '<div class="unread-banner-text">Your coach left ' +
+      (count === 1 ? 'a new note' : count + ' new notes') +
+      ' — scroll down to review.</div>' +
+    '<button class="unread-banner-dismiss" onclick="dismissUnreadBanner(\'' + day.isoDate + '\')" title="Dismiss">✕</button>';
+
+  // Insert at the top of day content
+  container.insertBefore(banner, container.firstChild);
+}
+
+function dismissUnreadBanner(isoDate) {
+  if (!S.user) return;
+  // Mark all sections for this day as read
+  const comments = loadComments(S.user.id, isoDate);
+  Object.keys(comments).forEach(idx => {
+    markCommentRead(S.user.id, isoDate, parseInt(idx));
+  });
+  const banner = document.getElementById('unread-banner-' + isoDate);
+  if (banner) banner.remove();
+  updateNotifUI();
+}
+
+// Mark a single section's note as read when its card is opened
+function markSectionRead(isoDate, sectionIdx) {
+  if (!S.user) return;
+  if (!isCommentUnread(S.user.id, isoDate, sectionIdx)) return;
+  markCommentRead(S.user.id, isoDate, sectionIdx);
+  // If all sections for this day are now read, remove the banner
+  const comments = loadComments(S.user.id, isoDate);
+  const anyUnread = Object.keys(comments).some(idx =>
+    isCommentUnread(S.user.id, isoDate, parseInt(idx))
+  );
+  if (!anyUnread) {
+    const banner = document.getElementById('unread-banner-' + isoDate);
+    if (banner) {
+      banner.style.opacity = '0';
+      banner.style.transition = 'opacity .3s';
+      setTimeout(() => banner.remove(), 300);
+    }
+  }
+  updateNotifUI();
+}
+
+// Refresh the current day view — re-fetches all sheets then re-opens the same day
+async function refreshDayView() {
+  const btn = document.getElementById('day-refresh-btn');
+  const savedDate = S.selDate;
+  if (!savedDate) return;
+  if (btn) { btn.disabled = true; btn.textContent = '\u21BA Loading\u2026'; }
+  try {
+    await loadAllSheets();
+    // loadAllSheets navigates automatically — if today has training it goes there,
+    // otherwise we force back to the saved date if it still exists
+    if (S.selDate !== savedDate && S.dayMap[savedDate]) {
+      navTo('day', { date: savedDate });
+    }
+  } catch(e) { console.error('Refresh failed:', e); }
+  if (btn) { btn.disabled = false; btn.textContent = '\u21BA Refresh'; }
+}
+
+// ── Init ────────────────────────────────────────────────────────────────
+// Strategy:
+// • Existing session  → route instantly from localStorage, no network wait
+// • Fresh device      → show login screen immediately (correct behaviour),
+//                       sync master in background so login works once done
+// This guarantees zero flash-to-login for any user who was already logged in.
+
+const _hasExistingSession = !!localStorage.getItem('bloc_session') ||
+                            !!localStorage.getItem('bloc_admin_session');
+
+if (_hasExistingSession) {
+  // Show loading screen immediately — never flash login to a logged-in user
+  document.getElementById('s-login').classList.remove('active');
+  document.getElementById('s-loading').classList.add('active');
+
+  // Sync master then route
+  const _doRoute = async () => {
+    if (getMasterUrl() && getMasterSecret()) {
+      const synced = await syncUsersFromMaster();
+      if (synced) {
+        USERS = migrateUsers(synced);
+        await migratePasswords(USERS);
+      }
+    }
+    parseHashAndRoute();
+    // Background re-sync for admin panel
+    const admUsers = document.getElementById('adm-users');
+    if (admUsers && admUsers.classList.contains('active')) renderUserTable();
+  };
+  _doRoute();
+} else {
+  // Fresh device or logged out — sync master first so all users are available,
+  // then show login.
+  if (getMasterUrl() && getMasterSecret()) {
+    syncUsersFromMaster().then(async synced => {
+      if (synced) {
+        USERS = migrateUsers(synced);
+        await migratePasswords(USERS);
+      }
+      parseHashAndRoute();
+    });
+  } else {
+    parseHashAndRoute();
+  }
+}
+
+// ── Register Service Worker ──────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      reg.update();
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        nw.addEventListener('statechange', () => {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            showToast('Update available — refreshing…', 'ok');
+            setTimeout(() => window.location.reload(), 1500);
+          }
+        });
+      });
+    }).catch(e => console.warn('SW registration failed:', e));
+  });
+}
+</script>
+</body>
+</html>
