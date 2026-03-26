@@ -1139,34 +1139,35 @@ const DEFAULT_USERS = [
 // ── Migrate existing users: add createdAt if missing ──────────────────
 // For any user without createdAt, default to 2026-01-01 so they don't
 // re-fetch historical data they've never had access to anyway.
-function migrateUsers(users) {
+function migrateUsers(users, fromMaster = false) {
   let changed = false;
 
-  // Version check — if stored version is behind, sync DEFAULT_USERS fields into storage.
-  // This ensures code changes (scriptUrl, sheetGids, etc.) propagate to existing browsers.
-  const storedVersion = parseInt(localStorage.getItem('bloc_data_version') || '0');
-  if (storedVersion < DATA_VERSION) {
-    DEFAULT_USERS.forEach(def => {
-      const idx = users.findIndex(u => u.id === def.id);
-      if (idx >= 0) {
-        // Preserve password and email the user may have changed; update everything else
-        const pass  = users[idx].pass;
-        const email = users[idx].email;
-        users[idx] = { ...def, pass, email };
-      } else {
-        users.push({...def});
-      }
-      changed = true;
-    });
-    localStorage.setItem('bloc_data_version', String(DATA_VERSION));
-    console.log('Users synced to version', DATA_VERSION);
+  if (!fromMaster) {
+    // Version migration only applies to locally-cached users, never to master data.
+    // This prevents demo/default users from being injected into a master-synced list.
+    const storedVersion = parseInt(localStorage.getItem('bloc_data_version') || '0');
+    if (storedVersion < DATA_VERSION) {
+      DEFAULT_USERS.forEach(def => {
+        const idx = users.findIndex(u => u.id === def.id);
+        if (idx >= 0) {
+          const pass  = users[idx].pass;
+          const email = users[idx].email;
+          users[idx] = { ...def, pass, email };
+        } else {
+          users.push({...def});
+        }
+        changed = true;
+      });
+      localStorage.setItem('bloc_data_version', String(DATA_VERSION));
+      console.log('Users synced to version', DATA_VERSION);
+    }
   }
 
   users.forEach(u => {
     if (!u.createdAt) { u.createdAt = '2024-01-01'; changed = true; }
   });
 
-  if (changed) localStorage.setItem('bloc_users', JSON.stringify(users)); // local only
+  if (changed && !fromMaster) localStorage.setItem('bloc_users', JSON.stringify(users));
   return users;
 }
 
@@ -1321,7 +1322,7 @@ setInterval(async () => {
   if (!synced) return;
   // Only update if count changed — avoids unnecessary re-renders
   const prevCount = USERS.length;
-  USERS = migrateUsers(synced);
+  USERS = migrateUsers(synced, true);
   await migratePasswords(USERS);
   const adminPanel = document.getElementById('adm-users');
   if (adminPanel && adminPanel.classList.contains('active') && USERS.length !== prevCount) {
@@ -1537,7 +1538,7 @@ async function adminSyncMaster() {
   // Writes only happen from explicit add/edit/delete actions.
   const synced = await syncUsersFromMaster();
   if (synced) {
-    USERS = migrateUsers(synced);
+    USERS = migrateUsers(synced, true);
     migratePasswords(USERS);
     renderUserTable();
     showToast('Synced — ' + USERS.length + ' users from master DB', 'ok');
@@ -1630,7 +1631,7 @@ async function saveUser() {
   if (MASTER_SCRIPT_URL && MASTER_SECRET) {
     const latest = await syncUsersFromMaster();
     if (latest) {
-      USERS = migrateUsers(latest);
+      USERS = migrateUsers(latest, true);
     }
   }
   const name  = document.getElementById('m-name').value.trim();
@@ -1688,7 +1689,7 @@ function confirmDelete(){
   const doDelete = async () => {
     if (MASTER_SCRIPT_URL && MASTER_SECRET) {
       const latest = await syncUsersFromMaster();
-      if (latest) USERS = migrateUsers(latest);
+      if (latest) USERS = migrateUsers(latest, true);
     }
     USERS = USERS.filter(u => u.id !== deleteTargetId);
     await saveUsersAndSync(USERS);
@@ -3508,7 +3509,7 @@ async function refreshDayView() {
     try {
       const synced = await syncUsersFromMaster();
       if (synced) {
-        USERS = migrateUsers(synced);
+        USERS = migrateUsers(synced, true);
         await migratePasswords(USERS);
       }
     } catch(e) {
