@@ -124,7 +124,7 @@ body { background: var(--surf); }
   }
   body { padding-top: 0; padding-bottom: 0; }
   #s-login { padding-top: env(safe-area-inset-top, 0px); }
-  #s-loading { padding-top: env(safe-area-inset-top, 0px); }
+  #s-loading { padding-top: 0; }
 }
 .hd-logo { font-family:var(--disp); font-size:1.35rem; letter-spacing:.04em; }
 .hd-right { display:flex; align-items:center; gap:.7rem; }
@@ -141,7 +141,7 @@ html { touch-action: manipulation; }
 .btn-ghost:hover { border-color:var(--danger); color:var(--danger); }
 
 /* ── App main ────────────────────────────────────── */
-.app-main { flex:1; padding:1.25rem; max-width:860px; margin:0 auto; width:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom: env(safe-area-inset-bottom, 0px); }
+.app-main { flex:1; padding:1.25rem; max-width:860px; margin:0 auto; width:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom: min(env(safe-area-inset-bottom, 0px), 20px); }
 
 /* ── Views ───────────────────────────────────────── */
 .view { display:none; }
@@ -452,7 +452,7 @@ html { touch-action: manipulation; }
 }
 .adm-logo { font-family:var(--disp); font-size:1.35rem; letter-spacing:.04em; }
 .adm-logo span { color:var(--danger); font-size:.9rem; margin-left:.4rem; font-family:var(--mono); letter-spacing:.12em; }
-.adm-main { flex:1; padding:1.25rem; max-width:960px; margin:0 auto; width:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom: env(safe-area-inset-bottom, 0px); }
+.adm-main { flex:1; padding:1.25rem; max-width:960px; margin:0 auto; width:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom: min(env(safe-area-inset-bottom, 0px), 20px); }
 .adm-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:1.4rem; }
 .adm-tab {
   font-family:var(--mono); font-size:.63rem; letter-spacing:.12em; text-transform:uppercase;
