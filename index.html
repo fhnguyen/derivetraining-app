@@ -44,8 +44,7 @@
   --disp: 'Bebas Neue', sans-serif;
 }
 html,body { height:100%; background:var(--surf); color:var(--text); font-family:var(--sans); font-size:15px; -webkit-font-smoothing:antialiased; overflow-x:hidden; }
-/* PWA safe area — background only, padding handled per-element */
-body { background: var(--surf); }
+
 
 
 
@@ -55,7 +54,8 @@ body { background: var(--surf); }
 
 /* ── Login ───────────────────────────────────────── */
 #s-login {
-  align-items:center; justify-content:center; padding:2rem;
+  align-items:center; justify-content:center;
+  padding: calc(2rem + env(safe-area-inset-top, 0px)) 2rem calc(2rem + env(safe-area-inset-bottom, 0px));
   position:relative; overflow:hidden;
   background:
     linear-gradient(rgba(10,10,10,.45), rgba(10,10,10,.45)),
@@ -113,19 +113,15 @@ body { background: var(--surf); }
 /* ── App header ──────────────────────────────────── */
 .app-hd {
   display:flex; align-items:center; justify-content:space-between;
-  padding:.85rem 1.25rem; border-bottom:1px solid var(--border);
+  padding:.85rem 1.25rem;
+  padding-top: calc(.85rem + env(safe-area-inset-top, 0px));
+  padding-left: calc(1.25rem + env(safe-area-inset-left, 0px));
+  padding-right: calc(1.25rem + env(safe-area-inset-right, 0px));
+  border-bottom:1px solid var(--border);
   background:var(--surf);
   position:sticky; top:0; z-index:100; flex-shrink:0;
 }
-/* PWA standalone mode — header sits below status bar */
-@media all and (display-mode: standalone) {
-  .app-hd, .adm-hd {
-    padding-top: calc(.85rem + env(safe-area-inset-top, 0px));
-  }
-  body { padding-top: 0; padding-bottom: 0; }
-  #s-login { padding-top: env(safe-area-inset-top, 0px); }
-  #s-loading { padding-top: 0; }
-}
+
 .hd-logo { font-family:var(--disp); font-size:1.35rem; letter-spacing:.04em; }
 .hd-right { display:flex; align-items:center; gap:.7rem; }
 .hd-name  { font-family:var(--mono); font-size:.6rem; letter-spacing:.1em; color:var(--muted2); text-transform:uppercase; }
@@ -141,7 +137,7 @@ html { touch-action: manipulation; }
 .btn-ghost:hover { border-color:var(--danger); color:var(--danger); }
 
 /* ── App main ────────────────────────────────────── */
-.app-main { flex:1; padding:1.25rem; max-width:860px; margin:0 auto; width:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom: min(env(safe-area-inset-bottom, 0px), 20px); }
+.app-main { flex:1; padding:1.25rem; padding-bottom: env(safe-area-inset-bottom, 0px); max-width:860px; margin:0 auto; width:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; }
 
 /* ── Views ───────────────────────────────────────── */
 .view { display:none; }
@@ -446,13 +442,17 @@ html { touch-action: manipulation; }
 #s-admin { background:var(--bg); }
 .adm-hd {
   display:flex; align-items:center; justify-content:space-between;
-  padding:.85rem 1.25rem; border-bottom:1px solid var(--border);
+  padding:.85rem 1.25rem;
+  padding-top: calc(.85rem + env(safe-area-inset-top, 0px));
+  padding-left: calc(1.25rem + env(safe-area-inset-left, 0px));
+  padding-right: calc(1.25rem + env(safe-area-inset-right, 0px));
+  border-bottom:1px solid var(--border);
   background:var(--surf);
   flex-shrink:0;
 }
 .adm-logo { font-family:var(--disp); font-size:1.35rem; letter-spacing:.04em; }
 .adm-logo span { color:var(--danger); font-size:.9rem; margin-left:.4rem; font-family:var(--mono); letter-spacing:.12em; }
-.adm-main { flex:1; padding:1.25rem; max-width:960px; margin:0 auto; width:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom: min(env(safe-area-inset-bottom, 0px), 20px); }
+.adm-main { flex:1; padding:1.25rem; padding-bottom: env(safe-area-inset-bottom, 0px); max-width:960px; margin:0 auto; width:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; }
 .adm-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:1.4rem; }
 .adm-tab {
   font-family:var(--mono); font-size:.63rem; letter-spacing:.12em; text-transform:uppercase;
@@ -784,7 +784,7 @@ html { touch-action: manipulation; }
 <body>
 
 <!-- ═══ LOGIN ═══════════════════════════════════════ -->
-<div id="s-loading" class="screen" style="flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);">
+<div id="s-loading" class="screen" style="flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;background:var(--bg);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);">
   <div style="font-family:var(--disp);font-size:2rem;letter-spacing:.1em;margin-bottom:1.2rem;">
     <span style="color:var(--accent)">TRAIN</span><span style="color:var(--gold)">DERIVE</span>
   </div>
