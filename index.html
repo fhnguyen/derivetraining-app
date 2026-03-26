@@ -2145,11 +2145,53 @@ function parseTrainingBlocks(raw) {
 }
 
 function parseResultSections(raw) {
-  const SECTION=/^\+\s*$/,lines=raw.split('\n'),secs=[];
-  let cur=[],idx=0;
-  const flush=()=>{const t=cur.join('\n').trim();if(t)secs.push({label:toAlpha(idx),content:t});idx++;cur=[];};
-  for(const line of lines){if(SECTION.test(line.trim()))flush();else cur.push(line);}
-  flush(); return secs;
+  if (!raw || !raw.trim()) return [];
+
+  // Format 1 (current): "A: text\nB: text\nC: text..."
+  // Split on lines that start with a letter label like "A:", "B:", "AA:", etc.
+  const LETTER_PREFIX = /^([A-Z]{1,3}):\s*/;
+  const lines = raw.split('\n');
+
+  // Check if this looks like the letter-prefix format
+  const hasLetterPrefix = lines.some(l => LETTER_PREFIX.test(l.trim()));
+
+  if (hasLetterPrefix) {
+    const secs = [];
+    let cur = [], curLabel = null;
+    const flush = () => {
+      const t = cur.join('\n').trim();
+      if (t || curLabel !== null) secs.push({ label: curLabel || toAlpha(secs.length), content: t });
+      cur = [];
+    };
+    for (const line of lines) {
+      const m = line.trim().match(/^([A-Z]{1,3}):\s*(.*)/);
+      if (m) {
+        if (curLabel !== null || cur.length) flush();
+        curLabel = m[1];
+        if (m[2].trim()) cur.push(m[2]);
+      } else {
+        cur.push(line);
+      }
+    }
+    flush();
+    return secs;
+  }
+
+  // Format 2 (legacy): sections separated by "+" lines
+  const SECTION = /^\+\s*$/;
+  const secs2 = [];
+  let cur2 = [], idx = 0;
+  const flush2 = () => {
+    const t = cur2.join('\n').trim();
+    if (t) secs2.push({ label: toAlpha(idx), content: t });
+    idx++; cur2 = [];
+  };
+  for (const line of lines) {
+    if (SECTION.test(line.trim())) flush2();
+    else cur2.push(line);
+  }
+  flush2();
+  return secs2;
 }
 
 function parseCSV(text) {
