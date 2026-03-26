@@ -6,8 +6,8 @@
   "scope": "https://app.trainderive.com/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f5f0e8",
-  "theme_color": "#2864D7",
+  "background_color": "#ede8df",
+  "theme_color": "#ede8df",
   "icons": [
     {
       "src": "icon-192.png",
