@@ -1207,8 +1207,11 @@ async function saveUsersAndSync(users) {
   localStorage.setItem('bloc_users', JSON.stringify(users));
   if (!MASTER_SCRIPT_URL || !MASTER_SECRET) return;
   const result = await pushUsersToMaster(users);
+  // result === false means all proxy attempts failed
+  // Caller handles success toast; we only surface a failure
   if (result === false) {
-    showToast('Saved locally — master DB push failed', 'err');
+    console.warn('Master DB push failed — changes saved locally only');
+    showToast('Sync to master failed — try again', 'err');
   }
 }
 
@@ -1315,11 +1318,14 @@ migratePasswords(USERS);  // async — hashes any plain-text passwords
 setInterval(async () => {
   if (!getMasterUrl() || !getMasterSecret()) return;
   const synced = await syncUsersFromMaster();
-  if (synced) {
-    USERS = migrateUsers(synced);
-    await migratePasswords(USERS);
-    const adminPanel = document.getElementById('adm-users');
-    if (adminPanel && adminPanel.classList.contains('active')) renderUserTable();
+  if (!synced) return;
+  // Only update if count changed — avoids unnecessary re-renders
+  const prevCount = USERS.length;
+  USERS = migrateUsers(synced);
+  await migratePasswords(USERS);
+  const adminPanel = document.getElementById('adm-users');
+  if (adminPanel && adminPanel.classList.contains('active') && USERS.length !== prevCount) {
+    renderUserTable();
   }
 }, 5 * 60 * 1000);
 
@@ -1670,8 +1676,8 @@ async function saveUser() {
       createdAt: isoToday(),
     });
   }
-  saveUsersAndSync(USERS).then(()=>{ closeModal('m-user'); renderUserTable(); showToast('User saved','ok'); });
-  showToast(editingUserId ? 'User updated' : 'User added', 'ok');
+  const _msg = editingUserId ? 'User updated' : 'User added';
+  saveUsersAndSync(USERS).then(()=>{ closeModal('m-user'); renderUserTable(); showToast(_msg, 'ok'); });
 }
 
 let deleteTargetId = null;
@@ -2259,7 +2265,9 @@ function _openDay(iso) {
 
   renderWeekNav(iso);
   renderDayContent(day);
-  window.scrollTo(0, 0);
+  // Scroll to top of page on day change
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
 }
 
 function renderDayContent(day) {
