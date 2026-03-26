@@ -49,18 +49,21 @@ html,body { height:100%; background:var(--surf); color:var(--text); font-family:
 
 
 /* ── Screens ─────────────────────────────────────── */
-.screen { display:none; height:100dvh; flex-direction:column; background:var(--surf); overflow:hidden; }
+.screen { display:none; min-height:100dvh; flex-direction:column; background:var(--surf); }
 .screen.active { display:flex; }
 
 /* ── Login ───────────────────────────────────────── */
 #s-login {
   align-items:center; justify-content:center;
   padding: calc(2rem + env(safe-area-inset-top, 0px)) 2rem calc(2rem + env(safe-area-inset-bottom, 0px));
-  position:relative; overflow:hidden;
+  position:fixed; top:0; left:0; right:0; bottom:0;
+  width:100%; height:100%;
+  overflow-y:auto;
   background:
     linear-gradient(rgba(10,10,10,.45), rgba(10,10,10,.45)),
     url('https://images.squarespace-cdn.com/content/69c08f2a9dcd1c36eb8f3c07/1342f583-697f-4045-9461-c7270c1d89d2/2025-11-01_61056.jpg?content-type=image/jpeg')
     center center / cover no-repeat;
+  background-attachment: fixed;
 }
 #s-login::before {
   content:'TRAINDERIVE'; position:absolute; font-family:var(--disp);
@@ -137,7 +140,7 @@ html { touch-action: manipulation; }
 .btn-ghost:hover { border-color:var(--danger); color:var(--danger); }
 
 /* ── App main ────────────────────────────────────── */
-.app-main { flex:1; padding:1.25rem; padding-bottom: env(safe-area-inset-bottom, 0px); max-width:860px; margin:0 auto; width:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+.app-main { flex:1; padding:1.25rem; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1.25rem); max-width:860px; margin:0 auto; width:100%; }
 
 /* ── Views ───────────────────────────────────────── */
 .view { display:none; }
@@ -452,7 +455,7 @@ html { touch-action: manipulation; }
 }
 .adm-logo { font-family:var(--disp); font-size:1.35rem; letter-spacing:.04em; }
 .adm-logo span { color:var(--danger); font-size:.9rem; margin-left:.4rem; font-family:var(--mono); letter-spacing:.12em; }
-.adm-main { flex:1; padding:1.25rem; padding-bottom: env(safe-area-inset-bottom, 0px); max-width:960px; margin:0 auto; width:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+.adm-main { flex:1; padding:1.25rem; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1.25rem); max-width:960px; margin:0 auto; width:100%; }
 .adm-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:1.4rem; }
 .adm-tab {
   font-family:var(--mono); font-size:.63rem; letter-spacing:.12em; text-transform:uppercase;
