@@ -1310,10 +1310,18 @@ async function pushUsersToMaster(users) {
 // getAdminPass / setAdminPass replaced by async getAdminHash / setAdminPass above
 
 // Load from localStorage cache immediately (synchronous, fast)
-let USERS = loadUsers() || DEFAULT_USERS;
-if (!loadUsers()) localStorage.setItem('bloc_users', JSON.stringify(USERS)); // local cache only
-USERS = migrateUsers(USERS);
-migratePasswords(USERS);  // async — hashes any plain-text passwords
+const _storedUsers = loadUsers();
+let USERS = _storedUsers || DEFAULT_USERS;
+if (_storedUsers) {
+  // Only migrate if there's real stored data — never write DEFAULT_USERS to localStorage
+  // on a fresh device before master sync has a chance to run
+  USERS = migrateUsers(USERS);
+  migratePasswords(USERS);  // async — hashes any plain-text passwords
+} else {
+  // Fresh device — mark version as current so migrateUsers never injects
+  // DEFAULT_USERS after master sync loads real users
+  localStorage.setItem('bloc_data_version', String(DATA_VERSION));
+}
 
 // Periodic background re-sync every 5 minutes to pick up changes from other devices
 setInterval(async () => {
