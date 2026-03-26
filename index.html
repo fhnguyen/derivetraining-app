@@ -1231,7 +1231,6 @@ async function syncUsersFromMaster() {
     if (!Array.isArray(data.users)) throw new Error('Invalid users response');
 
     const masterUsers = data.users;
-    const localUsers  = USERS || loadUsers() || [];
 
     // Master DB is READ ONLY here — never push during a sync.
     // Writes to master only happen from explicit admin save/delete actions.
@@ -1243,10 +1242,24 @@ async function syncUsersFromMaster() {
       return false;
     }
 
+    // Deduplicate master users by email (cleans up any existing duplicates in sheet)
+    const seenEmails = new Map();
+    masterUsers.forEach(u => {
+      const key = (u.email || '').toLowerCase();
+      if (key) seenEmails.set(key, u);
+    });
+    const cleanUsers = Array.from(seenEmails.values());
+    if (cleanUsers.length !== masterUsers.length) {
+      console.warn('syncUsersFromMaster: found', masterUsers.length - cleanUsers.length,
+        'duplicate(s) in master sheet — will auto-clean after init');
+      // Schedule clean after init is complete — never write during sync/init
+      setTimeout(() => pushUsersToMaster(cleanUsers).catch(() => {}), 3000);
+    }
+
     // Master has users — use them as source of truth, update local cache
-    localStorage.setItem('bloc_users', JSON.stringify(masterUsers));
-    console.log('Synced', masterUsers.length, 'users from master DB');
-    return masterUsers;
+    localStorage.setItem('bloc_users', JSON.stringify(cleanUsers));
+    console.log('Synced', cleanUsers.length, 'users from master DB');
+    return cleanUsers;
   } catch (err) {
     console.warn('Master DB sync failed, using local cache:', err.message);
     return false;
@@ -1255,7 +1268,31 @@ async function syncUsersFromMaster() {
 
 async function pushUsersToMaster(users) {
   if (!MASTER_SCRIPT_URL || !MASTER_SECRET) return false;
-  const payload = { secret: MASTER_SECRET, action: 'saveUsers', users };
+
+  // Block writes during initialisation — prevents race conditions where
+  // partial or stale USERS state gets pushed to master before sync completes
+  if (!window._initComplete) {
+    console.warn('pushUsersToMaster blocked — init not yet complete');
+    return false;
+  }
+
+  // Deduplicate by email before writing — last line of defense
+  // Keep the last entry for each email (most recently added/edited wins)
+  const seen = new Map();
+  users.forEach(u => {
+    const key = (u.email || '').toLowerCase();
+    if (key) seen.set(key, u);
+  });
+  const deduped = Array.from(seen.values());
+
+  if (deduped.length !== users.length) {
+    console.warn('pushUsersToMaster: removed', users.length - deduped.length, 'duplicate(s) before write');
+  }
+
+  console.warn('⚠️ MASTER DB WRITE:', deduped.length, 'users:', deduped.map(u=>u.email).join(', '));
+  console.trace('pushUsersToMaster called from:');
+
+  const payload = { secret: MASTER_SECRET, action: 'saveUsers', users: deduped };
   const url = MASTER_SCRIPT_URL;
 
   // Apps Script POSTs must go through a proxy — direct POST is blocked by CORS redirect
@@ -3516,6 +3553,10 @@ async function refreshDayView() {
 // available even after Safari cache clear, reinstall, or fresh device.
 // Master DB is the single source of truth. localStorage is just a fast cache.
 
+// Global flag — prevents any master DB writes during app initialisation
+// Set to true once init is complete and it's safe to write
+window._initComplete = false;
+
 (async () => {
   const hasSession = !!localStorage.getItem('bloc_session') ||
                      !!localStorage.getItem('bloc_admin_session');
@@ -3536,6 +3577,9 @@ async function refreshDayView() {
       console.warn('Master sync failed on init:', e.message);
     }
   }
+
+  // Init complete — master writes now permitted
+  window._initComplete = true;
 
   // Now route — users are loaded from master regardless of localStorage state
   parseHashAndRoute();
