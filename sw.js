@@ -1,7 +1,7 @@
 // TRAINDERIVE Service Worker
 // Cache name includes a version — change this string on every deploy
 // to force all clients to fetch fresh files immediately.
-const CACHE = 'trainderive-v1';
+const CACHE = 'trainderive-v3';
 
 // Files to cache for offline use
 const PRECACHE = [
