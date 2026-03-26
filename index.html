@@ -1388,10 +1388,22 @@ function restoreSession() {
   if (!user) {
     try {
       const cached = JSON.parse(localStorage.getItem('bloc_session_user') || 'null');
-      if (cached && cached.id === savedId && cached.role === 'athlete') {
-        // Re-add to USERS if missing (e.g. after reset or first load on new device)
-        if (!USERS.find(u => u.id === cached.id)) USERS.push(cached);
-        user = cached;
+      if (cached && cached.role === 'athlete') {
+        // First try to find by email in master-synced USERS (id may have changed)
+        const byEmail = USERS.find(u =>
+          u.email && cached.email &&
+          u.email.toLowerCase() === cached.email.toLowerCase()
+        );
+        if (byEmail) {
+          // Found in master under possibly different id — update session to master version
+          user = byEmail;
+          localStorage.setItem('bloc_session', byEmail.id);
+          localStorage.setItem('bloc_session_user', JSON.stringify(byEmail));
+        } else if (cached.id === savedId) {
+          // Not in master at all — use cached version (offline fallback only)
+          // Do NOT push to USERS — avoids creating duplicates
+          user = cached;
+        }
       }
     } catch(e) {}
   }
