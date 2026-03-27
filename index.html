@@ -531,6 +531,47 @@ html { touch-action: manipulation; }
 .setting-row:last-child { border-bottom:none; }
 .setting-label { font-weight:500; font-size:.88rem; margin-bottom:.18rem; }
 .setting-desc  { font-family:var(--mono); font-size:.63rem; color:var(--muted2); letter-spacing:.05em; }
+/* Toggle switch */
+.toggle-wrap { display:flex; align-items:center; gap:.5rem; flex-shrink:0; }
+.toggle { position:relative; width:42px; height:24px; }
+.toggle input { opacity:0; width:0; height:0; }
+.toggle-slider {
+  position:absolute; inset:0; background:var(--border);
+  border-radius:24px; cursor:pointer; transition:background .2s;
+}
+.toggle-slider::before {
+  content:''; position:absolute; width:18px; height:18px;
+  left:3px; top:3px; background:#fff; border-radius:50%;
+  transition:transform .2s;
+}
+.toggle input:checked + .toggle-slider { background:var(--accent); }
+.toggle input:checked + .toggle-slider::before { transform:translateX(18px); }
+/* Admin result notifications */
+.adm-notif-wrap { position:relative; }
+.adm-notif-badge {
+  position:absolute; top:-4px; right:-4px;
+  background:var(--gold); color:#fff;
+  font-family:var(--mono); font-size:.55rem; font-weight:700;
+  min-width:16px; height:16px; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  padding:0 3px; pointer-events:none;
+}
+.adm-notif-drop {
+  position:absolute; top:calc(100% + 8px); right:0;
+  width:300px; background:var(--surf); border:1px solid var(--border);
+  border-radius:var(--r); box-shadow:0 4px 20px rgba(0,0,0,.12);
+  z-index:200; display:none;
+}
+.adm-notif-drop.open { display:block; }
+.adm-notif-item {
+  padding:.7rem 1rem; border-bottom:1px solid var(--border);
+  cursor:pointer; transition:background .1s;
+}
+.adm-notif-item:last-child { border-bottom:none; }
+.adm-notif-item:hover { background:var(--bg); }
+.adm-notif-item-name { font-weight:500; font-size:.82rem; }
+.adm-notif-item-date { font-family:var(--mono); font-size:.62rem; color:var(--muted2); margin-top:.1rem; }
+.adm-notif-empty { padding:1rem; text-align:center; font-family:var(--mono); font-size:.68rem; color:var(--muted2); }
 
 /* ── Toast ───────────────────────────────────────── */
 .toast {
@@ -881,6 +922,17 @@ html { touch-action: manipulation; }
     <div class="adm-logo"><span style="color:var(--accent)">TRAIN</span><span style="color:var(--gold)">DERIVE</span> <span>ADMIN</span></div>
     <div class="hd-right">
       <span class="hd-name" id="adm-hd-name"></span>
+      <div class="adm-notif-wrap">
+        <button class="btn-ghost" id="adm-bell-btn" onclick="toggleAdmNotifDrop()" title="New results" style="font-size:1.1rem;padding:.35rem .6rem;">&#x1F514;</button>
+        <span class="adm-notif-badge" id="adm-notif-badge" style="display:none"></span>
+        <div class="adm-notif-drop" id="adm-notif-drop">
+          <div style="padding:.6rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted2)">New Results</span>
+            <button class="btn-sm" onclick="clearAdmNotifs()" style="font-size:.6rem;padding:.2rem .5rem">Mark all read</button>
+          </div>
+          <div id="adm-notif-list"></div>
+        </div>
+      </div>
       <button class="btn-ghost" onclick="doAdminLogout()">Sign Out</button>
     </div>
   </header>
@@ -907,6 +959,12 @@ html { touch-action: manipulation; }
       <div class="setting-row">
         <div><div class="setting-label">Sync Users</div><div class="setting-desc">Pull latest user list from master database</div></div>
         <button class="btn-sm" id="btn-sync-master" onclick="adminSyncMaster()">Sync Now</button>
+      </div>
+      <div class="setting-row">
+        <div><div class="setting-label">Email Alerts — New Results</div><div class="setting-desc">Send email to frank@trainderive.com when an athlete saves results</div></div>
+        <div class="toggle-wrap">
+          <label class="toggle"><input type="checkbox" id="toggle-admin-email" onchange="saveAdminEmailToggle()"><span class="toggle-slider"></span></label>
+        </div>
       </div>
       <div class="setting-row">
         <div><div class="setting-label">Admin Password</div><div class="setting-desc">Change the password for admin access</div></div>
@@ -1059,6 +1117,10 @@ html { touch-action: manipulation; }
 
       <div class="modal-section-title">Profile</div>
       <div class="fld"><label>Display Name</label><input type="text" id="acct-name" placeholder="Your name"></div>
+      <div class="setting-row" style="border:none;padding:.5rem 0 0 0;">
+        <div><div class="setting-label" style="font-size:.78rem">Email me when coach leaves feedback</div><div class="setting-desc">Sends to the email on your account (off by default)</div></div>
+        <div class="toggle-wrap"><label class="toggle"><input type="checkbox" id="toggle-athlete-email" onchange="saveAthleteEmailToggle()"><span class="toggle-slider"></span></label></div>
+      </div>
 
       <div class="modal-divider"></div>
       <div class="modal-section-title">Change Email</div>
@@ -1242,13 +1304,15 @@ async function syncUsersFromMaster() {
       return false;
     }
 
-    // Deduplicate master users by email (cleans up any existing duplicates in sheet)
+    // Deduplicate master users by email, preserving special entries
+    const specialEntries = masterUsers.filter(u => u._type);
+    const realMasterUsers = masterUsers.filter(u => !u._type);
     const seenEmails = new Map();
-    masterUsers.forEach(u => {
+    realMasterUsers.forEach(u => {
       const key = (u.email || '').toLowerCase();
       if (key) seenEmails.set(key, u);
     });
-    const cleanUsers = Array.from(seenEmails.values());
+    const cleanUsers = [...Array.from(seenEmails.values()), ...specialEntries];
     if (cleanUsers.length !== masterUsers.length) {
       console.warn('syncUsersFromMaster: found', masterUsers.length - cleanUsers.length,
         'duplicate(s) in master sheet — will auto-clean after init');
@@ -1298,14 +1362,15 @@ async function pushUsersToMaster(users, retries = 3) {
     return false;
   }
 
-  // Deduplicate by email before writing — last line of defense
-  // Keep the last entry for each email (most recently added/edited wins)
+  // Separate special system entries from real users before dedup
+  const special   = users.filter(u => u._type);
+  const realUsers = users.filter(u => !u._type);
   const seen = new Map();
-  users.forEach(u => {
+  realUsers.forEach(u => {
     const key = (u.email || '').toLowerCase();
     if (key) seen.set(key, u);
   });
-  const deduped = Array.from(seen.values());
+  const deduped = [...Array.from(seen.values()), ...special];
 
   if (deduped.length !== users.length) {
     console.warn('pushUsersToMaster: removed', users.length - deduped.length, 'duplicate(s) before write');
@@ -1506,6 +1571,7 @@ function parseHashAndRoute() {
   if (hash === '#admin') {
     if (localStorage.getItem('bloc_admin_session')) {
       document.getElementById('adm-hd-name').textContent = 'Administrator';
+      setTimeout(updateAdmNotifUI, 500);
       applyRoute('admin');
     } else {
       showAdminLogin();
@@ -1527,6 +1593,7 @@ function parseHashAndRoute() {
     // Check for admin session first
     if (localStorage.getItem('bloc_admin_session')) {
       document.getElementById('adm-hd-name').textContent = 'Administrator';
+      setTimeout(updateAdmNotifUI, 500);
       history.replaceState({ route:'admin' }, '', '#admin');
       applyRoute('admin');
     } else if (hasSession) {
@@ -1554,7 +1621,7 @@ async function doLogin() {
   const pass  = document.getElementById('l-pass').value;
   const errEl = document.getElementById('l-err');
   const passHash = await hashPass(pass);
-  const user = USERS.find(u => u.email === email && u.pass === passHash && u.role === 'athlete');
+  const user = USERS.find(u => !u._type && u.email === email && u.pass === passHash && u.role === 'athlete');
   if (!user) { errEl.textContent = 'Invalid email or password.'; return; }
   S.user = user;
   localStorage.setItem('bloc_session', user.id);
@@ -1603,6 +1670,7 @@ async function doAdminLogin() {
   if (entered !== stored) { document.getElementById('m-al-err').textContent = 'Incorrect password.'; return; }
   closeModal('m-adminlogin');
   document.getElementById('adm-hd-name').textContent = 'Administrator';
+  setTimeout(updateAdmNotifUI, 500);
   localStorage.setItem('bloc_admin_session', '1');
   history.pushState({ route:'admin' }, '', '#admin');
   applyRoute('admin');
@@ -1639,10 +1707,148 @@ async function adminSyncMaster() {
   if (btn) { btn.disabled = false; btn.textContent = 'Sync Now'; }
 }
 
+// Admin settings - synced via master DB as special _admin_settings entry
+async function saveAdminSettings(patch) {
+  let entry = USERS.find(u => u.id === '_admin_settings');
+  if (!entry) { entry = { id: '_admin_settings', _type: 'settings', emailAlerts: false }; USERS.push(entry); }
+  Object.assign(entry, patch);
+  localStorage.setItem('bloc_users', JSON.stringify(USERS));
+  localStorage.setItem('bloc_admin_email_alerts', entry.emailAlerts ? '1' : '0');
+  await pushUsersToMaster(USERS);
+}
+function getAdminSettings() {
+  return USERS.find(u => u.id === '_admin_settings') || { emailAlerts: false };
+}
+function saveAdminEmailToggle() {
+  const on = document.getElementById('toggle-admin-email').checked;
+  localStorage.setItem('bloc_admin_email_alerts', on ? '1' : '0');
+  saveAdminSettings({ emailAlerts: on })
+    .then(() => showToast('Email alerts ' + (on ? 'enabled' : 'disabled'), 'ok'))
+    .catch(() => showToast('Email alerts ' + (on ? 'enabled' : 'disabled'), 'ok'));
+}
+function getAdminEmailAlerts() {
+  const settings = getAdminSettings();
+  if (settings.emailAlerts !== undefined) return !!settings.emailAlerts;
+  return localStorage.getItem('bloc_admin_email_alerts') === '1';
+}
+function loadAdminEmailToggle() {
+  const el = document.getElementById('toggle-admin-email');
+  if (el) el.checked = getAdminEmailAlerts();
+}
+
+// ── Athlete email opt-in toggle ───────────────────────────────────
+function saveAthleteEmailToggle() {
+  if (!S.user) return;
+  const on = document.getElementById('toggle-athlete-email').checked;
+  const idx = USERS.findIndex(u => u.id === S.user.id);
+  if (idx < 0) return;
+  USERS[idx].coachEmailOptIn = on;
+  S.user = USERS[idx];
+  localStorage.setItem('bloc_session_user', JSON.stringify(S.user));
+  pushUsersToMaster(USERS).catch(() => {});
+  localStorage.setItem('bloc_users', JSON.stringify(USERS));
+  showToast('Coach email notifications ' + (on ? 'enabled' : 'disabled'), 'ok');
+}
+function loadAthleteEmailToggle() {
+  const el = document.getElementById('toggle-athlete-email');
+  if (el && S.user) el.checked = !!S.user.coachEmailOptIn;
+}
+
+// ── Admin notification bell ───────────────────────────────────────
+// Stores result notifications: bloc_adm_notif_{userId}_{isoDate} = 'unread'|'read'
+// Admin notification bell - synced via master DB as _admin_notifs entry
+function notifyAdminOfResults(isoDate, userId) {
+  if (isoDate && userId) markAdmResultUnread(userId, isoDate);
+}
+function getAdmNotifsEntry() {
+  return USERS.find(u => u.id === '_admin_notifs') || { id: '_admin_notifs', _type: 'notifs', items: [] };
+}
+async function saveAdmNotifsEntry(entry) {
+  const idx = USERS.findIndex(u => u.id === '_admin_notifs');
+  if (idx >= 0) USERS[idx] = entry; else USERS.push(entry);
+  localStorage.setItem('bloc_users', JSON.stringify(USERS));
+  await pushUsersToMaster(USERS);
+}
+function markAdmResultUnread(userId, isoDate) {
+  const entry = getAdmNotifsEntry();
+  entry.items = (entry.items || []).filter(n => !(n.userId === userId && n.isoDate === isoDate));
+  const u = USERS.find(u => u.id === userId);
+  entry.items.push({ userId, isoDate, name: u ? u.name : 'Athlete', ts: Date.now(), read: false });
+  saveAdmNotifsEntry(entry).catch(() => {});
+  updateAdmNotifUI();
+}
+function markAdmResultRead(userId, isoDate) {
+  const entry = getAdmNotifsEntry();
+  entry.items = (entry.items || []).map(n =>
+    (n.userId === userId && n.isoDate === isoDate) ? { ...n, read: true } : n
+  );
+  saveAdmNotifsEntry(entry).catch(() => {});
+  updateAdmNotifUI();
+}
+function getAdmUnreadResults() {
+  const entry = getAdmNotifsEntry();
+  return (entry.items || []).filter(n => !n.read).sort((a,b) => (b.ts||0) - (a.ts||0));
+}
+
+function updateAdmNotifUI() {
+  const badge = document.getElementById('adm-notif-badge');
+  const list  = document.getElementById('adm-notif-list');
+  if (!badge || !list) return;
+  const unread = getAdmUnreadResults();
+  if (unread.length) {
+    badge.textContent = unread.length > 9 ? '9+' : unread.length;
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+  if (unread.length === 0) {
+    list.innerHTML = '<div class="adm-notif-empty">No new results</div>';
+  } else {
+    list.innerHTML = unread.map(n =>
+      '<div class="adm-notif-item" onclick="admNotifClick(\'' + n.userId + '\',\'' + n.isoDate + '\')">' +
+        '<div class="adm-notif-item-name">' + escH(n.name) + '</div>' +
+        '<div class="adm-notif-item-date">Results logged — ' + n.isoDate + '</div>' +
+      '</div>'
+    ).join('');
+  }
+}
+
+function admNotifClick(userId, isoDate) {
+  markAdmResultRead(userId, isoDate);
+  closeAdmNotifDrop();
+  adminViewUser(userId).then(() => {
+    // Navigate to that date in admin day view
+    if (ADM.cache[userId]) adminOpenDay(isoDate);
+  });
+}
+
+function toggleAdmNotifDrop() {
+  const drop = document.getElementById('adm-notif-drop');
+  if (drop) drop.classList.toggle('open');
+}
+function closeAdmNotifDrop() {
+  const drop = document.getElementById('adm-notif-drop');
+  if (drop) drop.classList.remove('open');
+}
+async function clearAdmNotifs() {
+  const entry = getAdmNotifsEntry();
+  entry.items = (entry.items || []).map(n => ({ ...n, read: true }));
+  await saveAdmNotifsEntry(entry).catch(() => {});
+  updateAdmNotifUI();
+  closeAdmNotifDrop();
+  showToast('All results marked as read', 'ok');
+}
+
+// Close bell dropdown when clicking outside
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('adm-bell-btn')?.closest('.adm-notif-wrap');
+  if (wrap && !wrap.contains(e.target)) closeAdmNotifDrop();
+});
+
 function renderUserTable() {
   const tbody = document.getElementById('user-tbody');
   tbody.innerHTML = '';
-  USERS.forEach(u => {
+  USERS.filter(u => !u._type).forEach(u => {
     const hasSheet = !!u.spreadsheetId;
     const sheetUrl = hasSheet ? 'https://docs.google.com/spreadsheets/d/' + u.spreadsheetId : '';
     const tr = document.createElement('tr');
@@ -1795,7 +2001,7 @@ function switchAdmTab(name,btn){
   document.querySelectorAll('.adm-tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.adm-panel').forEach(p=>p.classList.remove('active'));
   btn.classList.add('active'); document.getElementById('adm-'+name).classList.add('active');
-
+  if (name === 'settings') loadAdminEmailToggle();
 }
 function openChangeAdminPass(){ ['m-ap-cur','m-ap-new','m-ap-conf'].forEach(id=>document.getElementById(id).value=''); document.getElementById('m-ap-err').textContent=''; openModal('m-adminpass'); }
 async function saveAdminPass(){
@@ -2567,6 +2773,7 @@ async function autoSaveAll(silent=false) {
     sectionResults: secArr, feel: S.feel,
     athleteName: S.user.name || 'Athlete',
     dateLabel: S.selDate || day.tabName,
+    sendEmail: getAdminEmailAlerts(),
   };
 
   const proxies = [
@@ -2591,6 +2798,7 @@ async function autoSaveAll(silent=false) {
           const stEl=document.getElementById('save-st');
           if (stEl) { stEl.textContent='Synced ✓'; stEl.className='save-st ok'; }
         }
+        if (S.user && S.selDate) notifyAdminOfResults(S.selDate, S.user.id);
         return true;
       }
     } catch(e) { /* try next proxy */ }
@@ -2658,6 +2866,7 @@ function openAccountSettings() {
   document.getElementById('acct-new-pass').value = '';
   document.getElementById('acct-conf-pass').value= '';
   document.getElementById('m-acct-err').textContent = '';
+  loadAthleteEmailToggle();
   openModal('m-account');
 }
 
@@ -3001,6 +3210,7 @@ async function adminRefreshDetail() {
 
 // ── Admin calendar view ──────────────────────────────────────────────────
 function renderDetailBody() {
+  updateAdmNotifUI();
   if (!ADM.detailUserId) return;
   const dm = ADM.cache[ADM.detailUserId]?.dayMap || {};
   const d = ADM.detailMonth, year = d.getFullYear(), month = d.getMonth();
@@ -3290,27 +3500,41 @@ async function syncCommentToSheet(u, day, sectionIdx, comment) {
   }
   const combinedComment = parts.join('\n');
 
+  // Check if athlete has opted into email notifications for coach feedback
+  const athlete = USERS.find(a => a.id === u.id) || u;
+  const sendAthleteEmail = !!(athlete.coachEmailOptIn && athlete.email);
+
   const payload = {
-    secret:        u.scriptSecret || '',
-    action:        'comment',
-    sheetName:     day.tabName,
-    resultsRowIdx: day.resultsRowIdx,
-    colIndex:      day.colIndex,
-    comment:       combinedComment,
+    secret:             u.scriptSecret || '',
+    action:             'comment',
+    sheetName:          day.tabName,
+    resultsRowIdx:      day.resultsRowIdx,
+    colIndex:           day.colIndex,
+    comment:            combinedComment,
+    sendAthleteEmail:   sendAthleteEmail,
+    athleteEmail:       sendAthleteEmail ? (athlete.email || '') : '',
+    athleteName:        athlete.name || 'Athlete',
+    dateLabel:          day.isoDate || day.tabName,
   };
 
-  try {
-    const enc = encodeURIComponent(u.scriptUrl);
-    const res = await fetch('https://corsproxy.io/?url=' + enc, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error);
-  } catch(err) {
-    // Fire-and-forget fallback
-    fetch(u.scriptUrl, {method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)}).catch(()=>{});
+  const commentProxies = [
+    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u.scriptUrl),
+    'https://corsproxy.io/?url=' + encodeURIComponent(u.scriptUrl),
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(u.scriptUrl),
+  ];
+  let commentSynced = false;
+  for (const proxyUrl of commentProxies) {
+    try {
+      const res = await fetch(proxyUrl, {
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data.ok) { commentSynced = true; break; }
+    } catch(e) {}
+  }
+  if (!commentSynced) {
+    fetch(u.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(()=>{});
   }
 }
 
