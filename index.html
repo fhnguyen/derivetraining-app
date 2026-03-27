@@ -2672,7 +2672,12 @@ async function saveAccountSettings() {
 
   USERS[idx] = updated;
   S.user = updated;
-  localStorage.setItem('bloc_users', JSON.stringify(USERS)); // local only
+
+  // Push to master DB so password/name/email changes persist across devices
+  await saveUsersAndSync(USERS);
+
+  // Update cached session with new details
+  localStorage.setItem('bloc_session_user', JSON.stringify(updated));
 
   // Update header
   document.getElementById('h-name').textContent = updated.name;
