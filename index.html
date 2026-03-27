@@ -2658,12 +2658,19 @@ async function saveAccountSettings() {
     if (newPass !== confPass) { errEl.textContent = 'New passwords do not match.'; return; }
   }
 
+  // Always pull fresh master state before writing — prevents stale createdAt
+  // or other admin-set fields from being overwritten by cached local data
+  if (MASTER_SCRIPT_URL && MASTER_SECRET) {
+    const latest = await syncUsersFromMaster();
+    if (latest) USERS = migrateUsers(latest, true);
+  }
+
   // Apply changes to USERS array
   const idx = USERS.findIndex(u => u.id === S.user.id);
   if (idx < 0) { errEl.textContent = 'User not found.'; return; }
 
   const updated = {
-    ...USERS[idx],
+    ...USERS[idx],       // base from fresh master — preserves createdAt, sheetTabNames etc.
     name:  newName,
     email: newEmail,
     mustChangePassword: false,
