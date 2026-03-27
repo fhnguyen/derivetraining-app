@@ -2565,6 +2565,8 @@ async function autoSaveAll(silent=false) {
     secret: scriptSecret, sheetName: day.tabName,
     resultsRowIdx: day.resultsRowIdx, colIndex: day.colIndex,
     sectionResults: secArr, feel: S.feel,
+    athleteName: S.user.name || 'Athlete',
+    dateLabel: S.selDate || day.tabName,
   };
 
   const proxies = [
