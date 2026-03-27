@@ -61,7 +61,7 @@ html,body { height:100%; background:var(--surf); color:var(--text); font-family:
   overflow-y:auto;
   background:
     linear-gradient(rgba(10,10,10,.45), rgba(10,10,10,.45)),
-    url('https://images.squarespace-cdn.com/content/69c08f2a9dcd1c36eb8f3c07/1342f583-697f-4045-9461-c7270c1d89d2/2025-11-01_61056.jpg?content-type=image/jpeg')
+    url('https://i.ibb.co/5WmVnvMt/2025-11-01-61056.jpg')
     center center / cover no-repeat;
   background-attachment: fixed;
 }
@@ -111,6 +111,40 @@ html,body { height:100%; background:var(--surf); color:var(--text); font-family:
 .btn-main:disabled { background:var(--border); color:var(--muted); cursor:not-allowed; }
 .login-admin-link { text-align:center; margin-top:1rem; font-family:var(--mono); font-size:.62rem; letter-spacing:.1em; }
 .login-admin-link a { color:var(--muted2); text-decoration:none; transition:color .15s; }
+
+/* Install banner */
+.install-banner {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--surf);
+  border-top: 2px solid var(--accent);
+  padding: 1rem 1.25rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: flex-start;
+  gap: .85rem;
+  z-index: 999;
+  box-shadow: 0 -4px 20px rgba(0,0,0,.12);
+  animation: slideUp .3s ease;
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.install-banner-icon { font-size: 1.6rem; flex-shrink: 0; margin-top: .1rem; }
+.install-banner-body { flex: 1; }
+.install-banner-title {
+  font-family: var(--mono); font-size: .7rem; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: .3rem;
+}
+.install-banner-text { font-family: var(--sans); font-size: .82rem; color: var(--text); line-height: 1.5; }
+.install-banner-text strong { color: var(--accent); }
+.install-banner-close {
+  background: none; border: none; font-size: 1.1rem; color: var(--muted);
+  cursor: pointer; flex-shrink: 0; padding: 0; line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+}
+.install-banner-close:hover { color: var(--text); }
 .login-admin-link a:hover { color:var(--accent); }
 
 /* ── App header ──────────────────────────────────── */
@@ -961,7 +995,7 @@ html { touch-action: manipulation; }
         <button class="btn-sm" id="btn-sync-master" onclick="adminSyncMaster()">Sync Now</button>
       </div>
       <div class="setting-row">
-        <div><div class="setting-label">Email Alerts — New Results</div><div class="setting-desc">Send email to frank@trainderive.com when an athlete saves results</div></div>
+        <div><div class="setting-label">Email Alerts — New Results</div><div class="setting-desc">Send email to <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e88e9a898683a89c9a8981868c8d9a819e8dc68b8785">[email&#160;protected]</a> when an athlete saves results</div></div>
         <div class="toggle-wrap">
           <label class="toggle"><input type="checkbox" id="toggle-admin-email" onchange="saveAdminEmailToggle()"><span class="toggle-slider"></span></label>
         </div>
@@ -1142,11 +1176,11 @@ html { touch-action: manipulation; }
 
 <div class="toast" id="toast"></div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ═══════════════════════════════════════════════════════════════
 // DATA STORE
 // ═══════════════════════════════════════════════════════════════
-const DEFAULT_ADMIN_PASS = 'D3riv@tiv3!';
+const DEFAULT_ADMIN_PASS = 'admin123';
 
 // ── Master database (shared across all devices/browsers) ─────────────
 // BAKED INTO CODE — available on every device without any configuration.
@@ -1159,7 +1193,7 @@ function getMasterUrl()    { return _MASTER_URL_DEFAULT; }
 function getMasterSecret() { return _MASTER_SECRET_DEFAULT; }
 Object.defineProperty(window, 'MASTER_SCRIPT_URL', { get: getMasterUrl });
 Object.defineProperty(window, 'MASTER_SECRET',     { get: getMasterSecret });
-const DATA_VERSION = 6;  // Bump this whenever DEFAULT_USERS changes to force localStorage refresh
+const DATA_VERSION = 7;  // Bumped: removed demo athlete for public release
 
 // ── Password hashing (SHA-256 via Web Crypto) ─────────────────────────
 async function hashPass(plain) {
@@ -1187,16 +1221,7 @@ async function setAdminPass(plain) {
   const h = await hashPass(plain);
   localStorage.setItem('bloc_admin_hash', h);
 }
-const DEFAULT_USERS = [
-{
-  id:'u1', name:'Athlete Demo', email:'athlete@example.com', pass:'d3ad9315b7be5dd53b31a273b3b3aba5defe700808305aa16a3062b76658a791', role:'athlete',
-  spreadsheetId:'1fNNn_Wh3oAzU6f_Au-14n8rgkX63kvmMVQdgWWIjDVY',
-  sheetGids:{'Sheet1':'0'},
-  scriptUrl:'',
-  scriptSecret:'',
-  createdAt:'2024-01-01',
-}
-];
+const DEFAULT_USERS = [];
 
 // ── Migrate existing users: add createdAt if missing ──────────────────
 // For any user without createdAt, default to 2026-01-01 so they don't
@@ -2829,6 +2854,52 @@ async function saveResults(){
 // UTILS
 // ═══════════════════════════════════════════════════════════════
 function isoToday(){ const n=new Date(); return isoFmt(n); }
+
+// ── Install banner — shown in browser, never in installed PWA ────────────
+function initInstallBanner() {
+  // Never show if already installed as PWA
+  const isInstalled = window.matchMedia('(display-mode: standalone)').matches
+                   || window.navigator.standalone === true;
+  if (isInstalled) return;
+
+  // Never show if user has dismissed it
+  if (localStorage.getItem('bloc_install_dismissed') === '1') return;
+
+  const banner   = document.getElementById('install-banner');
+  const textEl   = document.getElementById('install-banner-text');
+  const iconEl   = document.getElementById('install-banner-icon');
+  if (!banner || !textEl) return;
+
+  // Detect platform and show appropriate instructions
+  const ua = navigator.userAgent;
+  const isIOS     = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+  const isAndroid = /Android/.test(ua);
+
+  if (isIOS) {
+    iconEl.textContent = '📲';
+    textEl.innerHTML = 'Tap the <strong>Share</strong> button (⬆️) at the bottom of your browser, then tap <strong>“Add to Home Screen”</strong> for the full app experience.';
+  } else if (isAndroid) {
+    iconEl.textContent = '📲';
+    textEl.innerHTML = 'Tap the <strong>menu (⋮)</strong> in your browser and select <strong>“Add to Home Screen”</strong> or <strong>“Install App”</strong> for the full app experience.';
+  } else {
+    // Desktop — don't show banner
+    return;
+  }
+
+  // Show after a short delay so it doesn't flash on load
+  setTimeout(() => { banner.style.display = 'flex'; }, 1500);
+}
+
+function dismissInstallBanner() {
+  const banner = document.getElementById('install-banner');
+  if (banner) {
+    banner.style.animation = 'none';
+    banner.style.transform = 'translateY(100%)';
+    banner.style.transition = 'transform .25s ease';
+    setTimeout(() => { banner.style.display = 'none'; }, 260);
+  }
+  localStorage.setItem('bloc_install_dismissed', '1');
+}
 function togglePw(btn) {
   const input = btn.previousElementSibling;
   const show  = input.type === 'password';
@@ -3861,6 +3932,7 @@ window._initComplete = false;
 
   // Now route — users are loaded from master regardless of localStorage state
   parseHashAndRoute();
+  initInstallBanner();
 
   // Background re-sync for admin panel
   const admUsers = document.getElementById('adm-users');
@@ -3885,5 +3957,16 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+
+  <!-- Install to home screen banner (shown in browser, hidden in PWA) -->
+  <div class="install-banner" id="install-banner" style="display:none">
+    <div class="install-banner-icon" id="install-banner-icon">📲</div>
+    <div class="install-banner-body">
+      <div class="install-banner-title">Add to Home Screen</div>
+      <div class="install-banner-text" id="install-banner-text"></div>
+    </div>
+    <button class="install-banner-close" onclick="dismissInstallBanner()" title="Dismiss">✕</button>
+  </div>
+
 </body>
 </html>
