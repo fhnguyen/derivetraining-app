@@ -1252,8 +1252,29 @@ async function syncUsersFromMaster() {
     if (cleanUsers.length !== masterUsers.length) {
       console.warn('syncUsersFromMaster: found', masterUsers.length - cleanUsers.length,
         'duplicate(s) in master sheet — will auto-clean after init');
-      // Schedule clean after init is complete — never write during sync/init
       setTimeout(() => pushUsersToMaster(cleanUsers).catch(() => {}), 3000);
+    }
+
+    // If there's an active athlete session, preserve their locally cached password
+    // in case they changed it and the push to master hasn't completed yet
+    const sessionUser = (() => {
+      try { return JSON.parse(localStorage.getItem('bloc_session_user') || 'null'); } catch { return null; }
+    })();
+    if (sessionUser && sessionUser.pass) {
+      const idx = cleanUsers.findIndex(u =>
+        u.email && sessionUser.email &&
+        u.email.toLowerCase() === sessionUser.email.toLowerCase()
+      );
+      if (idx >= 0 && cleanUsers[idx].pass !== sessionUser.pass) {
+        // Local has a different (newer) password hash — check if it's a valid hash
+        const HEX64 = /^[0-9a-f]{64}$/;
+        if (HEX64.test(sessionUser.pass)) {
+          console.log('Preserving local password hash for', sessionUser.email);
+          cleanUsers[idx] = { ...cleanUsers[idx], pass: sessionUser.pass, mustChangePassword: false };
+          // Push the corrected list back to master so it's permanent
+          setTimeout(() => pushUsersToMaster(cleanUsers).catch(() => {}), 3000);
+        }
+      }
     }
 
     // Master has users — use them as source of truth, update local cache
@@ -1266,11 +1287,12 @@ async function syncUsersFromMaster() {
   }
 }
 
-async function pushUsersToMaster(users) {
+// Pending push queue — if a push fails, retry when next opportunity arises
+let _pendingPush = null;
+
+async function pushUsersToMaster(users, retries = 3) {
   if (!MASTER_SCRIPT_URL || !MASTER_SECRET) return false;
 
-  // Block writes during initialisation — prevents race conditions where
-  // partial or stale USERS state gets pushed to master before sync completes
   if (!window._initComplete) {
     console.warn('pushUsersToMaster blocked — init not yet complete');
     return false;
@@ -1340,6 +1362,18 @@ async function pushUsersToMaster(users) {
     console.log('Users push sent (no-cors, unconfirmed)');
     return null; // unknown — may have worked
   } catch(e) {}
+
+  // All proxies failed — queue for retry
+  if (retries > 0) {
+    console.warn('Push failed, retrying in 5s... (' + retries + ' retries left)');
+    _pendingPush = deduped;
+    setTimeout(async () => {
+      if (_pendingPush) {
+        const r = await pushUsersToMaster(_pendingPush, retries - 1);
+        if (r !== false) _pendingPush = null;
+      }
+    }, 5000);
+  }
 
   console.error('All push attempts failed');
   return false;
@@ -2681,7 +2715,8 @@ async function saveAccountSettings() {
   S.user = updated;
 
   // Push to master DB so password/name/email changes persist across devices
-  await saveUsersAndSync(USERS);
+  const pushResult = await pushUsersToMaster(USERS);
+  localStorage.setItem('bloc_users', JSON.stringify(USERS));
 
   // Update cached session with new details
   localStorage.setItem('bloc_session_user', JSON.stringify(updated));
@@ -2694,7 +2729,11 @@ async function saveAccountSettings() {
   document.getElementById('first-login-banner').style.display = 'none';
 
   closeModal('m-account');
-  showToast('Account updated', 'ok');
+  if (pushResult === false) {
+    showToast('Account saved locally — sync to master failed, try again', 'err');
+  } else {
+    showToast('Account updated ✔', 'ok');
+  }
 }
 
 
