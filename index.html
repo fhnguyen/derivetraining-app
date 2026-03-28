@@ -995,7 +995,7 @@ html { touch-action: manipulation; }
         <button class="btn-sm" id="btn-sync-master" onclick="adminSyncMaster()">Sync Now</button>
       </div>
       <div class="setting-row">
-       <div><div class="setting-label">Email Alerts — New Results</div><div class="setting-desc">Send email alert when an athlete saves results</div></div>
+        <div><div class="setting-label">Email Alerts — New Results</div><div class="setting-desc">Send email to <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e88e9a898683a89c9a8981868c8d9a819e8dc68b8785">[email&#160;protected]</a> when an athlete saves results</div></div>
         <div class="toggle-wrap">
           <label class="toggle"><input type="checkbox" id="toggle-admin-email" onchange="saveAdminEmailToggle()"><span class="toggle-slider"></span></label>
         </div>
@@ -1344,24 +1344,31 @@ async function syncUsersFromMaster() {
       setTimeout(() => pushUsersToMaster(cleanUsers).catch(() => {}), 3000);
     }
 
-    // If there's an active athlete session, preserve their locally cached password
-    // in case they changed it and the push to master hasn't completed yet
+    // Preserve locally pending password changes that are newer than master
+    const HEX64 = /^[0-9a-f]{64}$/;
+    const pendingChange = (() => {
+      try { return JSON.parse(localStorage.getItem('bloc_pending_account_change') || 'null'); } catch { return null; }
+    })();
     const sessionUser = (() => {
       try { return JSON.parse(localStorage.getItem('bloc_session_user') || 'null'); } catch { return null; }
     })();
-    if (sessionUser && sessionUser.pass) {
+    const localCandidate = pendingChange || sessionUser;
+    if (localCandidate && localCandidate.email && localCandidate.pass && HEX64.test(localCandidate.pass)) {
       const idx = cleanUsers.findIndex(u =>
-        u.email && sessionUser.email &&
-        u.email.toLowerCase() === sessionUser.email.toLowerCase()
+        u.email && u.email.toLowerCase() === localCandidate.email.toLowerCase()
       );
-      if (idx >= 0 && cleanUsers[idx].pass !== sessionUser.pass) {
-        // Local has a different (newer) password hash — check if it's a valid hash
-        const HEX64 = /^[0-9a-f]{64}$/;
-        if (HEX64.test(sessionUser.pass)) {
-          console.log('Preserving local password hash for', sessionUser.email);
-          cleanUsers[idx] = { ...cleanUsers[idx], pass: sessionUser.pass, mustChangePassword: false };
-          // Push the corrected list back to master so it's permanent
-          setTimeout(() => pushUsersToMaster(cleanUsers).catch(() => {}), 3000);
+      if (idx >= 0 && cleanUsers[idx].pass !== localCandidate.pass) {
+        const masterTs = cleanUsers[idx]._passChangedAt || 0;
+        const localTs  = localCandidate._passChangedAt  || 0;
+        if (localTs >= masterTs) {
+          console.log('Local password is newer — preserving for', localCandidate.email);
+          cleanUsers[idx] = { ...cleanUsers[idx], pass: localCandidate.pass,
+            mustChangePassword: false, _passChangedAt: localTs };
+          setTimeout(() => {
+            pushUsersToMaster(cleanUsers)
+              .then(ok => { if (ok === true) localStorage.removeItem('bloc_pending_account_change'); })
+              .catch(() => {});
+          }, 3000);
         }
       }
     }
@@ -2994,28 +3001,34 @@ async function saveAccountSettings() {
     ...(changingPassword ? { pass: await hashPass(newPass) } : {}),
   };
 
+  // Stamp the update time so sync can compare timestamps
+  updated._passChangedAt = Date.now();
+
   USERS[idx] = updated;
   S.user = updated;
-
-  // Push to master DB so password/name/email changes persist across devices
-  const pushResult = await pushUsersToMaster(USERS);
   localStorage.setItem('bloc_users', JSON.stringify(USERS));
-
-  // Update cached session with new details
   localStorage.setItem('bloc_session_user', JSON.stringify(updated));
 
-  // Update header
   document.getElementById('h-name').textContent = updated.name;
   document.getElementById('h-avatar').textContent = updated.name.charAt(0).toUpperCase();
-
-  // Hide first-login banner
   document.getElementById('first-login-banner').style.display = 'none';
 
   closeModal('m-account');
-  if (pushResult === false) {
-    showToast('Account saved locally — sync to master failed, try again', 'err');
-  } else {
+
+  // Push with retries
+  let pushed = false;
+  for (let attempt = 0; attempt < 3 && !pushed; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
+    const result = await pushUsersToMaster(USERS);
+    if (result === true) { pushed = true; }
+  }
+
+  if (pushed) {
+    localStorage.removeItem('bloc_pending_account_change');
     showToast('Account updated ✔', 'ok');
+  } else {
+    localStorage.setItem('bloc_pending_account_change', JSON.stringify(updated));
+    showToast('Saved — will sync when connection improves', 'ok');
   }
 }
 
