@@ -2806,7 +2806,7 @@ async function autoSaveAll(silent=false) {
     sectionResults: secArr, feel: S.feel,
     athleteName: S.user.name || 'Athlete',
     dateLabel: S.selDate || day.tabName,
-    sendEmail: getAdminEmailAlerts(),
+    sendEmail: !silent && getAdminEmailAlerts(),
   };
 
   const proxies = [
