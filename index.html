@@ -1209,9 +1209,16 @@ async function hashPass(plain) {
 const DEFAULT_ADMIN_HASH = '7c4f0e3e8ac7ea7b8c9b4c3a6f1e2d5e9b0f3a2c8d4e1b6a9c7f2e5d8b3a4f1c';
 
 async function getAdminHash() {
+  // Check localStorage first (fast path)
   const stored = localStorage.getItem('bloc_admin_hash');
   if (stored) return stored;
-  // First run — hash the default password and store it
+  // Check master DB settings entry (survives localStorage wipes)
+  const settings = getAdminSettings();
+  if (settings.adminHash) {
+    localStorage.setItem('bloc_admin_hash', settings.adminHash);
+    return settings.adminHash;
+  }
+  // First run — hash the default and store
   const h = await hashPass(DEFAULT_ADMIN_PASS);
   localStorage.setItem('bloc_admin_hash', h);
   return h;
@@ -1220,6 +1227,8 @@ async function getAdminHash() {
 async function setAdminPass(plain) {
   const h = await hashPass(plain);
   localStorage.setItem('bloc_admin_hash', h);
+  // Persist in master DB so password survives localStorage clears
+  saveAdminSettings({ adminHash: h }).catch(() => {});
 }
 const DEFAULT_USERS = [];
 
