@@ -3501,11 +3501,9 @@ function adminBuildSecCard(text, idx, blockLabel, secIdx, day) {
   pre.innerHTML = linkify(escH(text));
   body.appendChild(pre);
 
-  // Client result (read-only) — match by label not position (handles sparse results)
+  // Client result (read-only) — match by label only, never fall back to position
   const sectionLabel = toAlpha(idx);
-  const result = day.results && (
-    day.results.find(r => r.label === sectionLabel) || day.results[idx]
-  );
+  const result = day.results && day.results.find(r => r.label === sectionLabel);
   const resBox = document.createElement('div'); resBox.className = 'adm-result-box';
   if (result && result.content) {
     resBox.innerHTML = '<div class="adm-result-label">Client Result</div>' +
