@@ -2627,7 +2627,12 @@ function _openDay(iso) {
   S.selDate = iso;
   S.feel = day?.feel ? parseFloat(day.feel) : null;
   S.secResults = {};
-  if (day?.results?.length) day.results.forEach((r,i)=>{ if(r.content) S.secResults[i]=r.content; });
+  if (day?.results?.length) day.results.forEach((r,i) => {
+    if (!r.content) return;
+    // Map label back to index: A->0, B->1, etc. Handles sparse results correctly
+    const labelIdx = r.label && /^[A-Z]$/.test(r.label) ? r.label.charCodeAt(0) - 65 : i;
+    S.secResults[labelIdx >= 0 ? labelIdx : i] = r.content;
+  });
   // Restore any unsaved draft from localStorage (survives refresh)
   const draft = loadDraft(iso);
   if (draft) {
@@ -2894,7 +2899,7 @@ function initInstallBanner() {
 
   if (isIOS) {
     iconEl.textContent = '📲';
-    textEl.innerHTML = 'Tap the <strong>Share</strong> button (⬆️) at the bottom of your browser, then tap <strong>“Add to Home Screen”</strong> for the full app experience.';
+    textEl.innerHTML = 'Tap the <strong>Share</strong> button in your browser, then tap <strong>“Add to Home Screen”</strong> for the full app experience.';
   } else if (isAndroid) {
     iconEl.textContent = '📲';
     textEl.innerHTML = 'Tap the <strong>menu (⋮)</strong> in your browser and select <strong>“Add to Home Screen”</strong> or <strong>“Install App”</strong> for the full app experience.';
@@ -3034,10 +3039,10 @@ async function saveAccountSettings() {
 
   if (pushed) {
     localStorage.removeItem('bloc_pending_account_change');
-    showToast('Account updated ✔', 'ok');
+    showToast(changingPassword ? 'Password changed ✔' : 'Account updated ✔', 'ok');
   } else {
     localStorage.setItem('bloc_pending_account_change', JSON.stringify(updated));
-    showToast('Saved — will sync when connection improves', 'ok');
+    showToast(changingPassword ? 'Password saved — syncing in background' : 'Saved — will sync when connection improves', 'ok');
   }
 }
 
@@ -3496,8 +3501,11 @@ function adminBuildSecCard(text, idx, blockLabel, secIdx, day) {
   pre.innerHTML = linkify(escH(text));
   body.appendChild(pre);
 
-  // Client result (read-only)
-  const result = day.results && day.results[idx];
+  // Client result (read-only) — match by label not position (handles sparse results)
+  const sectionLabel = toAlpha(idx);
+  const result = day.results && (
+    day.results.find(r => r.label === sectionLabel) || day.results[idx]
+  );
   const resBox = document.createElement('div'); resBox.className = 'adm-result-box';
   if (result && result.content) {
     resBox.innerHTML = '<div class="adm-result-label">Client Result</div>' +
