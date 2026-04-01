@@ -1593,9 +1593,22 @@ function restoreSession() {
     } catch(e) {}
   }
   if (!user) { localStorage.removeItem('bloc_session'); localStorage.removeItem('bloc_session_user'); return false; }
-  // Sync latest user data from USERS if available
-  const live = USERS.find(u => u.id === savedId);
-  if (live) user = live;
+  // Sync latest user data from USERS if available — use email match preferentially
+  // so a restored session always gets the freshest master data by email, not stale id
+  const liveByEmail = user.email && USERS.find(u =>
+    !u._type && u.email && u.email.toLowerCase() === user.email.toLowerCase()
+  );
+  if (liveByEmail) {
+    // Check if master version has a newer password change than our session user
+    const sessionTs = user._passChangedAt || 0;
+    const masterTs  = liveByEmail._passChangedAt || 0;
+    if (sessionTs > masterTs && user.pass) {
+      // Session has a newer password — merge it onto master data
+      user = { ...liveByEmail, pass: user.pass, mustChangePassword: false, _passChangedAt: sessionTs };
+    } else {
+      user = liveByEmail;
+    }
+  }
   S.user = user;
   document.getElementById('h-name').textContent = user.name;
   document.getElementById('h-avatar').textContent = user.name.charAt(0).toUpperCase();
