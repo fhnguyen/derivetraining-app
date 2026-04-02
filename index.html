@@ -2839,6 +2839,8 @@ async function autoSaveAll(silent=false) {
       const stEl=document.getElementById('save-st');
       if (stEl) { stEl.textContent='Saved ✓'; stEl.className='save-st ok'; }
     }
+    // Notify admin even without script
+    if (!silent && S.user && S.selDate) notifyAdminOfResults(S.selDate, S.user.id);
     return null; // no script — local only
   }
 
@@ -2889,6 +2891,8 @@ async function autoSaveAll(silent=false) {
     const stEl=document.getElementById('save-st');
     if (stEl) { stEl.textContent='Saved ✓'; stEl.className='save-st ok'; }
   }
+  // Notify admin even on unconfirmed send
+  if (S.user && S.selDate) notifyAdminOfResults(S.selDate, S.user.id);
   return null;
 }
 
