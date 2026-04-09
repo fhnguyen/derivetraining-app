@@ -284,6 +284,20 @@ html { touch-action: manipulation; }
 
 /* ── Blocks ──────────────────────────────────────── */
 .blk-wrap { margin-bottom:1.8rem; }
+.daily-note {
+  background:#fdf6e8; border-left:4px solid var(--gold);
+  border-radius:0 var(--r) var(--r) 0;
+  padding:.85rem 1rem; margin-bottom:1.4rem;
+}
+.daily-note-label {
+  font-family:var(--mono); font-size:.58rem; font-weight:700;
+  letter-spacing:.16em; text-transform:uppercase;
+  color:var(--gold); margin-bottom:.4rem;
+}
+.daily-note-text {
+  font-family:var(--sans); font-size:.9rem; line-height:1.6;
+  color:var(--text); white-space:pre-wrap;
+}
 
 /* Section container that extends below the pill bar */
 .blk-sections {
@@ -2467,12 +2481,31 @@ function parseSheetCSV(csv, tabName, cutoff) {
       // Skip if this date already exists with more data
       if (S.dayMap[isoDate] && !S.dayMap[isoDate].isRestDay && !rawTraining) continue;
 
+      // Extract NOTE: prefix from top of training cell
+      let dailyNote = null;
+      let trainingContent = rawTraining;
+      if (rawTraining && /^NOTE:/i.test(rawTraining)) {
+        const lines = rawTraining.split('\n');
+        const noteLines = [];
+        let i = 0;
+        // Consume NOTE: line and any continuation lines until + or ___
+        while (i < lines.length) {
+          const t = lines[i].trim();
+          if (i === 0) { noteLines.push(t.replace(/^NOTE:\s*/i, '')); i++; continue; }
+          if (/^[+]$/.test(t) || /^_{5,}$/.test(t)) break;
+          noteLines.push(lines[i]); i++;
+        }
+        dailyNote = noteLines.join('\n').trim();
+        trainingContent = lines.slice(i).join('\n').trim();
+      }
+
       S.dayMap[isoDate] = {
         isoDate, dateStr, tabName,
         colIndex: col,
         resultsRowIdx: resultsRowIdx,
         isRestDay: !rawTraining,
-        blocks: rawTraining ? parseTrainingBlocks(rawTraining) : [],
+        dailyNote,
+        blocks: trainingContent ? parseTrainingBlocks(trainingContent) : [],
         results: rawResults ? parseResultSections(rawResults) : [],
         feel
       };
@@ -2692,6 +2725,12 @@ function renderDayContent(day) {
   }
   if (day.results?.length && day.results.some(r=>r.content)) {
     const b=document.createElement('div'); b.className='logged-badge'; b.innerHTML='✓ &nbsp;Results logged'; el.appendChild(b);
+  }
+  if (day.dailyNote) {
+    const n=document.createElement('div'); n.className='daily-note';
+    n.innerHTML='<div class="daily-note-label">📋 Today\'s Training Note</div>' +
+      '<div class="daily-note-text">'+escH(day.dailyNote)+'</div>';
+    el.appendChild(n);
   }
   let gIdx = 0;
   day.blocks.forEach(block => {
@@ -3534,6 +3573,12 @@ function adminRenderDayContent(day) {
     el.appendChild(b);
   }
 
+  if (day.dailyNote) {
+    const n=document.createElement('div'); n.className='daily-note';
+    n.innerHTML='<div class="daily-note-label">📋 Today\'s Training Note</div>' +
+      '<div class="daily-note-text">'+escH(day.dailyNote)+'</div>';
+    el.appendChild(n);
+  }
   let gIdx = 0;
   let bSecIdx = 0;
   day.blocks.forEach(block => {
