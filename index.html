@@ -2272,21 +2272,26 @@ async function loadAllSheets() {
 
     if (tabNames) {
       console.log('Fetching by tab names:', tabNames.join(', '));
+      const discovered = await discoverTabs(spreadsheetId) || [];
+      const nameToGid = {};
+      discovered.forEach(t => { nameToGid[t.title.trim()] = t.gid; });
+
       await Promise.all(tabNames.map(async tabName => {
         try {
+          const gid = nameToGid[tabName.trim()];
           const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
-                      '/export?format=csv&sheet=' + encodeURIComponent(tabName);
+                      (gid ? '/export?format=csv&gid=' + gid
+                           : '/export?format=csv&sheet=' + encodeURIComponent(tabName));
           const csv = await proxyFetch(url);
           if (csvHasTrainingBlock(csv)) {
             parseSheetCSV(csv, tabName, cutoff);
-            console.log('Parsed by name:', tabName, '— days:', Object.keys(S.dayMap).length);
+            console.log('Parsed tab:', tabName, gid ? '(GID ' + gid + ')' : '(by name)', '— days:', Object.keys(S.dayMap).length);
           } else {
             console.log('Skipped (no Training row):', tabName);
           }
         } catch(err) { console.warn('Tab by name failed:', tabName, err.message); }
       }));
 
-      // If we got data, done
       if (Object.keys(S.dayMap).length > 0) { _finishLoad(); return; }
       console.warn('Named tabs returned no data, falling back to GID scan');
     }
@@ -3309,11 +3314,17 @@ async function loadUserSheets(u) {
 
   // Strategy 1: fetch by tab name (same as client path — GID-independent)
   const tabNames = u.sheetTabNames && u.sheetTabNames.length ? u.sheetTabNames : null;
-  if (tabNames) {
+ if (tabNames) {
+    const discovered = await discoverTabs(sid) || [];
+    const nameToGid = {};
+    discovered.forEach(t => { nameToGid[t.title.trim()] = t.gid; });
+
     await Promise.all(tabNames.map(async tabName => {
       try {
+        const gid = nameToGid[tabName.trim()];
         const url = 'https://docs.google.com/spreadsheets/d/' + sid +
-                    '/export?format=csv&sheet=' + encodeURIComponent(tabName);
+                    (gid ? '/export?format=csv&gid=' + gid
+                         : '/export?format=csv&sheet=' + encodeURIComponent(tabName));
         const csv = await proxyFetch(url);
         if (!csvHasTrainingBlock(csv)) return;
         const savedMap = S.dayMap; S.dayMap = dayMap;
