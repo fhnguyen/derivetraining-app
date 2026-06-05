@@ -1,5 +1,5 @@
 // TRAINDERIVE Service Worker
-const CACHE = 'trainderive-v4';
+const CACHE = 'trainderive-v5';
 
 // On install — skip waiting immediately, take control right away
 self.addEventListener('install', e => {
