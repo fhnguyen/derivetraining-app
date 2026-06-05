@@ -2053,43 +2053,42 @@ async function loadAllSheets() {
     const useScript = !!(scriptUrl && scriptSec);
 
     if (tabNames) {
-      console.log('Loading tabs:', tabNames.join(', '), '| script:', useScript ? 'yes' : 'no');
+      setStatus('Fetching ' + tabNames.join(', ') + '...');
       await Promise.all(tabNames.map(async tabName => {
         try {
           let csv = null;
 
-          // Primary: Apps Script doGet — confirmed working after redeployment
           if (useScript) {
             try {
+              setStatus('Trying Apps Script for ' + tabName + '...');
               csv = await loadCSVViaScript(scriptUrl, scriptSec, tabName);
-              console.log('✓ Apps Script returned CSV for', tabName, 'length:', csv?.length);
+              setStatus('Got CSV via Apps Script (' + (csv ? csv.length : 0) + ' chars)');
             } catch(se) {
-              console.warn('Apps Script failed for', tabName, ':', se.message);
+              setStatus('Apps Script failed: ' + se.message);
             }
           }
 
-          // Fallback: proxy chain (if script not configured or failed)
           if (!csv || csv.length < 10) {
             try {
+              setStatus('Trying proxy for ' + tabName + '...');
               const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
                           '/export?format=csv&sheet=' + encodeURIComponent(tabName);
               csv = await proxyFetch(url);
-              console.log('✓ Proxy returned CSV for', tabName, 'length:', csv?.length);
+              setStatus('Got CSV via proxy (' + (csv ? csv.length : 0) + ' chars)');
             } catch(pe) {
-              console.warn('Proxy failed for', tabName, ':', pe.message);
+              setStatus('Proxy failed: ' + pe.message);
             }
           }
 
           if (csv && csvHasTrainingBlock(csv)) {
             parseSheetCSV(csv, tabName, cutoff);
-            console.log('✓ Parsed', tabName, '— days:', Object.keys(S.dayMap).length);
+            setStatus('Parsed ' + tabName + ' - ' + Object.keys(S.dayMap).length + ' days found');
           } else {
-            console.warn('✗ No training block in', tabName, '— first 120 chars:', csv ? csv.slice(0,120) : 'null');
+            setStatus('No training block. CSV starts: ' + (csv ? csv.slice(0,80) : 'null'));
           }
-        } catch(err) { console.warn('Tab failed:', tabName, err.message); }
+        } catch(err) { setStatus('Error: ' + err.message); }
       }));
       if (Object.keys(S.dayMap).length > 0) { _finishLoad(); return; }
-      console.warn('No days loaded — check console logs above');
     }
 
     _finishLoad();
