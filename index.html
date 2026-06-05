@@ -1423,7 +1423,6 @@ async function pushUsersToMaster(users, retries = 3) {
   const proxies = [
     'https://trainderive.frank-467.workers.dev/?url=' + encodeURIComponent(url),
     'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
-    'https://cors.x2u.in/' + url,
   ];
 
   for (const proxyUrl of proxies) {
@@ -1954,8 +1953,6 @@ async function scriptFetch(scriptUrl, secret, action, params = {}) {
     { url: url,                                                ms: 12000, opts: { redirect: 'follow' } },
     { url: 'https://trainderive.frank-467.workers.dev/?url=' + enc,                          ms: 8000,  opts: {} },
     { url: 'https://api.codetabs.com/v1/proxy?quest=' + enc,  ms: 8000,  opts: {} },
-    { url: 'https://cors.x2u.in/' + url,                      ms: 8000,  opts: {} },
-    { url: 'https://thingproxy.freeboard.io/fetch/' + url,    ms: 8000,  opts: {} },
   ];
 
   for (let i = 0; i < attempts.length; i++) {
@@ -2014,8 +2011,6 @@ async function proxyFetch(url) {
   const proxies = [
     'https://trainderive.frank-467.workers.dev/?url=' + enc,
     'https://api.codetabs.com/v1/proxy?quest=' + enc,
-    'https://cors.x2u.in/' + url,
-    'https://thingproxy.freeboard.io/fetch/' + url,
   ];
 
   try {
@@ -2679,7 +2674,6 @@ async function autoSaveAll(silent=false) {
   const proxies = [
     'https://trainderive.frank-467.workers.dev/?url=' + encodeURIComponent(scriptUrl),
     'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(scriptUrl),
-    'https://cors.x2u.in/' + scriptUrl,
   ];
 
   for (const proxyUrl of proxies) {
@@ -3505,7 +3499,6 @@ async function syncCommentToSheet(u, day, sectionIdx, comment) {
   const commentProxies = [
     'https://trainderive.frank-467.workers.dev/?url=' + encodeURIComponent(u.scriptUrl),
     'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u.scriptUrl),
-    'https://cors.x2u.in/' + u.scriptUrl,
   ];
   let commentSynced = false;
   for (const proxyUrl of commentProxies) {
