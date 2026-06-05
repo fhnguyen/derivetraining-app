@@ -927,6 +927,7 @@ html { touch-action: manipulation; }
           <div class="cal-badge" id="cal-badge" style="display:none"></div>
         </div>
         <div class="cal-arrows">
+          <button class="btn-sm" onclick="loadAllSheets()" title="Reload programming" style="margin-right:.4rem">&#x21BA;</button>
           <button class="cal-arr" onclick="shiftMonth(-1)">&#8592;</button>
           <button class="cal-arr" onclick="shiftMonth(1)">&#8594;</button>
         </div>
@@ -1937,27 +1938,37 @@ function confirmReset(){
 // Apps Script instead of a public CORS proxy. This is reliable, fast,
 // and not subject to proxy blocking.
 
+function makeFetchWithTimeout(ms) {
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), ms);
+  return { signal: ctrl.signal, clear: () => clearTimeout(tid) };
+}
+
 async function scriptFetch(scriptUrl, secret, action, params = {}) {
   const qs  = new URLSearchParams({ action, secret, ...params }).toString();
   const url = scriptUrl + '?' + qs;
   const enc = encodeURIComponent(url);
 
   const attempts = [
-    () => fetch(url, { signal: AbortSignal.timeout(12000), redirect: 'follow' }),
-    () => fetch('https://api.allorigins.win/raw?url=' + enc, { signal: AbortSignal.timeout(8000) }),
-    () => fetch('https://api.codetabs.com/v1/proxy?quest=' + enc, { signal: AbortSignal.timeout(8000) }),
-    () => fetch('https://cors.x2u.in/' + url, { signal: AbortSignal.timeout(8000) }),
-    () => fetch('https://thingproxy.freeboard.io/fetch/' + url, { signal: AbortSignal.timeout(8000) }),
+    { url: url,                                              ms: 12000, opts: { redirect: 'follow' } },
+    { url: 'https://api.allorigins.win/raw?url=' + enc,     ms: 8000,  opts: {} },
+    { url: 'https://api.codetabs.com/v1/proxy?quest=' + enc,ms: 8000,  opts: {} },
+    { url: 'https://cors.x2u.in/' + url,                    ms: 8000,  opts: {} },
+    { url: 'https://thingproxy.freeboard.io/fetch/' + url,  ms: 8000,  opts: {} },
   ];
 
   for (let i = 0; i < attempts.length; i++) {
+    const { url: u, ms, opts } = attempts[i];
+    const { signal, clear } = makeFetchWithTimeout(ms);
     try {
-      const res = await attempts[i]();
+      const res = await fetch(u, { signal, ...opts });
+      clear();
       if (!res.ok) { console.warn('scriptFetch attempt', i, 'HTTP', res.status); continue; }
       const text = await res.text();
       if (text && text.length > 10) return text;
       console.warn('scriptFetch attempt', i, 'empty response');
     } catch(err) {
+      clear();
       console.warn('scriptFetch attempt', i, 'failed:', err.message);
     }
   }
@@ -3119,23 +3130,29 @@ async function loadUserSheets(u) {
   const dayMap = {};
   if (!u.spreadsheetId) return dayMap;
 
-  const sid = u.spreadsheetId;
+  const sid        = u.spreadsheetId;
+  const useScript  = !!(u.scriptUrl && u.scriptSecret);
+  const tabNames   = u.sheetTabNames && u.sheetTabNames.length ? u.sheetTabNames : null;
 
-  // Strategy 1: fetch by tab name (same as client path — GID-independent)
-  const tabNames = u.sheetTabNames && u.sheetTabNames.length ? u.sheetTabNames : null;
- if (tabNames) {
-    const discovered = await discoverTabs(sid) || [];
-    const nameToGid = {};
-    discovered.forEach(t => { nameToGid[t.title.trim()] = t.gid; });
-
+  // Strategy 1: fetch by tab name — Apps Script primary, proxy fallback
+  if (tabNames) {
     await Promise.all(tabNames.map(async tabName => {
       try {
-        const gid = nameToGid[tabName.trim()];
-        const url = 'https://docs.google.com/spreadsheets/d/' + sid +
-                    (gid ? '/export?format=csv&gid=' + gid
-                         : '/export?format=csv&sheet=' + encodeURIComponent(tabName));
-        const csv = await proxyFetch(url);
-        if (!csvHasTrainingBlock(csv)) return;
+        let csv;
+        // Primary: Apps Script doGet (reliable, no Google export auth issues)
+        if (useScript) {
+          try { csv = await loadCSVViaScript(u.scriptUrl, u.scriptSecret, tabName); }
+          catch(se) { console.warn('Admin script CSV failed, trying proxy:', se.message); }
+        }
+        // Fallback: proxy chain
+        if (!csv || csv.length < 10) {
+          try {
+            const url = 'https://docs.google.com/spreadsheets/d/' + sid +
+                        '/export?format=csv&sheet=' + encodeURIComponent(tabName);
+            csv = await proxyFetch(url);
+          } catch(pe) { console.warn('Admin proxy also failed:', pe.message); }
+        }
+        if (!csv || !csvHasTrainingBlock(csv)) return;
         const savedMap = S.dayMap; S.dayMap = dayMap;
         parseSheetCSV(csv, tabName, null);
         S.dayMap = savedMap;
@@ -3144,24 +3161,24 @@ async function loadUserSheets(u) {
     if (Object.keys(dayMap).length) return dayMap;
   }
 
-  // Strategy 2: feeds API discovery
-  let tabs = await discoverTabs(sid);
-
-  // Strategy 3: stored sheetGids fallback
-  if (!tabs || !tabs.length) {
-    const gids = u.sheetGids || {};
-    if (Object.keys(gids).length) {
-      tabs = Object.entries(gids).map(([title,gid]) => ({title,gid}));
-    } else {
-      tabs = [{ title: 'Sheet', gid: '0' }];
-    }
-  }
+  // Strategy 2: stored sheetGids fallback (no discoverTabs — too slow/unreliable)
+  const gids = u.sheetGids || {};
+  const tabs = Object.keys(gids).length
+    ? Object.entries(gids).map(([title, gid]) => ({ title, gid }))
+    : [{ title: 'Sheet', gid: '0' }];
 
   await Promise.all(tabs.map(async ({title, gid}) => {
     try {
-      const url = 'https://docs.google.com/spreadsheets/d/' + sid +
-                  '/export?format=csv&gid=' + gid;
-      const csv = await proxyFetch(url);
+      let csv;
+      if (useScript) {
+        try { csv = await loadCSVViaScript(u.scriptUrl, u.scriptSecret, gid); }
+        catch(se) { console.warn('Admin script GID failed, trying proxy:', se.message); }
+      }
+      if (!csv || csv.length < 10) {
+        const url = 'https://docs.google.com/spreadsheets/d/' + sid +
+                    '/export?format=csv&gid=' + gid;
+        csv = await proxyFetch(url);
+      }
       if (!csvHasTrainingBlock(csv)) return;
       const savedMap = S.dayMap; S.dayMap = dayMap;
       parseSheetCSV(csv, title, null);
