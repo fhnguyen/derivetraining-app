@@ -1421,8 +1421,8 @@ async function pushUsersToMaster(users, retries = 3) {
   // Apps Script POSTs must go through a proxy — direct POST is blocked by CORS redirect
   const proxies = [
     'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
-    'https://corsproxy.io/?url=' + encodeURIComponent(url),
-    'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+    'https://cors.x2u.in/' + url,
+    'https://corsfix.com/' + url,
   ];
 
   for (const proxyUrl of proxies) {
@@ -1950,11 +1950,11 @@ async function scriptFetch(scriptUrl, secret, action, params = {}) {
   const enc = encodeURIComponent(url);
 
   const attempts = [
-    { url: url,                                              ms: 12000, opts: { redirect: 'follow' } },
-    { url: 'https://api.allorigins.win/raw?url=' + enc,     ms: 8000,  opts: {} },
-    { url: 'https://api.codetabs.com/v1/proxy?quest=' + enc,ms: 8000,  opts: {} },
-    { url: 'https://cors.x2u.in/' + url,                    ms: 8000,  opts: {} },
-    { url: 'https://thingproxy.freeboard.io/fetch/' + url,  ms: 8000,  opts: {} },
+    { url: url,                                                ms: 12000, opts: { redirect: 'follow' } },
+    { url: 'https://api.codetabs.com/v1/proxy?quest=' + enc,  ms: 8000,  opts: {} },
+    { url: 'https://cors.x2u.in/' + url,                      ms: 8000,  opts: {} },
+    { url: 'https://corsfix.com/' + url,                       ms: 8000,  opts: {} },
+    { url: 'https://thingproxy.freeboard.io/fetch/' + url,    ms: 8000,  opts: {} },
   ];
 
   for (let i = 0; i < attempts.length; i++) {
@@ -2054,12 +2054,33 @@ async function loadAllSheets() {
     const useScript = !!(scriptUrl && scriptSec);
 
     if (tabNames) {
-      console.log('Fetching tabs via proxy:', tabNames.join(', '));
+      console.log('Loading tabs:', tabNames.join(', '), '| script:', useScript ? 'yes' : 'no');
       await Promise.all(tabNames.map(async tabName => {
         try {
-          const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
-                      '/export?format=csv&sheet=' + encodeURIComponent(tabName);
-          const csv = await proxyFetch(url);
+          let csv = null;
+
+          // Primary: Apps Script doGet — confirmed working after redeployment
+          if (useScript) {
+            try {
+              csv = await loadCSVViaScript(scriptUrl, scriptSec, tabName);
+              console.log('✓ Apps Script returned CSV for', tabName, 'length:', csv?.length);
+            } catch(se) {
+              console.warn('Apps Script failed for', tabName, ':', se.message);
+            }
+          }
+
+          // Fallback: proxy chain (if script not configured or failed)
+          if (!csv || csv.length < 10) {
+            try {
+              const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
+                          '/export?format=csv&sheet=' + encodeURIComponent(tabName);
+              csv = await proxyFetch(url);
+              console.log('✓ Proxy returned CSV for', tabName, 'length:', csv?.length);
+            } catch(pe) {
+              console.warn('Proxy failed for', tabName, ':', pe.message);
+            }
+          }
+
           if (csv && csvHasTrainingBlock(csv)) {
             parseSheetCSV(csv, tabName, cutoff);
             console.log('✓ Parsed', tabName, '— days:', Object.keys(S.dayMap).length);
@@ -2069,7 +2090,7 @@ async function loadAllSheets() {
         } catch(err) { console.warn('Tab failed:', tabName, err.message); }
       }));
       if (Object.keys(S.dayMap).length > 0) { _finishLoad(); return; }
-      console.warn('No days loaded — all proxies failed or no training data found');
+      console.warn('No days loaded — check console logs above');
     }
 
     _finishLoad();
@@ -2642,8 +2663,8 @@ async function autoSaveAll(silent=false) {
 
   const proxies = [
     'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(scriptUrl),
-    'https://corsproxy.io/?url=' + encodeURIComponent(scriptUrl),
-    'https://api.allorigins.win/raw?url=' + encodeURIComponent(scriptUrl),
+    'https://cors.x2u.in/' + scriptUrl,
+    'https://corsfix.com/' + scriptUrl,
   ];
 
   for (const proxyUrl of proxies) {
@@ -2995,7 +3016,7 @@ async function pollForChanges(userId) {
   if (!u || !u.scriptUrl) return;
   try {
     const enc = encodeURIComponent(u.scriptUrl);
-    const res = await fetch('https://corsproxy.io/?url=' + enc);
+    const res = await fetch('https://api.codetabs.com/v1/proxy?quest=' + enc);
     if (!res.ok) return;
     const data = await res.json();
     if (!data.ok || !data.lastChanged) return;
@@ -3018,7 +3039,7 @@ function startClientChangePoll() {
     if (!S.user || !S.user.scriptUrl) return;
     try {
       const enc = encodeURIComponent(S.user.scriptUrl);
-      const res = await fetch('https://corsproxy.io/?url=' + enc);
+      const res = await fetch('https://api.codetabs.com/v1/proxy?quest=' + enc);
       if (!res.ok) return;
       const data = await res.json();
       if (!data.ok || !data.lastChanged) return;
@@ -3053,13 +3074,23 @@ async function loadUserSheets(u) {
   const useScript  = !!(u.scriptUrl && u.scriptSecret);
   const tabNames   = u.sheetTabNames && u.sheetTabNames.length ? u.sheetTabNames : null;
 
-  // Fetch by tab name via proxy
+  // Apps Script primary, proxy fallback
   if (tabNames) {
     await Promise.all(tabNames.map(async tabName => {
       try {
-        const url = 'https://docs.google.com/spreadsheets/d/' + sid +
-                    '/export?format=csv&sheet=' + encodeURIComponent(tabName);
-        const csv = await proxyFetch(url);
+        let csv = null;
+        if (useScript) {
+          try {
+            csv = await loadCSVViaScript(u.scriptUrl, u.scriptSecret, tabName);
+          } catch(se) { console.warn('Admin script failed for', tabName, ':', se.message); }
+        }
+        if (!csv || csv.length < 10) {
+          try {
+            const url = 'https://docs.google.com/spreadsheets/d/' + sid +
+                        '/export?format=csv&sheet=' + encodeURIComponent(tabName);
+            csv = await proxyFetch(url);
+          } catch(pe) { console.warn('Admin proxy failed for', tabName, ':', pe.message); }
+        }
         if (!csv || !csvHasTrainingBlock(csv)) {
           console.warn('Admin: no training block in', tabName, ':', csv ? csv.slice(0,120) : 'null');
           return;
@@ -3457,8 +3488,8 @@ async function syncCommentToSheet(u, day, sectionIdx, comment) {
 
   const commentProxies = [
     'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u.scriptUrl),
-    'https://corsproxy.io/?url=' + encodeURIComponent(u.scriptUrl),
-    'https://api.allorigins.win/raw?url=' + encodeURIComponent(u.scriptUrl),
+    'https://cors.x2u.in/' + u.scriptUrl,
+    'https://corsfix.com/' + u.scriptUrl,
   ];
   let commentSynced = false;
   for (const proxyUrl of commentProxies) {
