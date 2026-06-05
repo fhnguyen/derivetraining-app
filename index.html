@@ -1171,7 +1171,7 @@ const DEFAULT_ADMIN_PASS = 'admin123';
 // BAKED INTO CODE — available on every device without any configuration.
 // The admin Settings panel can override these with localStorage values,
 // but these hardcoded defaults ensure every fresh device can sync.
-const _MASTER_URL_DEFAULT    = 'https://script.google.com/macros/s/AKfycbzm0ZnfSmDmXfw8PV-INT0bYOg48hp5Bci5QjYdW9pq0Kmy1Ahm0bILUOwAjD8k_cJD/exec';
+const _MASTER_URL_DEFAULT    = 'https://script.google.com/macros/s/AKfycbxk90aICTYWcL_UqF1_ID67wJUY3HfUowqKhyN8DwVku_NRccueYWMrM5Z5YoHvvxd6/exec';
 const _MASTER_SECRET_DEFAULT = 'derive-master';
 
 function getMasterUrl()    { return _MASTER_URL_DEFAULT; }
@@ -1315,7 +1315,8 @@ async function syncUsersFromMaster() {
   if (!MASTER_SCRIPT_URL || !MASTER_SECRET) return false;
   try {
     const url = MASTER_SCRIPT_URL + '?action=getUsers&secret=' + encodeURIComponent(MASTER_SECRET);
-    const res = await fetch(url, { redirect: 'follow' });
+    const workerUrl = 'https://trainderive.frank-467.workers.dev/?url=' + encodeURIComponent(url);
+    const res = await fetch(workerUrl);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'Master DB error');
