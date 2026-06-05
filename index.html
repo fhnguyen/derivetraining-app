@@ -1886,8 +1886,11 @@ async function loadTabsViaScript(scriptUrl, secret) {
   return json.tabs; // [{title, gid}, ...]
 }
 
-async function loadCSVViaScript(scriptUrl, secret, gid) {
-  return await scriptFetch(scriptUrl, secret, 'csv', { gid: String(gid) });
+async function loadCSVViaScript(scriptUrl, secret, tabNameOrGid) {
+  // Accept either a numeric GID or a tab name string
+  const isGid = /^\d+$/.test(String(tabNameOrGid));
+  const params = isGid ? { gid: String(tabNameOrGid) } : { sheet: String(tabNameOrGid) };
+  return await scriptFetch(scriptUrl, secret, 'csv', params);
 }
 
 async function proxyFetch(url) {
@@ -1992,21 +1995,28 @@ async function loadAllSheets() {
     const tabNames = sheetTabNames && sheetTabNames.length ? sheetTabNames : null;
 
     if (tabNames) {
-      console.log('Fetching by tab names:', tabNames.join(', '));
-      const discovered = await discoverTabs(spreadsheetId) || [];
-      const nameToGid = {};
-      discovered.forEach(t => { nameToGid[t.title.trim()] = t.gid; });
+      const scriptUrl  = S.user.scriptUrl;
+      const scriptSec  = S.user.scriptSecret;
+      const useScript  = !!(scriptUrl && scriptSec);
+
+      console.log('Fetching by tab names:', tabNames.join(', '), useScript ? '(via Apps Script)' : '(via proxy)');
 
       await Promise.all(tabNames.map(async tabName => {
         try {
-          const gid = nameToGid[tabName.trim()];
-          const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
-                      (gid ? '/export?format=csv&gid=' + gid
-                           : '/export?format=csv&sheet=' + encodeURIComponent(tabName));
-          const csv = await proxyFetch(url);
-          if (csvHasTrainingBlock(csv)) {
+          let csv;
+          if (useScript) {
+            // Preferred: fetch CSV directly from Apps Script — no proxy needed,
+            // no CORS issues, always works as long as sheet is deployed
+            csv = await loadCSVViaScript(scriptUrl, scriptSec, tabName);
+          } else {
+            // Fallback: use proxy chain to fetch Google export URL
+            const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
+                        '/export?format=csv&sheet=' + encodeURIComponent(tabName);
+            csv = await proxyFetch(url);
+          }
+          if (csv && csvHasTrainingBlock(csv)) {
             parseSheetCSV(csv, tabName, cutoff);
-            console.log('Parsed tab:', tabName, gid ? '(GID ' + gid + ')' : '(by name)', '— days:', Object.keys(S.dayMap).length);
+            console.log('Parsed tab:', tabName, '— days:', Object.keys(S.dayMap).length);
           } else {
             console.log('Skipped (no Training row):', tabName);
           }
@@ -3012,19 +3022,21 @@ async function loadUserSheets(u) {
 
   // Strategy 1: fetch by tab name (same as client path — GID-independent)
   const tabNames = u.sheetTabNames && u.sheetTabNames.length ? u.sheetTabNames : null;
- if (tabNames) {
-    const discovered = await discoverTabs(sid) || [];
-    const nameToGid = {};
-    discovered.forEach(t => { nameToGid[t.title.trim()] = t.gid; });
-
+  if (tabNames) {
+    const useScript = !!(u.scriptUrl && u.scriptSecret);
     await Promise.all(tabNames.map(async tabName => {
       try {
-        const gid = nameToGid[tabName.trim()];
-        const url = 'https://docs.google.com/spreadsheets/d/' + sid +
-                    (gid ? '/export?format=csv&gid=' + gid
-                         : '/export?format=csv&sheet=' + encodeURIComponent(tabName));
-        const csv = await proxyFetch(url);
-        if (!csvHasTrainingBlock(csv)) return;
+        let csv;
+        if (useScript) {
+          try { csv = await loadCSVViaScript(u.scriptUrl, u.scriptSecret, tabName); }
+          catch(se) { console.warn('Script CSV failed, trying proxy:', se.message); }
+        }
+        if (!csv) {
+          const url = 'https://docs.google.com/spreadsheets/d/' + sid +
+                      '/export?format=csv&sheet=' + encodeURIComponent(tabName);
+          csv = await proxyFetch(url);
+        }
+        if (!csv || !csvHasTrainingBlock(csv)) return;
         const savedMap = S.dayMap; S.dayMap = dayMap;
         parseSheetCSV(csv, tabName, null);
         S.dayMap = savedMap;
