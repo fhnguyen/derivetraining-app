@@ -1991,32 +1991,62 @@ async function loadCSVViaScript(scriptUrl, secret, tabNameOrGid) {
 
 async function proxyFetch(url) {
   const enc = encodeURIComponent(url);
-  const proxies = [
+
+  // Race the top 3 proxies simultaneously — first good response wins
+  // This is much faster than trying them sequentially
+  const top3 = [
     'https://api.allorigins.win/raw?url=' + enc,
     'https://api.codetabs.com/v1/proxy?quest=' + enc,
     'https://cors.x2u.in/' + url,
-    'https://thingproxy.freeboard.io/fetch/' + url,
-    'https://corsproxy.io/?url=' + enc,
   ];
-  let lastErr;
-  for (const p of proxies) {
+
+  const tryProxy = async (p) => {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 6000);
     try {
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 8000);  // 8s timeout per proxy
       const res = await fetch(p, { signal: ctrl.signal });
       clearTimeout(tid);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const text = await res.text();
-      if (text.length > 10) return text;
-      throw new Error('Empty response');
+      if (!text || text.length < 10) throw new Error('Empty response');
+      // Reject HTML error pages — a valid CSV never starts with <
+      if (text.trimStart().startsWith('<')) throw new Error('Got HTML instead of CSV');
+      return text;
     } catch(err) {
-      lastErr = err;
-      if (err.name !== 'AbortError') {
-        console.warn('Proxy failed:', p.split('?')[0], '-', err.message);
-      }
+      clearTimeout(tid);
+      throw err;
+    }
+  };
+
+  // Try all 3 at once, return first success
+  try {
+    return await Promise.any(top3.map(p => tryProxy(p)));
+  } catch(e) {
+    // All 3 failed — try fallbacks sequentially
+    console.warn('Top proxies all failed, trying fallbacks...');
+  }
+
+  // Fallbacks
+  const fallbacks = [
+    'https://thingproxy.freeboard.io/fetch/' + url,
+    'https://corsproxy.io/?url=' + enc,
+  ];
+  for (const p of fallbacks) {
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 6000);
+      const res = await fetch(p, { signal: ctrl.signal });
+      clearTimeout(tid);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
+      if (!text || text.length < 10) throw new Error('Empty');
+      if (text.trimStart().startsWith('<')) throw new Error('Got HTML not CSV');
+      return text;
+    } catch(err) {
+      console.warn('Fallback proxy failed:', p.split('?')[0], err.message);
     }
   }
-  throw new Error('All proxies failed: ' + (lastErr&&lastErr.message));
+  throw new Error('All proxies failed for: ' + url.slice(0, 80));
 }
 
 // Discover all tabs by fetching the HTML preview of the spreadsheet
@@ -2091,29 +2121,17 @@ async function loadAllSheets() {
     const tabNames = sheetTabNames && sheetTabNames.length ? sheetTabNames : null;
 
     if (tabNames) {
-      const scriptUrl = S.user.scriptUrl;
-      const scriptSec = S.user.scriptSecret;
-      const useScript = !!(scriptUrl && scriptSec);
       console.log('Fetching by tab names:', tabNames.join(', '));
       await Promise.all(tabNames.map(async tabName => {
         try {
-          let csv;
-          if (useScript) {
-            try { csv = await loadCSVViaScript(scriptUrl, scriptSec, tabName); }
-            catch(se) { console.warn('Script CSV failed, trying proxy:', se.message); }
-          }
-          if (!csv || csv.length < 10) {
-            try {
-              const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
-                          '/export?format=csv&sheet=' + encodeURIComponent(tabName);
-              csv = await proxyFetch(url);
-            } catch(pe) { console.warn('Proxy also failed:', pe.message); }
-          }
+          const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
+                      '/export?format=csv&sheet=' + encodeURIComponent(tabName);
+          const csv = await proxyFetch(url);
           if (csv && csvHasTrainingBlock(csv)) {
             parseSheetCSV(csv, tabName, cutoff);
-            console.log('Parsed tab:', tabName, 'days:', Object.keys(S.dayMap).length);
+            console.log('Parsed tab:', tabName, '— days:', Object.keys(S.dayMap).length);
           } else {
-            console.log('Skipped (no Training row):', tabName);
+            console.warn('Tab skipped — no Training row found. First 100 chars:', csv ? csv.slice(0,100) : 'null');
           }
         } catch(err) { console.warn('Tab by name failed:', tabName, err.message); }
       }));
@@ -3134,24 +3152,13 @@ async function loadUserSheets(u) {
   const useScript  = !!(u.scriptUrl && u.scriptSecret);
   const tabNames   = u.sheetTabNames && u.sheetTabNames.length ? u.sheetTabNames : null;
 
-  // Strategy 1: fetch by tab name — Apps Script primary, proxy fallback
+  // Strategy 1: fetch by tab name — simple proxy fetch
   if (tabNames) {
     await Promise.all(tabNames.map(async tabName => {
       try {
-        let csv;
-        // Primary: Apps Script doGet (reliable, no Google export auth issues)
-        if (useScript) {
-          try { csv = await loadCSVViaScript(u.scriptUrl, u.scriptSecret, tabName); }
-          catch(se) { console.warn('Admin script CSV failed, trying proxy:', se.message); }
-        }
-        // Fallback: proxy chain
-        if (!csv || csv.length < 10) {
-          try {
-            const url = 'https://docs.google.com/spreadsheets/d/' + sid +
-                        '/export?format=csv&sheet=' + encodeURIComponent(tabName);
-            csv = await proxyFetch(url);
-          } catch(pe) { console.warn('Admin proxy also failed:', pe.message); }
-        }
+        const url = 'https://docs.google.com/spreadsheets/d/' + sid +
+                    '/export?format=csv&sheet=' + encodeURIComponent(tabName);
+        const csv = await proxyFetch(url);
         if (!csv || !csvHasTrainingBlock(csv)) return;
         const savedMap = S.dayMap; S.dayMap = dayMap;
         parseSheetCSV(csv, tabName, null);
