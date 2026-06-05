@@ -1420,9 +1420,9 @@ async function pushUsersToMaster(users, retries = 3) {
 
   // Apps Script POSTs must go through a proxy — direct POST is blocked by CORS redirect
   const proxies = [
+    'https://trainderive.frank-467.workers.dev/?url=' + encodeURIComponent(url),
     'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
     'https://cors.x2u.in/' + url,
-    'https://corsfix.com/' + url,
   ];
 
   for (const proxyUrl of proxies) {
@@ -1951,9 +1951,9 @@ async function scriptFetch(scriptUrl, secret, action, params = {}) {
 
   const attempts = [
     { url: url,                                                ms: 12000, opts: { redirect: 'follow' } },
+    { url: 'https://trainderive.frank-467.workers.dev/?url=' + enc,                          ms: 8000,  opts: {} },
     { url: 'https://api.codetabs.com/v1/proxy?quest=' + enc,  ms: 8000,  opts: {} },
     { url: 'https://cors.x2u.in/' + url,                      ms: 8000,  opts: {} },
-    { url: 'https://corsfix.com/' + url,                       ms: 8000,  opts: {} },
     { url: 'https://thingproxy.freeboard.io/fetch/' + url,    ms: 8000,  opts: {} },
   ];
 
@@ -2011,10 +2011,9 @@ async function proxyFetch(url) {
 
   // Race all proxies simultaneously — first valid response wins
   const proxies = [
+    'https://trainderive.frank-467.workers.dev/?url=' + enc,
     'https://api.codetabs.com/v1/proxy?quest=' + enc,
     'https://cors.x2u.in/' + url,
-    'https://corsfix.com/' + url,
-    'https://proxy.killcors.com/?url=' + enc,
     'https://thingproxy.freeboard.io/fetch/' + url,
   ];
 
@@ -2662,9 +2661,9 @@ async function autoSaveAll(silent=false) {
   };
 
   const proxies = [
+    'https://trainderive.frank-467.workers.dev/?url=' + encodeURIComponent(scriptUrl),
     'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(scriptUrl),
     'https://cors.x2u.in/' + scriptUrl,
-    'https://corsfix.com/' + scriptUrl,
   ];
 
   for (const proxyUrl of proxies) {
@@ -3016,7 +3015,7 @@ async function pollForChanges(userId) {
   if (!u || !u.scriptUrl) return;
   try {
     const enc = encodeURIComponent(u.scriptUrl);
-    const res = await fetch('https://api.codetabs.com/v1/proxy?quest=' + enc);
+    const res = await fetch('https://trainderive.frank-467.workers.dev/?url=' + enc);
     if (!res.ok) return;
     const data = await res.json();
     if (!data.ok || !data.lastChanged) return;
@@ -3039,7 +3038,7 @@ function startClientChangePoll() {
     if (!S.user || !S.user.scriptUrl) return;
     try {
       const enc = encodeURIComponent(S.user.scriptUrl);
-      const res = await fetch('https://api.codetabs.com/v1/proxy?quest=' + enc);
+      const res = await fetch('https://trainderive.frank-467.workers.dev/?url=' + enc);
       if (!res.ok) return;
       const data = await res.json();
       if (!data.ok || !data.lastChanged) return;
@@ -3487,9 +3486,9 @@ async function syncCommentToSheet(u, day, sectionIdx, comment) {
   };
 
   const commentProxies = [
+    'https://trainderive.frank-467.workers.dev/?url=' + encodeURIComponent(u.scriptUrl),
     'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u.scriptUrl),
     'https://cors.x2u.in/' + u.scriptUrl,
-    'https://corsfix.com/' + u.scriptUrl,
   ];
   let commentSynced = false;
   for (const proxyUrl of commentProxies) {
