@@ -2155,13 +2155,18 @@ async function loadAllSheets() {
 // The strict allowlist regex is the ONLY gate — sheetDateToISO is only called
 // after a cell passes this check, so no non-date content ever gets parsed.
 const DATE_HEADER_RE = /^(?:[a-z]{2,3},?\s*)?\d{1,2}[-\/]\d{1,2}$/i;
+// Full JS date string from Google Sheets when cells are Date type:
+// "Mon Jun 01 2026 00:00:00 GMT-0500 (Central Daylight Time)"
+const FULL_DATE_RE = /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+(\d{4})/i;
+const MONTH_MAP = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
 
 function isDateHeader(s) {
   if (!s) return false;
   const trimmed = s.trim();
-  // Must match the allowlist pattern
+  // Handle full JS date string format from Google Sheets Date cells
+  if (FULL_DATE_RE.test(trimmed)) return true;
+  // Must match the short allowlist pattern
   if (!DATE_HEADER_RE.test(trimmed)) return false;
-  // Extract the MM-DD part and validate the numbers are calendar-plausible
   const numPart = trimmed.replace(/^[a-z]{2,3},?\s*/i, '');
   const parts   = numPart.split(/[-\/]/);
   const month   = parseInt(parts[0], 10);
@@ -2172,11 +2177,12 @@ function isDateHeader(s) {
 // Quick check: does this CSV contain at least one Training row?
 // Used to skip utility/template tabs without doing a full parse.
 function csvHasTrainingBlock(csv) {
-  // Matches sheets with explicit "Training" label OR sheets where a row
-  // has multiple date headers (Duda-style sheets with blank col A)
   if (/^training[,\r\n]/im.test(csv)) return true;
-  // Check for a row with 2+ date-like headers (Mon, 03-16 pattern)
-  return (csv.match(/(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s*\d{1,2}-\d{1,2}/gi) || []).length >= 2;
+  // Short date format: Mon, 03-16
+  if ((csv.match(/(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s*\d{1,2}-\d{1,2}/gi) || []).length >= 2) return true;
+  // Full JS date format from Google Sheets Date cells
+  if ((csv.match(/(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{4}/gi) || []).length >= 2) return true;
+  return false;
 }
 
 // Detect if a row is a "date row" — has 2+ valid date headers across its columns
@@ -2284,6 +2290,16 @@ function parseSheetCSV(csv, tabName, cutoff) {
 
 function sheetDateToISO(s, tabHint) {
   if (!s) return null;
+  const trimmed = s.trim();
+
+  // Handle full JS date string: "Mon Jun 01 2026 00:00:00 GMT-0500 (...)"
+  const fullMatch = trimmed.match(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+(\d{4})/i);
+  if (fullMatch) {
+    const month = MONTH_MAP[fullMatch[1].toLowerCase()];
+    const day   = parseInt(fullMatch[2], 10);
+    const year  = parseInt(fullMatch[3], 10);
+    return year + '-' + String(month).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+  }
   const dowMatch = s.match(/^([a-z]{2,3}),?\s*/i);
   const dowStr   = dowMatch ? dowMatch[1].toLowerCase() : null;
   const clean    = s.replace(/^[a-z]+,?\s*/i,'').trim();
