@@ -3094,6 +3094,7 @@ async function loadUserSheets(u) {
           console.warn('Admin: no training block in', tabName, ':', csv ? csv.slice(0,120) : 'null');
           return;
         }
+        console.log('Admin CSV preview for', tabName, ':', csv.slice(0, 300));
         const savedMap = S.dayMap; S.dayMap = dayMap;
         parseSheetCSV(csv, tabName, null);
         S.dayMap = savedMap;
