@@ -1352,7 +1352,7 @@ async function pushUsersToMaster(users) {
 
   // Apps Script POSTs must go through a proxy — direct POST is blocked by CORS redirect
   const proxies = [
-    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+    'https://corsfix.com/' + encodeURIComponent(url),
     'https://corsproxy.io/?url=' + encodeURIComponent(url),
     'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
   ];
@@ -1861,7 +1861,7 @@ async function scriptFetch(scriptUrl, secret, action, params = {}) {
     console.warn('Direct script fetch failed (' + err.message + '), trying via proxy...');
     const enc = encodeURIComponent(url);
     const proxies = [
-      'https://api.codetabs.com/v1/proxy?quest=' + enc,
+      'https://corsfix.com/' + enc,
       'https://corsproxy.io/?url=' + enc,
       'https://api.allorigins.win/raw?url=' + enc,
     ];
@@ -1894,7 +1894,7 @@ async function loadCSVViaScript(scriptUrl, secret, gid) {
 async function proxyFetch(url) {
   const enc = encodeURIComponent(url);
   const proxies = [
-    'https://api.codetabs.com/v1/proxy?quest=' + enc,
+    'https://corsfix.com/' + enc,
     'https://corsproxy.io/?url=' + enc,
     'https://api.allorigins.win/raw?url=' + enc,
     'https://thingproxy.freeboard.io/fetch/' + url,
@@ -2619,7 +2619,7 @@ async function autoSaveAll(silent=false) {
   };
 
   const proxies = [
-    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(scriptUrl),
+    'https://corsfix.com/' + encodeURIComponent(scriptUrl),
     'https://corsproxy.io/?url=' + encodeURIComponent(scriptUrl),
     'https://api.allorigins.win/raw?url=' + encodeURIComponent(scriptUrl),
   ];
@@ -3443,7 +3443,7 @@ async function syncCommentToSheet(u, day, sectionIdx, comment) {
   };
 
   const commentProxies = [
-    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u.scriptUrl),
+    'https://corsfix.com/' + encodeURIComponent(u.scriptUrl),
     'https://corsproxy.io/?url=' + encodeURIComponent(u.scriptUrl),
     'https://api.allorigins.win/raw?url=' + encodeURIComponent(u.scriptUrl),
   ];
