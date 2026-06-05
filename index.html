@@ -1352,9 +1352,9 @@ async function pushUsersToMaster(users) {
 
   // Apps Script POSTs must go through a proxy — direct POST is blocked by CORS redirect
   const proxies = [
-    'https://corsfix.com/' + encodeURIComponent(url),
-    'https://corsproxy.io/?url=' + encodeURIComponent(url),
     'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+    'https://cors.x2u.in/' + url,
   ];
 
   for (const proxyUrl of proxies) {
@@ -1861,9 +1861,8 @@ async function scriptFetch(scriptUrl, secret, action, params = {}) {
     console.warn('Direct script fetch failed (' + err.message + '), trying via proxy...');
     const enc = encodeURIComponent(url);
     const proxies = [
-      'https://corsfix.com/' + enc,
-      'https://corsproxy.io/?url=' + enc,
       'https://api.allorigins.win/raw?url=' + enc,
+      'https://api.codetabs.com/v1/proxy?quest=' + enc,
     ];
     for (const p of proxies) {
       try {
@@ -1894,18 +1893,17 @@ async function loadCSVViaScript(scriptUrl, secret, gid) {
 async function proxyFetch(url) {
   const enc = encodeURIComponent(url);
   const proxies = [
-    'https://corsfix.com/' + enc,
-    'https://corsproxy.io/?url=' + enc,
     'https://api.allorigins.win/raw?url=' + enc,
+    'https://api.codetabs.com/v1/proxy?quest=' + enc,
+    'https://cors.x2u.in/' + url,
     'https://thingproxy.freeboard.io/fetch/' + url,
-    'https://cors.eu.org/' + url,
-    'https://proxy.cors.sh/' + url,
+    'https://corsproxy.io/?url=' + enc,
   ];
   let lastErr;
   for (const p of proxies) {
     try {
       const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 8000);  // 8s timeout per proxy
+      const tid = setTimeout(() => ctrl.abort(), 5000);  // 5s timeout per proxy
       const res = await fetch(p, { signal: ctrl.signal });
       clearTimeout(tid);
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -2619,9 +2617,9 @@ async function autoSaveAll(silent=false) {
   };
 
   const proxies = [
-    'https://corsfix.com/' + encodeURIComponent(scriptUrl),
-    'https://corsproxy.io/?url=' + encodeURIComponent(scriptUrl),
     'https://api.allorigins.win/raw?url=' + encodeURIComponent(scriptUrl),
+    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(scriptUrl),
+    'https://cors.x2u.in/' + scriptUrl,
   ];
 
   for (const proxyUrl of proxies) {
@@ -2956,7 +2954,7 @@ async function pollForChanges(userId) {
   if (!u || !u.scriptUrl) return;
   try {
     const enc = encodeURIComponent(u.scriptUrl);
-    const res = await fetch('https://corsproxy.io/?url=' + enc);
+    const res = await fetch('https://api.allorigins.win/raw?url=' + enc);
     if (!res.ok) return;
     const data = await res.json();
     if (!data.ok || !data.lastChanged) return;
@@ -2979,7 +2977,7 @@ function startClientChangePoll() {
     if (!S.user || !S.user.scriptUrl) return;
     try {
       const enc = encodeURIComponent(S.user.scriptUrl);
-      const res = await fetch('https://corsproxy.io/?url=' + enc);
+      const res = await fetch('https://api.allorigins.win/raw?url=' + enc);
       if (!res.ok) return;
       const data = await res.json();
       if (!data.ok || !data.lastChanged) return;
@@ -3443,8 +3441,8 @@ async function syncCommentToSheet(u, day, sectionIdx, comment) {
   };
 
   const commentProxies = [
-    'https://corsfix.com/' + encodeURIComponent(u.scriptUrl),
-    'https://corsproxy.io/?url=' + encodeURIComponent(u.scriptUrl),
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(u.scriptUrl),
+    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u.scriptUrl),
     'https://api.allorigins.win/raw?url=' + encodeURIComponent(u.scriptUrl),
   ];
   let commentSynced = false;
