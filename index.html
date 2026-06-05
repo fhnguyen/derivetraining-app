@@ -1999,20 +1999,22 @@ async function loadAllSheets() {
       const scriptSec  = S.user.scriptSecret;
       const useScript  = !!(scriptUrl && scriptSec);
 
-      console.log('Fetching by tab names:', tabNames.join(', '), useScript ? '(via Apps Script)' : '(via proxy)');
+      console.log('Fetching by tab names:', tabNames.join(', '));
 
       await Promise.all(tabNames.map(async tabName => {
         try {
           let csv;
-          if (useScript) {
-            // Preferred: fetch CSV directly from Apps Script — no proxy needed,
-            // no CORS issues, always works as long as sheet is deployed
-            csv = await loadCSVViaScript(scriptUrl, scriptSec, tabName);
-          } else {
-            // Fallback: use proxy chain to fetch Google export URL
+          // Try proxy first (avoids Apps Script quota usage)
+          try {
             const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
                         '/export?format=csv&sheet=' + encodeURIComponent(tabName);
             csv = await proxyFetch(url);
+          } catch(pe) {
+            console.warn('Proxy failed, trying Apps Script:', pe.message);
+          }
+          // Fall back to Apps Script if proxy fails
+          if ((!csv || csv.length < 10) && useScript) {
+            csv = await loadCSVViaScript(scriptUrl, scriptSec, tabName);
           }
           if (csv && csvHasTrainingBlock(csv)) {
             parseSheetCSV(csv, tabName, cutoff);
@@ -3027,14 +3029,15 @@ async function loadUserSheets(u) {
     await Promise.all(tabNames.map(async tabName => {
       try {
         let csv;
-        if (useScript) {
-          try { csv = await loadCSVViaScript(u.scriptUrl, u.scriptSecret, tabName); }
-          catch(se) { console.warn('Script CSV failed, trying proxy:', se.message); }
-        }
-        if (!csv) {
+        // Try proxy first
+        try {
           const url = 'https://docs.google.com/spreadsheets/d/' + sid +
                       '/export?format=csv&sheet=' + encodeURIComponent(tabName);
           csv = await proxyFetch(url);
+        } catch(pe) { console.warn('Proxy failed, trying Apps Script:', pe.message); }
+        // Fall back to Apps Script
+        if ((!csv || csv.length < 10) && useScript) {
+          csv = await loadCSVViaScript(u.scriptUrl, u.scriptSecret, tabName);
         }
         if (!csv || !csvHasTrainingBlock(csv)) return;
         const savedMap = S.dayMap; S.dayMap = dayMap;
