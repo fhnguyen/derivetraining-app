@@ -2052,48 +2052,6 @@ async function proxyFetch(url) {
 // Discover all tabs by fetching the HTML preview of the spreadsheet
 // and extracting sheet GIDs from the tab bar — works on any publicly shared sheet
 // without requiring it to be "published to web".
-async function discoverTabs(spreadsheetId) {
-  // Method: feeds API via proxy (works if sheet is published to web)
-  try {
-    const feedUrl = 'https://spreadsheets.google.com/feeds/worksheets/' + spreadsheetId + '/public/basic?alt=json';
-    const text = await proxyFetch(feedUrl);
-    const json = JSON.parse(text);
-    const tabs = (json.feed?.entry || []).map(e => {
-      const selfLink = e.link?.find(l => l.rel === 'self');
-      const gid = selfLink ? selfLink.href.split('/').pop() : null;
-      return { title: e.title?.['$t'] || 'Tab', gid };
-    }).filter(t => t.gid);
-    if (tabs.length) {
-      console.log('Feeds discovery found:', tabs.map(t=>t.title).join(', '));
-      return tabs;
-    }
-  } catch(e) { console.warn('Feeds discovery failed:', e.message); }
-  return null;
-}
-
-// Scan all GIDs that exist in a spreadsheet by trying exports
-// Returns tabs that respond with actual CSV content
-async function scanAllGids(spreadsheetId, setStatus) {
-  // Common GID patterns: 0 (first sheet always), then random large numbers
-  // We fetch the sheet's HTML to extract GIDs without needing feeds API
-  const candidateGids = ['0'];
-
-  // Try fetching the sheet HTML directly to get GIDs from the DOM
-  try {
-    const html = await proxyFetch('https://docs.google.com/spreadsheets/d/' + spreadsheetId + '/edit');
-    const gidMatches = [...html.matchAll(/"gid\\u003d([0-9]+)"/g)];
-    const gidMatches2 = [...html.matchAll(/\\"gid=([0-9]+)\\"/g)];
-    const gidMatches3 = [...html.matchAll(/sheetId.{1,5}([0-9]{5,})/g)];
-    const found = new Set(['0']);
-    for (const m of [...gidMatches, ...gidMatches2, ...gidMatches3]) found.add(m[1]);
-    if (found.size > 1) {
-      console.log('GIDs from HTML scan:', [...found].join(', '));
-      return [...found].map(g => ({ gid: g, title: 'Tab' }));
-    }
-  } catch(e) { console.warn('HTML GID scan failed:', e.message); }
-
-  return candidateGids.map(g => ({ gid: g, title: 'Sheet' }));
-}
 
 async function loadAllSheets() {
   const { spreadsheetId, sheetGids, sheetTabNames } = S.user;
@@ -2114,62 +2072,54 @@ async function loadAllSheets() {
   setStatus('Loading your program…');
 
   try {
-    // ── Strategy 1: fetch by tab NAME (most reliable, GID-independent) ──
-    // If the admin has specified tab names, fetch each one directly by name.
-    // Google Sheets export supports ?sheet=TabName which always works on
-    // publicly shared sheets regardless of GID.
     const tabNames = sheetTabNames && sheetTabNames.length ? sheetTabNames : null;
+    const scriptUrl = S.user.scriptUrl;
+    const scriptSec = S.user.scriptSecret;
+    const useScript = !!(scriptUrl && scriptSec);
 
     if (tabNames) {
-      console.log('Fetching by tab names:', tabNames.join(', '));
+      console.log('Loading tabs:', tabNames.join(', '), '| via:', useScript ? 'Apps Script' : 'proxy');
+
       await Promise.all(tabNames.map(async tabName => {
         try {
-          const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
-                      '/export?format=csv&sheet=' + encodeURIComponent(tabName);
-          const csv = await proxyFetch(url);
+          let csv = null;
+
+          // Primary path: Apps Script doGet — authenticated, always works
+          if (useScript) {
+            try {
+              csv = await loadCSVViaScript(scriptUrl, scriptSec, tabName);
+              console.log('Got CSV via Apps Script for', tabName, '— length:', csv?.length);
+            } catch(se) {
+              console.warn('Apps Script failed for', tabName, ':', se.message);
+            }
+          }
+
+          // Fallback: proxy (only if Apps Script not configured or failed)
+          if (!csv || csv.length < 10) {
+            try {
+              const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
+                          '/export?format=csv&sheet=' + encodeURIComponent(tabName);
+              csv = await proxyFetch(url);
+              console.log('Got CSV via proxy for', tabName, '— length:', csv?.length);
+            } catch(pe) {
+              console.warn('Proxy also failed for', tabName, ':', pe.message);
+            }
+          }
+
           if (csv && csvHasTrainingBlock(csv)) {
             parseSheetCSV(csv, tabName, cutoff);
-            console.log('Parsed tab:', tabName, '— days:', Object.keys(S.dayMap).length);
+            console.log('✓ Parsed', tabName, '— days found:', Object.keys(S.dayMap).length);
           } else {
-            console.warn('Tab skipped — no Training row found. First 100 chars:', csv ? csv.slice(0,100) : 'null');
+            console.warn('✗ No training block in', tabName, '— first 120 chars:', csv ? csv.slice(0,120) : 'null');
           }
-        } catch(err) { console.warn('Tab by name failed:', tabName, err.message); }
-      }));
-      if (Object.keys(S.dayMap).length > 0) { _finishLoad(); return; }
-      console.warn('Named tabs returned no data, falling back to GID scan');
-    }
-
-    // ── Strategy 2: discover tabs via feeds API (requires published sheet) ──
-    let tabs = await discoverTabs(spreadsheetId);
-
-    // ── Strategy 3: use stored sheetGids as fallback ──────────────────────
-    if (!tabs || !tabs.length) {
-      if (sheetGids && Object.keys(sheetGids).length) {
-        tabs = Object.entries(sheetGids).map(([title, gid]) => ({ title, gid }));
-        console.log('Using stored sheetGids:', tabs.map(t=>t.title).join(', '));
-      }
-    }
-
-    // ── Strategy 4: blind scan of first sheet (gid=0) ────────────────────
-    if (!tabs || !tabs.length) {
-      tabs = [{ title: 'Sheet', gid: '0' }];
-    }
-
-    setStatus('Loading ' + tabs.length + ' tab' + (tabs.length !== 1 ? 's' : '') + '…');
-
-    await Promise.all(tabs.map(async ({ title, gid }) => {
-      try {
-        const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
-                    '/export?format=csv&gid=' + gid;
-        const csv = await proxyFetch(url);
-        if (csvHasTrainingBlock(csv)) {
-          parseSheetCSV(csv, title, cutoff);
-          console.log('Parsed by GID:', title, gid);
-        } else {
-          console.log('Skipped:', title);
+        } catch(err) {
+          console.warn('Tab failed:', tabName, err.message);
         }
-      } catch(err) { console.warn('Tab failed:', title, err.message); }
-    }));
+      }));
+
+      if (Object.keys(S.dayMap).length > 0) { _finishLoad(); return; }
+      console.warn('No days loaded from named tabs — check console logs above');
+    }
 
     _finishLoad();
 
@@ -3152,46 +3102,47 @@ async function loadUserSheets(u) {
   const useScript  = !!(u.scriptUrl && u.scriptSecret);
   const tabNames   = u.sheetTabNames && u.sheetTabNames.length ? u.sheetTabNames : null;
 
-  // Strategy 1: fetch by tab name — simple proxy fetch
+  // Apps Script primary, proxy fallback — identical to athlete loadAllSheets
   if (tabNames) {
     await Promise.all(tabNames.map(async tabName => {
       try {
-        const url = 'https://docs.google.com/spreadsheets/d/' + sid +
-                    '/export?format=csv&sheet=' + encodeURIComponent(tabName);
-        const csv = await proxyFetch(url);
-        if (!csv || !csvHasTrainingBlock(csv)) return;
+        let csv = null;
+
+        // Primary: Apps Script doGet — authenticated, always works
+        if (useScript) {
+          try {
+            csv = await loadCSVViaScript(u.scriptUrl, u.scriptSecret, tabName);
+            console.log('Admin got CSV via Apps Script for', tabName, '— length:', csv?.length);
+          } catch(se) {
+            console.warn('Admin script failed for', tabName, ':', se.message);
+          }
+        }
+
+        // Fallback: proxy
+        if (!csv || csv.length < 10) {
+          try {
+            const url = 'https://docs.google.com/spreadsheets/d/' + sid +
+                        '/export?format=csv&sheet=' + encodeURIComponent(tabName);
+            csv = await proxyFetch(url);
+            console.log('Admin got CSV via proxy for', tabName, '— length:', csv?.length);
+          } catch(pe) {
+            console.warn('Admin proxy failed for', tabName, ':', pe.message);
+          }
+        }
+
+        if (!csv || !csvHasTrainingBlock(csv)) {
+          console.warn('Admin: no training block in', tabName, '— first 120 chars:', csv ? csv.slice(0,120) : 'null');
+          return;
+        }
         const savedMap = S.dayMap; S.dayMap = dayMap;
         parseSheetCSV(csv, tabName, null);
         S.dayMap = savedMap;
-      } catch(e) { console.warn('Admin tab by name failed:', tabName, e.message); }
+        console.log('Admin \u2713 Parsed', tabName, '— days found:', Object.keys(dayMap).length);
+      } catch(e) { console.warn('Admin tab failed:', tabName, e.message); }
     }));
     if (Object.keys(dayMap).length) return dayMap;
   }
 
-  // Strategy 2: stored sheetGids fallback (no discoverTabs — too slow/unreliable)
-  const gids = u.sheetGids || {};
-  const tabs = Object.keys(gids).length
-    ? Object.entries(gids).map(([title, gid]) => ({ title, gid }))
-    : [{ title: 'Sheet', gid: '0' }];
-
-  await Promise.all(tabs.map(async ({title, gid}) => {
-    try {
-      let csv;
-      if (useScript) {
-        try { csv = await loadCSVViaScript(u.scriptUrl, u.scriptSecret, gid); }
-        catch(se) { console.warn('Admin script GID failed, trying proxy:', se.message); }
-      }
-      if (!csv || csv.length < 10) {
-        const url = 'https://docs.google.com/spreadsheets/d/' + sid +
-                    '/export?format=csv&gid=' + gid;
-        csv = await proxyFetch(url);
-      }
-      if (!csvHasTrainingBlock(csv)) return;
-      const savedMap = S.dayMap; S.dayMap = dayMap;
-      parseSheetCSV(csv, title, null);
-      S.dayMap = savedMap;
-    } catch(err) { console.warn('Admin tab failed:', title, err.message); }
-  }));
   return dayMap;
 }
 
