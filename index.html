@@ -111,6 +111,7 @@ html,body { height:100%; background:var(--surf); color:var(--text); font-family:
 .btn-main:disabled { background:var(--border); color:var(--muted); cursor:not-allowed; }
 .login-admin-link { text-align:center; margin-top:1rem; font-family:var(--mono); font-size:.62rem; letter-spacing:.1em; }
 .login-admin-link a { color:var(--muted2); text-decoration:none; transition:color .15s; }
+.login-admin-link.hidden { display:none; }
 
 /* Install banner */
 .install-banner {
@@ -877,13 +878,13 @@ html { touch-action: manipulation; }
 
 <div id="s-login" class="screen active">
   <div class="login-box">
-    <div class="login-logo"><span style="color:var(--accent)">TRAIN</span><span style="color:var(--gold)">DERIVE</span></div>
+    <div class="login-logo" id="login-logo-tap"><span style="color:var(--accent)">TRAIN</span><span style="color:var(--gold)">DERIVE</span></div>
     <div class="login-sub">By Frank Nguyen</div>
     <div class="fld"><label>Email</label><input type="email" id="l-email" placeholder="athlete@example.com" autocomplete="email"></div>
     <div class="fld"><label>Password</label><div class="pw-wrap"><input type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
     <div class="l-err" id="l-err"></div>
     <button class="btn-main" id="l-btn" onclick="doLogin()">Sign In</button>
-    <div class="login-admin-link"><a href="#" onclick="showAdminLogin();return false;">Admin access →</a></div>
+    <div class="login-admin-link" id="admin-link-wrap"><a href="#" onclick="showAdminLogin();return false;">Admin access →</a></div>
   </div>
 </div>
 
@@ -1160,7 +1161,10 @@ html { touch-action: manipulation; }
 // ═══════════════════════════════════════════════════════════════
 // DATA STORE
 // ═══════════════════════════════════════════════════════════════
-const DEFAULT_ADMIN_PASS = 'admin123';
+const DEFAULT_ADMIN_PASS  = 'admin123';
+// Secret code required to enable admin access on a new device.
+// Change this to something only you know. Tap the logo 7x on login screen to unlock.
+const DEVICE_UNLOCK_CODE  = 'trainderive-admin';
 
 // ── Master database (shared across all devices/browsers) ─────────────
 // BAKED INTO CODE — available on every device without any configuration.
@@ -1189,8 +1193,16 @@ async function hashPass(plain) {
 const DEFAULT_ADMIN_HASH = '7c4f0e3e8ac7ea7b8c9b4c3a6f1e2d5e9b0f3a2c8d4e1b6a9c7f2e5d8b3a4f1c';
 
 async function getAdminHash() {
+  // 1. localStorage — fast path
   const stored = localStorage.getItem('bloc_admin_hash');
   if (stored) return stored;
+  // 2. Master DB _admin_settings entry — survives localStorage wipes
+  const settingsEntry = USERS.find(u => u.id === '_admin_settings');
+  if (settingsEntry && settingsEntry.adminHash) {
+    localStorage.setItem('bloc_admin_hash', settingsEntry.adminHash);
+    return settingsEntry.adminHash;
+  }
+  // 3. First run — hash default and store
   const h = await hashPass(DEFAULT_ADMIN_PASS);
   localStorage.setItem('bloc_admin_hash', h);
   return h;
@@ -1199,6 +1211,18 @@ async function getAdminHash() {
 async function setAdminPass(plain) {
   const h = await hashPass(plain);
   localStorage.setItem('bloc_admin_hash', h);
+  // Persist in master DB so hash survives localStorage clears on any device
+  try {
+    let entry = USERS.find(u => u.id === '_admin_settings');
+    if (!entry) {
+      entry = { id: '_admin_settings', _type: 'settings', adminHash: h };
+      USERS.push(entry);
+    } else {
+      entry.adminHash = h;
+    }
+    localStorage.setItem('bloc_users', JSON.stringify(USERS));
+    pushUsersToMaster(USERS).catch(() => {});
+  } catch(e) {}
 }
 const DEFAULT_USERS = [];
 
@@ -1306,12 +1330,13 @@ async function syncUsersFromMaster() {
     }
 
     // Deduplicate master users by email, preserving special entries
+    const specialEntries = masterUsers.filter(u => u._type);
     const seenEmails = new Map();
     masterUsers.filter(u => !u._type).forEach(u => {
       const key = (u.email || '').toLowerCase();
       if (key) seenEmails.set(key, u);
     });
-    const cleanUsers = Array.from(seenEmails.values());
+    const cleanUsers = [...Array.from(seenEmails.values()), ...specialEntries];
     if (cleanUsers.length !== masterUsers.length) {
       console.warn('syncUsersFromMaster: found', masterUsers.length - cleanUsers.length,
         'duplicate(s) in master sheet — will auto-clean after init');
@@ -1334,13 +1359,14 @@ async function pushUsersToMaster(users) {
   if (!MASTER_SCRIPT_URL || !MASTER_SECRET) return false;
 
 
-  // Deduplicate real users by email only — no special system entries anymore
+  // Separate _admin_settings (and any other _type entries) from real users
+  const special   = users.filter(u => u._type);
   const seen = new Map();
   users.filter(u => !u._type).forEach(u => {
     const key = (u.email || '').toLowerCase();
     if (key) seen.set(key, u);
   });
-  const deduped = Array.from(seen.values());
+  const deduped = [...Array.from(seen.values()), ...special];
 
   if (deduped.length !== users.length) {
     console.warn('pushUsersToMaster: removed', users.length - deduped.length, 'duplicate(s) before write');
@@ -1568,7 +1594,7 @@ async function doLogin() {
   const pass  = document.getElementById('l-pass').value;
   const errEl = document.getElementById('l-err');
   const passHash = await hashPass(pass);
-  const user = USERS.find(u => u.email === email && u.pass === passHash && u.role === 'athlete');
+  const user = USERS.find(u => !u._type && u.email === email && u.pass === passHash && u.role === 'athlete');
   if (!user) { errEl.textContent = 'Invalid email or password.'; return; }
   S.user = user;
   localStorage.setItem('bloc_session', user.id);
@@ -1604,6 +1630,59 @@ function doLogout() {
   showScreen('s-login');
 }
 
+// ── Device unlock — enables admin access on this device ─────────────────
+function isDeviceUnlocked() {
+  return localStorage.getItem('bloc_admin_device') === '1';
+}
+
+function initAdminLink() {
+  const wrap = document.getElementById('admin-link-wrap');
+  if (!wrap) return;
+  if (isDeviceUnlocked()) {
+    wrap.style.display = 'block';
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+// Logo tap counter — tap 7 times to show device unlock modal
+let _logoTaps = 0, _logoTapTimer = null;
+function initLogoTap() {
+  const logo = document.getElementById('login-logo-tap');
+  if (!logo) return;
+  logo.addEventListener('click', () => {
+    _logoTaps++;
+    clearTimeout(_logoTapTimer);
+    _logoTapTimer = setTimeout(() => { _logoTaps = 0; }, 2000);
+    if (_logoTaps >= 7) {
+      _logoTaps = 0;
+      if (isDeviceUnlocked()) {
+        showToast('Admin access already enabled on this device', 'ok');
+      } else {
+        document.getElementById('m-du-code').value = '';
+        document.getElementById('m-du-err').textContent = '';
+        openModal('m-device-unlock');
+      }
+    }
+  });
+}
+
+function submitDeviceUnlock() {
+  const code = document.getElementById('m-du-code').value.trim();
+  if (code === DEVICE_UNLOCK_CODE) {
+    localStorage.setItem('bloc_admin_device', '1');
+    closeModal('m-device-unlock');
+    initAdminLink();
+    showToast('Admin access enabled on this device', 'ok');
+  } else {
+    document.getElementById('m-du-err').textContent = 'Incorrect unlock code.';
+  }
+}
+
+document.getElementById('m-du-code') && document.getElementById('m-du-code').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitDeviceUnlock();
+});
+
 function showAdminLogin() {
   document.getElementById('m-al-pass').value = '';
   document.getElementById('m-al-err').textContent = '';
@@ -1611,6 +1690,10 @@ function showAdminLogin() {
 }
 
 async function doAdminLogin() {
+  if (!isDeviceUnlocked()) {
+    document.getElementById('m-al-err').textContent = 'Device not authorized for admin access.';
+    return;
+  }
   const pass = document.getElementById('m-al-pass').value;
   const entered = await hashPass(pass);
   const stored  = await getAdminHash();
@@ -1656,7 +1739,7 @@ async function adminSyncMaster() {
 function renderUserTable() {
   const tbody = document.getElementById('user-tbody');
   tbody.innerHTML = '';
-  USERS.forEach(u => {
+  USERS.filter(u => !u._type).forEach(u => {
     const hasSheet = !!u.spreadsheetId;
     const sheetUrl = hasSheet ? 'https://docs.google.com/spreadsheets/d/' + u.spreadsheetId : '';
     const tr = document.createElement('tr');
@@ -3793,6 +3876,8 @@ async function refreshDayView() {
   // Now route — users are loaded from master regardless of localStorage state
   parseHashAndRoute();
   initInstallBanner();
+  initAdminLink();
+  initLogoTap();
 
   // Background re-sync for admin panel
   const admUsers = document.getElementById('adm-users');
@@ -3817,6 +3902,19 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+
+  <!-- Device unlock modal — shown when logo tapped 7x on login screen -->
+  <div class="modal-bg" id="m-device-unlock">
+    <div class="modal">
+      <div class="modal-hd"><div class="modal-title">Enable Admin Access</div><button class="modal-close" onclick="closeModal('m-device-unlock')">✕</button></div>
+      <div class="modal-body">
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:1rem">Enter the device unlock code to enable admin access on this device.</p>
+        <div class="form-err" id="m-du-err"></div>
+        <div class="fld"><label>Unlock Code</label><div class="pw-wrap"><input type="password" id="m-du-code" placeholder="••••••••"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
+      </div>
+      <div class="modal-foot"><button class="btn-cancel" onclick="closeModal('m-device-unlock')">Cancel</button><button class="btn-confirm" onclick="submitDeviceUnlock()">Unlock</button></div>
+    </div>
+  </div>
 
   <!-- Install to home screen banner (shown in browser, hidden in PWA) -->
   <div class="install-banner" id="install-banner" style="display:none">
