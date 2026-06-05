@@ -610,32 +610,7 @@ html { touch-action: manipulation; }
 }
 .toggle input:checked + .toggle-slider { background:var(--accent); }
 .toggle input:checked + .toggle-slider::before { transform:translateX(18px); }
-/* Admin result notifications */
-.adm-notif-wrap { position:relative; }
-.adm-notif-badge {
-  position:absolute; top:-4px; right:-4px;
-  background:var(--gold); color:#fff;
-  font-family:var(--mono); font-size:.55rem; font-weight:700;
-  min-width:16px; height:16px; border-radius:8px;
-  display:flex; align-items:center; justify-content:center;
-  padding:0 3px; pointer-events:none;
-}
-.adm-notif-drop {
-  position:absolute; top:calc(100% + 8px); right:0;
-  width:300px; background:var(--surf); border:1px solid var(--border);
-  border-radius:var(--r); box-shadow:0 4px 20px rgba(0,0,0,.12);
-  z-index:200; display:none;
-}
-.adm-notif-drop.open { display:block; }
-.adm-notif-item {
-  padding:.7rem 1rem; border-bottom:1px solid var(--border);
-  cursor:pointer; transition:background .1s;
-}
-.adm-notif-item:last-child { border-bottom:none; }
-.adm-notif-item:hover { background:var(--bg); }
-.adm-notif-item-name { font-weight:500; font-size:.82rem; }
-.adm-notif-item-date { font-family:var(--mono); font-size:.62rem; color:var(--muted2); margin-top:.1rem; }
-.adm-notif-empty { padding:1rem; text-align:center; font-family:var(--mono); font-size:.68rem; color:var(--muted2); }
+
 
 /* ── Toast ───────────────────────────────────────── */
 .toast {
@@ -986,17 +961,7 @@ html { touch-action: manipulation; }
     <div class="adm-logo"><span style="color:var(--accent)">TRAIN</span><span style="color:var(--gold)">DERIVE</span> <span>ADMIN</span></div>
     <div class="hd-right">
       <span class="hd-name" id="adm-hd-name"></span>
-      <div class="adm-notif-wrap">
-        <button class="btn-ghost" id="adm-bell-btn" onclick="toggleAdmNotifDrop()" title="New results" style="font-size:1.1rem;padding:.35rem .6rem;">&#x1F514;</button>
-        <span class="adm-notif-badge" id="adm-notif-badge" style="display:none"></span>
-        <div class="adm-notif-drop" id="adm-notif-drop">
-          <div style="padding:.6rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-            <span style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted2)">New Results</span>
-            <button class="btn-sm" onclick="clearAdmNotifs()" style="font-size:.6rem;padding:.2rem .5rem">Mark all read</button>
-          </div>
-          <div id="adm-notif-list"></div>
-        </div>
-      </div>
+
       <button class="btn-ghost" onclick="doAdminLogout()">Sign Out</button>
     </div>
   </header>
@@ -1020,15 +985,7 @@ html { touch-action: manipulation; }
     <div id="adm-settings" class="adm-panel">
       <div class="section-title" style="margin-bottom:1.2rem">Settings</div>
 
-      <div class="setting-row">
-        <div><div class="setting-label">Sync Users</div><div class="setting-desc">Pull latest user list from master database</div></div>
-        <button class="btn-sm" id="btn-sync-master" onclick="adminSyncMaster()">Sync Now</button>
-      </div>
-      <div class="setting-row">
-        <div><div class="setting-label">Email Alerts — New Results</div><div class="setting-desc">Send email alert when an athlete saves results</div></div>
-        <div class="toggle-wrap">
-          <label class="toggle"><input type="checkbox" id="toggle-admin-email" onchange="saveAdminEmailToggle()"><span class="toggle-slider"></span></label>
-        </div>
+      
       </div>
       <div class="setting-row">
         <div><div class="setting-label">Admin Password</div><div class="setting-desc">Change the password for admin access</div></div>
@@ -1181,10 +1138,6 @@ html { touch-action: manipulation; }
 
       <div class="modal-section-title">Profile</div>
       <div class="fld"><label>Display Name</label><input type="text" id="acct-name" placeholder="Your name"></div>
-      <div class="setting-row" style="border:none;padding:.5rem 0 0 0;">
-        <div><div class="setting-label" style="font-size:.78rem">Email me when coach leaves feedback</div><div class="setting-desc">Sends to the email on your account (off by default)</div></div>
-        <div class="toggle-wrap"><label class="toggle"><input type="checkbox" id="toggle-athlete-email" onchange="saveAthleteEmailToggle()"><span class="toggle-slider"></span></label></div>
-      </div>
 
       <div class="modal-divider"></div>
       <div class="modal-section-title">Change Email</div>
@@ -1239,16 +1192,8 @@ async function hashPass(plain) {
 const DEFAULT_ADMIN_HASH = '7c4f0e3e8ac7ea7b8c9b4c3a6f1e2d5e9b0f3a2c8d4e1b6a9c7f2e5d8b3a4f1c';
 
 async function getAdminHash() {
-  // Check localStorage first (fast path)
   const stored = localStorage.getItem('bloc_admin_hash');
   if (stored) return stored;
-  // Check master DB settings entry (survives localStorage wipes)
-  const settings = getAdminSettings();
-  if (settings.adminHash) {
-    localStorage.setItem('bloc_admin_hash', settings.adminHash);
-    return settings.adminHash;
-  }
-  // First run — hash the default and store
   const h = await hashPass(DEFAULT_ADMIN_PASS);
   localStorage.setItem('bloc_admin_hash', h);
   return h;
@@ -1257,8 +1202,6 @@ async function getAdminHash() {
 async function setAdminPass(plain) {
   const h = await hashPass(plain);
   localStorage.setItem('bloc_admin_hash', h);
-  // Persist in master DB so password survives localStorage clears
-  saveAdminSettings({ adminHash: h }).catch(() => {});
 }
 const DEFAULT_USERS = [];
 
@@ -1336,10 +1279,7 @@ async function saveUsersAndSync(users) {
   const result = await pushUsersToMaster(users);
   // result === false means all proxy attempts failed
   // Caller handles success toast; we only surface a failure
-  if (result === false) {
-    console.warn('Master DB push failed — changes saved locally only');
-    showToast('Sync to master failed — try again', 'err');
-  }
+
 }
 
 // Fetch users from master DB.
@@ -1369,48 +1309,19 @@ async function syncUsersFromMaster() {
     }
 
     // Deduplicate master users by email, preserving special entries
-    const specialEntries = masterUsers.filter(u => u._type);
-    const realMasterUsers = masterUsers.filter(u => !u._type);
     const seenEmails = new Map();
-    realMasterUsers.forEach(u => {
+    masterUsers.filter(u => !u._type).forEach(u => {
       const key = (u.email || '').toLowerCase();
       if (key) seenEmails.set(key, u);
     });
-    const cleanUsers = [...Array.from(seenEmails.values()), ...specialEntries];
+    const cleanUsers = Array.from(seenEmails.values());
     if (cleanUsers.length !== masterUsers.length) {
       console.warn('syncUsersFromMaster: found', masterUsers.length - cleanUsers.length,
         'duplicate(s) in master sheet — will auto-clean after init');
       setTimeout(() => pushUsersToMaster(cleanUsers).catch(() => {}), 3000);
     }
 
-    // Preserve locally pending password changes that are newer than master
-    const HEX64 = /^[0-9a-f]{64}$/;
-    const pendingChange = (() => {
-      try { return JSON.parse(localStorage.getItem('bloc_pending_account_change') || 'null'); } catch { return null; }
-    })();
-    const sessionUser = (() => {
-      try { return JSON.parse(localStorage.getItem('bloc_session_user') || 'null'); } catch { return null; }
-    })();
-    const localCandidate = pendingChange || sessionUser;
-    if (localCandidate && localCandidate.email && localCandidate.pass && HEX64.test(localCandidate.pass)) {
-      const idx = cleanUsers.findIndex(u =>
-        u.email && u.email.toLowerCase() === localCandidate.email.toLowerCase()
-      );
-      if (idx >= 0 && cleanUsers[idx].pass !== localCandidate.pass) {
-        const masterTs = cleanUsers[idx]._passChangedAt || 0;
-        const localTs  = localCandidate._passChangedAt  || 0;
-        if (localTs >= masterTs) {
-          console.log('Local password is newer — preserving for', localCandidate.email);
-          cleanUsers[idx] = { ...cleanUsers[idx], pass: localCandidate.pass,
-            mustChangePassword: false, _passChangedAt: localTs };
-          setTimeout(() => {
-            pushUsersToMaster(cleanUsers)
-              .then(ok => { if (ok === true) localStorage.removeItem('bloc_pending_account_change'); })
-              .catch(() => {});
-          }, 3000);
-        }
-      }
-    }
+
 
     // Master has users — use them as source of truth, update local cache
     localStorage.setItem('bloc_users', JSON.stringify(cleanUsers));
@@ -1422,33 +1333,22 @@ async function syncUsersFromMaster() {
   }
 }
 
-// Pending push queue — if a push fails, retry when next opportunity arises
-let _pendingPush = null;
-
-async function pushUsersToMaster(users, retries = 3) {
+async function pushUsersToMaster(users) {
   if (!MASTER_SCRIPT_URL || !MASTER_SECRET) return false;
 
-  if (!window._initComplete) {
-    console.warn('pushUsersToMaster blocked — init not yet complete');
-    return false;
-  }
 
-  // Separate special system entries from real users before dedup
-  const special   = users.filter(u => u._type);
-  const realUsers = users.filter(u => !u._type);
+  // Deduplicate real users by email only — no special system entries anymore
   const seen = new Map();
-  realUsers.forEach(u => {
+  users.filter(u => !u._type).forEach(u => {
     const key = (u.email || '').toLowerCase();
     if (key) seen.set(key, u);
   });
-  const deduped = [...Array.from(seen.values()), ...special];
+  const deduped = Array.from(seen.values());
 
   if (deduped.length !== users.length) {
     console.warn('pushUsersToMaster: removed', users.length - deduped.length, 'duplicate(s) before write');
   }
 
-  console.warn('⚠️ MASTER DB WRITE:', deduped.length, 'users:', deduped.map(u=>u.email).join(', '));
-  console.trace('pushUsersToMaster called from:');
 
   const payload = { secret: MASTER_SECRET, action: 'saveUsers', users: deduped };
   const url = MASTER_SCRIPT_URL;
@@ -1500,16 +1400,7 @@ async function pushUsersToMaster(users, retries = 3) {
   } catch(e) {}
 
   // All proxies failed — queue for retry
-  if (retries > 0) {
-    console.warn('Push failed, retrying in 5s... (' + retries + ' retries left)');
-    _pendingPush = deduped;
-    setTimeout(async () => {
-      if (_pendingPush) {
-        const r = await pushUsersToMaster(_pendingPush, retries - 1);
-        if (r !== false) _pendingPush = null;
-      }
-    }, 5000);
-  }
+
 
   console.error('All push attempts failed');
   return false;
@@ -1530,20 +1421,7 @@ if (_storedUsers) {
   localStorage.setItem('bloc_data_version', String(DATA_VERSION));
 }
 
-// Periodic background re-sync every 5 minutes to pick up changes from other devices
-setInterval(async () => {
-  if (!getMasterUrl() || !getMasterSecret()) return;
-  const synced = await syncUsersFromMaster();
-  if (!synced) return;
-  // Only update if count changed — avoids unnecessary re-renders
-  const prevCount = USERS.length;
-  USERS = migrateUsers(synced, true);
-  await migratePasswords(USERS);
-  const adminPanel = document.getElementById('adm-users');
-  if (adminPanel && adminPanel.classList.contains('active') && USERS.length !== prevCount) {
-    renderUserTable();
-  }
-}, 5 * 60 * 1000);
+
 
 // ═══════════════════════════════════════════════════════════════
 // STATE
@@ -1628,17 +1506,7 @@ function restoreSession() {
   const liveByEmail = user.email && USERS.find(u =>
     !u._type && u.email && u.email.toLowerCase() === user.email.toLowerCase()
   );
-  if (liveByEmail) {
-    // Check if master version has a newer password change than our session user
-    const sessionTs = user._passChangedAt || 0;
-    const masterTs  = liveByEmail._passChangedAt || 0;
-    if (sessionTs > masterTs && user.pass) {
-      // Session has a newer password — merge it onto master data
-      user = { ...liveByEmail, pass: user.pass, mustChangePassword: false, _passChangedAt: sessionTs };
-    } else {
-      user = liveByEmail;
-    }
-  }
+  if (liveByEmail) user = liveByEmail;
   S.user = user;
   document.getElementById('h-name').textContent = user.name;
   document.getElementById('h-avatar').textContent = user.name.charAt(0).toUpperCase();
@@ -1655,8 +1523,7 @@ function parseHashAndRoute() {
   if (hash === '#admin') {
     if (localStorage.getItem('bloc_admin_session')) {
       document.getElementById('adm-hd-name').textContent = 'Administrator';
-      setTimeout(updateAdmNotifUI, 500);
-      applyRoute('admin');
+        applyRoute('admin');
     } else {
       showAdminLogin();
     }
@@ -1677,8 +1544,7 @@ function parseHashAndRoute() {
     // Check for admin session first
     if (localStorage.getItem('bloc_admin_session')) {
       document.getElementById('adm-hd-name').textContent = 'Administrator';
-      setTimeout(updateAdmNotifUI, 500);
-      history.replaceState({ route:'admin' }, '', '#admin');
+        history.replaceState({ route:'admin' }, '', '#admin');
       applyRoute('admin');
     } else if (hasSession) {
       history.replaceState({ route:'cal' }, '', '#cal');
@@ -1705,7 +1571,7 @@ async function doLogin() {
   const pass  = document.getElementById('l-pass').value;
   const errEl = document.getElementById('l-err');
   const passHash = await hashPass(pass);
-  const user = USERS.find(u => !u._type && u.email === email && u.pass === passHash && u.role === 'athlete');
+  const user = USERS.find(u => u.email === email && u.pass === passHash && u.role === 'athlete');
   if (!user) { errEl.textContent = 'Invalid email or password.'; return; }
   S.user = user;
   localStorage.setItem('bloc_session', user.id);
@@ -1754,7 +1620,6 @@ async function doAdminLogin() {
   if (entered !== stored) { document.getElementById('m-al-err').textContent = 'Incorrect password.'; return; }
   closeModal('m-adminlogin');
   document.getElementById('adm-hd-name').textContent = 'Administrator';
-  setTimeout(updateAdmNotifUI, 500);
   localStorage.setItem('bloc_admin_session', '1');
   history.pushState({ route:'admin' }, '', '#admin');
   applyRoute('admin');
@@ -1791,148 +1656,10 @@ async function adminSyncMaster() {
   if (btn) { btn.disabled = false; btn.textContent = 'Sync Now'; }
 }
 
-// Admin settings - synced via master DB as special _admin_settings entry
-async function saveAdminSettings(patch) {
-  let entry = USERS.find(u => u.id === '_admin_settings');
-  if (!entry) { entry = { id: '_admin_settings', _type: 'settings', emailAlerts: false }; USERS.push(entry); }
-  Object.assign(entry, patch);
-  localStorage.setItem('bloc_users', JSON.stringify(USERS));
-  localStorage.setItem('bloc_admin_email_alerts', entry.emailAlerts ? '1' : '0');
-  await pushUsersToMaster(USERS);
-}
-function getAdminSettings() {
-  return USERS.find(u => u.id === '_admin_settings') || { emailAlerts: false };
-}
-function saveAdminEmailToggle() {
-  const on = document.getElementById('toggle-admin-email').checked;
-  localStorage.setItem('bloc_admin_email_alerts', on ? '1' : '0');
-  saveAdminSettings({ emailAlerts: on })
-    .then(() => showToast('Email alerts ' + (on ? 'enabled' : 'disabled'), 'ok'))
-    .catch(() => showToast('Email alerts ' + (on ? 'enabled' : 'disabled'), 'ok'));
-}
-function getAdminEmailAlerts() {
-  const settings = getAdminSettings();
-  if (settings.emailAlerts !== undefined) return !!settings.emailAlerts;
-  return localStorage.getItem('bloc_admin_email_alerts') === '1';
-}
-function loadAdminEmailToggle() {
-  const el = document.getElementById('toggle-admin-email');
-  if (el) el.checked = getAdminEmailAlerts();
-}
-
-// ── Athlete email opt-in toggle ───────────────────────────────────
-function saveAthleteEmailToggle() {
-  if (!S.user) return;
-  const on = document.getElementById('toggle-athlete-email').checked;
-  const idx = USERS.findIndex(u => u.id === S.user.id);
-  if (idx < 0) return;
-  USERS[idx].coachEmailOptIn = on;
-  S.user = USERS[idx];
-  localStorage.setItem('bloc_session_user', JSON.stringify(S.user));
-  pushUsersToMaster(USERS).catch(() => {});
-  localStorage.setItem('bloc_users', JSON.stringify(USERS));
-  showToast('Coach email notifications ' + (on ? 'enabled' : 'disabled'), 'ok');
-}
-function loadAthleteEmailToggle() {
-  const el = document.getElementById('toggle-athlete-email');
-  if (el && S.user) el.checked = !!S.user.coachEmailOptIn;
-}
-
-// ── Admin notification bell ───────────────────────────────────────
-// Stores result notifications: bloc_adm_notif_{userId}_{isoDate} = 'unread'|'read'
-// Admin notification bell - synced via master DB as _admin_notifs entry
-function notifyAdminOfResults(isoDate, userId) {
-  if (isoDate && userId) markAdmResultUnread(userId, isoDate);
-}
-function getAdmNotifsEntry() {
-  return USERS.find(u => u.id === '_admin_notifs') || { id: '_admin_notifs', _type: 'notifs', items: [] };
-}
-async function saveAdmNotifsEntry(entry) {
-  const idx = USERS.findIndex(u => u.id === '_admin_notifs');
-  if (idx >= 0) USERS[idx] = entry; else USERS.push(entry);
-  localStorage.setItem('bloc_users', JSON.stringify(USERS));
-  await pushUsersToMaster(USERS);
-}
-function markAdmResultUnread(userId, isoDate) {
-  const entry = getAdmNotifsEntry();
-  entry.items = (entry.items || []).filter(n => !(n.userId === userId && n.isoDate === isoDate));
-  const u = USERS.find(u => u.id === userId);
-  entry.items.push({ userId, isoDate, name: u ? u.name : 'Athlete', ts: Date.now(), read: false });
-  saveAdmNotifsEntry(entry).catch(() => {});
-  updateAdmNotifUI();
-}
-function markAdmResultRead(userId, isoDate) {
-  const entry = getAdmNotifsEntry();
-  entry.items = (entry.items || []).map(n =>
-    (n.userId === userId && n.isoDate === isoDate) ? { ...n, read: true } : n
-  );
-  saveAdmNotifsEntry(entry).catch(() => {});
-  updateAdmNotifUI();
-}
-function getAdmUnreadResults() {
-  const entry = getAdmNotifsEntry();
-  return (entry.items || []).filter(n => !n.read).sort((a,b) => (b.ts||0) - (a.ts||0));
-}
-
-function updateAdmNotifUI() {
-  const badge = document.getElementById('adm-notif-badge');
-  const list  = document.getElementById('adm-notif-list');
-  if (!badge || !list) return;
-  const unread = getAdmUnreadResults();
-  if (unread.length) {
-    badge.textContent = unread.length > 9 ? '9+' : unread.length;
-    badge.style.display = 'flex';
-  } else {
-    badge.style.display = 'none';
-  }
-  if (unread.length === 0) {
-    list.innerHTML = '<div class="adm-notif-empty">No new results</div>';
-  } else {
-    list.innerHTML = unread.map(n =>
-      '<div class="adm-notif-item" onclick="admNotifClick(\'' + n.userId + '\',\'' + n.isoDate + '\')">' +
-        '<div class="adm-notif-item-name">' + escH(n.name) + '</div>' +
-        '<div class="adm-notif-item-date">Results logged — ' + n.isoDate + '</div>' +
-      '</div>'
-    ).join('');
-  }
-}
-
-function admNotifClick(userId, isoDate) {
-  markAdmResultRead(userId, isoDate);
-  closeAdmNotifDrop();
-  adminViewUser(userId).then(() => {
-    // Navigate to that date in admin day view
-    if (ADM.cache[userId]) adminOpenDay(isoDate);
-  });
-}
-
-function toggleAdmNotifDrop() {
-  const drop = document.getElementById('adm-notif-drop');
-  if (drop) drop.classList.toggle('open');
-}
-function closeAdmNotifDrop() {
-  const drop = document.getElementById('adm-notif-drop');
-  if (drop) drop.classList.remove('open');
-}
-async function clearAdmNotifs() {
-  const entry = getAdmNotifsEntry();
-  entry.items = (entry.items || []).map(n => ({ ...n, read: true }));
-  await saveAdmNotifsEntry(entry).catch(() => {});
-  updateAdmNotifUI();
-  closeAdmNotifDrop();
-  showToast('All results marked as read', 'ok');
-}
-
-// Close bell dropdown when clicking outside
-document.addEventListener('click', e => {
-  const wrap = document.getElementById('adm-bell-btn')?.closest('.adm-notif-wrap');
-  if (wrap && !wrap.contains(e.target)) closeAdmNotifDrop();
-});
-
 function renderUserTable() {
   const tbody = document.getElementById('user-tbody');
   tbody.innerHTML = '';
-  USERS.filter(u => !u._type).forEach(u => {
+  USERS.forEach(u => {
     const hasSheet = !!u.spreadsheetId;
     const sheetUrl = hasSheet ? 'https://docs.google.com/spreadsheets/d/' + u.spreadsheetId : '';
     const tr = document.createElement('tr');
@@ -2085,7 +1812,6 @@ function switchAdmTab(name,btn){
   document.querySelectorAll('.adm-tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.adm-panel').forEach(p=>p.classList.remove('active'));
   btn.classList.add('active'); document.getElementById('adm-'+name).classList.add('active');
-  if (name === 'settings') loadAdminEmailToggle();
 }
 function openChangeAdminPass(){ ['m-ap-cur','m-ap-new','m-ap-conf'].forEach(id=>document.getElementById(id).value=''); document.getElementById('m-ap-err').textContent=''; openModal('m-adminpass'); }
 async function saveAdminPass(){
@@ -2883,9 +2609,7 @@ async function autoSaveAll(silent=false) {
       const stEl=document.getElementById('save-st');
       if (stEl) { stEl.textContent='Saved ✓'; stEl.className='save-st ok'; }
     }
-    // Notify admin even without script
-    if (!silent && S.user && S.selDate) notifyAdminOfResults(S.selDate, S.user.id);
-    return null; // no script — local only
+      return null; // no script — local only
   }
 
   const payload = {
@@ -2895,7 +2619,6 @@ async function autoSaveAll(silent=false) {
     sectionResults: secArr, feel: S.feel,
     athleteName: S.user.name || 'Athlete',
     dateLabel: S.selDate || day.tabName,
-    sendEmail: !silent && getAdminEmailAlerts(),
   };
 
   const proxies = [
@@ -2920,8 +2643,7 @@ async function autoSaveAll(silent=false) {
           const stEl=document.getElementById('save-st');
           if (stEl) { stEl.textContent='Synced ✓'; stEl.className='save-st ok'; }
         }
-        if (S.user && S.selDate) notifyAdminOfResults(S.selDate, S.user.id);
-        return true;
+              return true;
       }
     } catch(e) { /* try next proxy */ }
   }
@@ -2936,7 +2658,6 @@ async function autoSaveAll(silent=false) {
     if (stEl) { stEl.textContent='Saved ✓'; stEl.className='save-st ok'; }
   }
   // Notify admin even on unconfirmed send
-  if (S.user && S.selDate) notifyAdminOfResults(S.selDate, S.user.id);
   return null;
 }
 
@@ -3076,7 +2797,6 @@ function openAccountSettings() {
   document.getElementById('acct-new-pass').value = '';
   document.getElementById('acct-conf-pass').value= '';
   document.getElementById('m-acct-err').textContent = '';
-  loadAthleteEmailToggle();
   openModal('m-account');
 }
 
@@ -3132,9 +2852,6 @@ async function saveAccountSettings() {
     ...(changingPassword ? { pass: await hashPass(newPass) } : {}),
   };
 
-  // Stamp the update time so sync can compare timestamps
-  updated._passChangedAt = Date.now();
-
   USERS[idx] = updated;
   S.user = updated;
   localStorage.setItem('bloc_users', JSON.stringify(USERS));
@@ -3145,22 +2862,8 @@ async function saveAccountSettings() {
   document.getElementById('first-login-banner').style.display = 'none';
 
   closeModal('m-account');
-
-  // Push with retries
-  let pushed = false;
-  for (let attempt = 0; attempt < 3 && !pushed; attempt++) {
-    if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
-    const result = await pushUsersToMaster(USERS);
-    if (result === true) { pushed = true; }
-  }
-
-  if (pushed) {
-    localStorage.removeItem('bloc_pending_account_change');
-    showToast(changingPassword ? 'Password changed ✔' : 'Account updated ✔', 'ok');
-  } else {
-    localStorage.setItem('bloc_pending_account_change', JSON.stringify(updated));
-    showToast(changingPassword ? 'Password saved — syncing in background' : 'Saved — will sync when connection improves', 'ok');
-  }
+  await saveUsersAndSync(USERS);
+  showToast(changingPassword ? 'Password changed ✔' : 'Account updated ✔', 'ok');
 }
 
 
@@ -3432,7 +3135,6 @@ async function adminRefreshDetail() {
 
 // ── Admin calendar view ──────────────────────────────────────────────────
 function renderDetailBody() {
-  updateAdmNotifUI();
   if (!ADM.detailUserId) return;
   const dm = ADM.cache[ADM.detailUserId]?.dayMap || {};
   const d = ADM.detailMonth, year = d.getFullYear(), month = d.getMonth();
@@ -3731,7 +3433,6 @@ async function syncCommentToSheet(u, day, sectionIdx, comment) {
 
   // Check if athlete has opted into email notifications for coach feedback
   const athlete = USERS.find(a => a.id === u.id) || u;
-  const sendAthleteEmail = !!(athlete.coachEmailOptIn && athlete.email);
 
   const payload = {
     secret:             u.scriptSecret || '',
@@ -3740,9 +3441,7 @@ async function syncCommentToSheet(u, day, sectionIdx, comment) {
     resultsRowIdx:      day.resultsRowIdx,
     colIndex:           day.colIndex,
     comment:            combinedComment,
-    sendAthleteEmail:   sendAthleteEmail,
-    athleteEmail:       sendAthleteEmail ? (athlete.email || '') : '',
-    athleteName:        athlete.name || 'Athlete',
+    sendAthleteEmail:   sendAthleteEmail,    athleteName:        athlete.name || 'Athlete',
     dateLabel:          day.isoDate || day.tabName,
   };
 
@@ -4060,10 +3759,6 @@ async function refreshDayView() {
 // available even after Safari cache clear, reinstall, or fresh device.
 // Master DB is the single source of truth. localStorage is just a fast cache.
 
-// Global flag — prevents any master DB writes during app initialisation
-// Set to true once init is complete and it's safe to write
-window._initComplete = false;
-
 (async () => {
   const hasSession = !!localStorage.getItem('bloc_session') ||
                      !!localStorage.getItem('bloc_admin_session');
@@ -4084,9 +3779,6 @@ window._initComplete = false;
       console.warn('Master sync failed on init:', e.message);
     }
   }
-
-  // Init complete — master writes now permitted
-  window._initComplete = true;
 
   // Now route — users are loaded from master regardless of localStorage state
   parseHashAndRoute();
