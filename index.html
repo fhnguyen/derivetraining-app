@@ -610,6 +610,32 @@ html { touch-action: manipulation; }
 }
 .toggle input:checked + .toggle-slider { background:var(--accent); }
 .toggle input:checked + .toggle-slider::before { transform:translateX(18px); }
+/* Admin result notifications */
+.adm-notif-wrap { position:relative; }
+.adm-notif-badge {
+  position:absolute; top:-4px; right:-4px;
+  background:var(--gold); color:#fff;
+  font-family:var(--mono); font-size:.55rem; font-weight:700;
+  min-width:16px; height:16px; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  padding:0 3px; pointer-events:none;
+}
+.adm-notif-drop {
+  position:absolute; top:calc(100% + 8px); right:0;
+  width:300px; background:var(--surf); border:1px solid var(--border);
+  border-radius:var(--r); box-shadow:0 4px 20px rgba(0,0,0,.12);
+  z-index:200; display:none;
+}
+.adm-notif-drop.open { display:block; }
+.adm-notif-item {
+  padding:.7rem 1rem; border-bottom:1px solid var(--border);
+  cursor:pointer; transition:background .1s;
+}
+.adm-notif-item:last-child { border-bottom:none; }
+.adm-notif-item:hover { background:var(--bg); }
+.adm-notif-item-name { font-weight:500; font-size:.82rem; }
+.adm-notif-item-date { font-family:var(--mono); font-size:.62rem; color:var(--muted2); margin-top:.1rem; }
+.adm-notif-empty { padding:1rem; text-align:center; font-family:var(--mono); font-size:.68rem; color:var(--muted2); }
 
 /* ── Toast ───────────────────────────────────────── */
 .toast {
@@ -927,7 +953,6 @@ html { touch-action: manipulation; }
           <div class="cal-badge" id="cal-badge" style="display:none"></div>
         </div>
         <div class="cal-arrows">
-          <button class="btn-sm" onclick="loadAllSheets()" title="Reload programming" style="margin-right:.4rem">&#x21BA;</button>
           <button class="cal-arr" onclick="shiftMonth(-1)">&#8592;</button>
           <button class="cal-arr" onclick="shiftMonth(1)">&#8594;</button>
         </div>
@@ -961,7 +986,17 @@ html { touch-action: manipulation; }
     <div class="adm-logo"><span style="color:var(--accent)">TRAIN</span><span style="color:var(--gold)">DERIVE</span> <span>ADMIN</span></div>
     <div class="hd-right">
       <span class="hd-name" id="adm-hd-name"></span>
-      
+      <div class="adm-notif-wrap">
+        <button class="btn-ghost" id="adm-bell-btn" onclick="toggleAdmNotifDrop()" title="New results" style="font-size:1.1rem;padding:.35rem .6rem;">&#x1F514;</button>
+        <span class="adm-notif-badge" id="adm-notif-badge" style="display:none"></span>
+        <div class="adm-notif-drop" id="adm-notif-drop">
+          <div style="padding:.6rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted2)">New Results</span>
+            <button class="btn-sm" onclick="clearAdmNotifs()" style="font-size:.6rem;padding:.2rem .5rem">Mark all read</button>
+          </div>
+          <div id="adm-notif-list"></div>
+        </div>
+      </div>
       <button class="btn-ghost" onclick="doAdminLogout()">Sign Out</button>
     </div>
   </header>
@@ -988,6 +1023,12 @@ html { touch-action: manipulation; }
       <div class="setting-row">
         <div><div class="setting-label">Sync Users</div><div class="setting-desc">Pull latest user list from master database</div></div>
         <button class="btn-sm" id="btn-sync-master" onclick="adminSyncMaster()">Sync Now</button>
+      </div>
+      <div class="setting-row">
+        <div><div class="setting-label">Email Alerts — New Results</div><div class="setting-desc">Send email alert when an athlete saves results</div></div>
+        <div class="toggle-wrap">
+          <label class="toggle"><input type="checkbox" id="toggle-admin-email" onchange="saveAdminEmailToggle()"><span class="toggle-slider"></span></label>
+        </div>
       </div>
       <div class="setting-row">
         <div><div class="setting-label">Admin Password</div><div class="setting-desc">Change the password for admin access</div></div>
@@ -1140,6 +1181,10 @@ html { touch-action: manipulation; }
 
       <div class="modal-section-title">Profile</div>
       <div class="fld"><label>Display Name</label><input type="text" id="acct-name" placeholder="Your name"></div>
+      <div class="setting-row" style="border:none;padding:.5rem 0 0 0;">
+        <div><div class="setting-label" style="font-size:.78rem">Email me when coach leaves feedback</div><div class="setting-desc">Sends to the email on your account (off by default)</div></div>
+        <div class="toggle-wrap"><label class="toggle"><input type="checkbox" id="toggle-athlete-email" onchange="saveAthleteEmailToggle()"><span class="toggle-slider"></span></label></div>
+      </div>
 
       <div class="modal-divider"></div>
       <div class="modal-section-title">Change Email</div>
@@ -1194,16 +1239,16 @@ async function hashPass(plain) {
 const DEFAULT_ADMIN_HASH = '7c4f0e3e8ac7ea7b8c9b4c3a6f1e2d5e9b0f3a2c8d4e1b6a9c7f2e5d8b3a4f1c';
 
 async function getAdminHash() {
-  // 1. localStorage — fast path
+  // Check localStorage first (fast path)
   const stored = localStorage.getItem('bloc_admin_hash');
   if (stored) return stored;
-  // 2. Master DB _admin_settings entry — survives localStorage wipes
-  const settingsEntry = USERS.find(u => u.id === '_admin_settings');
-  if (settingsEntry && settingsEntry.adminHash) {
-    localStorage.setItem('bloc_admin_hash', settingsEntry.adminHash);
-    return settingsEntry.adminHash;
+  // Check master DB settings entry (survives localStorage wipes)
+  const settings = getAdminSettings();
+  if (settings.adminHash) {
+    localStorage.setItem('bloc_admin_hash', settings.adminHash);
+    return settings.adminHash;
   }
-  // 3. First run — hash default and store
+  // First run — hash the default and store
   const h = await hashPass(DEFAULT_ADMIN_PASS);
   localStorage.setItem('bloc_admin_hash', h);
   return h;
@@ -1212,18 +1257,8 @@ async function getAdminHash() {
 async function setAdminPass(plain) {
   const h = await hashPass(plain);
   localStorage.setItem('bloc_admin_hash', h);
-  // Persist in master DB so hash survives localStorage clears on any device
-  try {
-    let entry = USERS.find(u => u.id === '_admin_settings');
-    if (!entry) {
-      entry = { id: '_admin_settings', _type: 'settings', adminHash: h };
-      USERS.push(entry);
-    } else {
-      entry.adminHash = h;
-    }
-    localStorage.setItem('bloc_users', JSON.stringify(USERS));
-    pushUsersToMaster(USERS).catch(() => {});
-  } catch(e) {}
+  // Persist in master DB so password survives localStorage clears
+  saveAdminSettings({ adminHash: h }).catch(() => {});
 }
 const DEFAULT_USERS = [];
 
@@ -1620,6 +1655,7 @@ function parseHashAndRoute() {
   if (hash === '#admin') {
     if (localStorage.getItem('bloc_admin_session')) {
       document.getElementById('adm-hd-name').textContent = 'Administrator';
+      setTimeout(updateAdmNotifUI, 500);
       applyRoute('admin');
     } else {
       showAdminLogin();
@@ -1641,6 +1677,7 @@ function parseHashAndRoute() {
     // Check for admin session first
     if (localStorage.getItem('bloc_admin_session')) {
       document.getElementById('adm-hd-name').textContent = 'Administrator';
+      setTimeout(updateAdmNotifUI, 500);
       history.replaceState({ route:'admin' }, '', '#admin');
       applyRoute('admin');
     } else if (hasSession) {
@@ -1717,6 +1754,7 @@ async function doAdminLogin() {
   if (entered !== stored) { document.getElementById('m-al-err').textContent = 'Incorrect password.'; return; }
   closeModal('m-adminlogin');
   document.getElementById('adm-hd-name').textContent = 'Administrator';
+  setTimeout(updateAdmNotifUI, 500);
   localStorage.setItem('bloc_admin_session', '1');
   history.pushState({ route:'admin' }, '', '#admin');
   applyRoute('admin');
@@ -1752,6 +1790,144 @@ async function adminSyncMaster() {
   }
   if (btn) { btn.disabled = false; btn.textContent = 'Sync Now'; }
 }
+
+// Admin settings - synced via master DB as special _admin_settings entry
+async function saveAdminSettings(patch) {
+  let entry = USERS.find(u => u.id === '_admin_settings');
+  if (!entry) { entry = { id: '_admin_settings', _type: 'settings', emailAlerts: false }; USERS.push(entry); }
+  Object.assign(entry, patch);
+  localStorage.setItem('bloc_users', JSON.stringify(USERS));
+  localStorage.setItem('bloc_admin_email_alerts', entry.emailAlerts ? '1' : '0');
+  await pushUsersToMaster(USERS);
+}
+function getAdminSettings() {
+  return USERS.find(u => u.id === '_admin_settings') || { emailAlerts: false };
+}
+function saveAdminEmailToggle() {
+  const on = document.getElementById('toggle-admin-email').checked;
+  localStorage.setItem('bloc_admin_email_alerts', on ? '1' : '0');
+  saveAdminSettings({ emailAlerts: on })
+    .then(() => showToast('Email alerts ' + (on ? 'enabled' : 'disabled'), 'ok'))
+    .catch(() => showToast('Email alerts ' + (on ? 'enabled' : 'disabled'), 'ok'));
+}
+function getAdminEmailAlerts() {
+  const settings = getAdminSettings();
+  if (settings.emailAlerts !== undefined) return !!settings.emailAlerts;
+  return localStorage.getItem('bloc_admin_email_alerts') === '1';
+}
+function loadAdminEmailToggle() {
+  const el = document.getElementById('toggle-admin-email');
+  if (el) el.checked = getAdminEmailAlerts();
+}
+
+// ── Athlete email opt-in toggle ───────────────────────────────────
+function saveAthleteEmailToggle() {
+  if (!S.user) return;
+  const on = document.getElementById('toggle-athlete-email').checked;
+  const idx = USERS.findIndex(u => u.id === S.user.id);
+  if (idx < 0) return;
+  USERS[idx].coachEmailOptIn = on;
+  S.user = USERS[idx];
+  localStorage.setItem('bloc_session_user', JSON.stringify(S.user));
+  pushUsersToMaster(USERS).catch(() => {});
+  localStorage.setItem('bloc_users', JSON.stringify(USERS));
+  showToast('Coach email notifications ' + (on ? 'enabled' : 'disabled'), 'ok');
+}
+function loadAthleteEmailToggle() {
+  const el = document.getElementById('toggle-athlete-email');
+  if (el && S.user) el.checked = !!S.user.coachEmailOptIn;
+}
+
+// ── Admin notification bell ───────────────────────────────────────
+// Stores result notifications: bloc_adm_notif_{userId}_{isoDate} = 'unread'|'read'
+// Admin notification bell - synced via master DB as _admin_notifs entry
+function notifyAdminOfResults(isoDate, userId) {
+  if (isoDate && userId) markAdmResultUnread(userId, isoDate);
+}
+function getAdmNotifsEntry() {
+  return USERS.find(u => u.id === '_admin_notifs') || { id: '_admin_notifs', _type: 'notifs', items: [] };
+}
+async function saveAdmNotifsEntry(entry) {
+  const idx = USERS.findIndex(u => u.id === '_admin_notifs');
+  if (idx >= 0) USERS[idx] = entry; else USERS.push(entry);
+  localStorage.setItem('bloc_users', JSON.stringify(USERS));
+  await pushUsersToMaster(USERS);
+}
+function markAdmResultUnread(userId, isoDate) {
+  const entry = getAdmNotifsEntry();
+  entry.items = (entry.items || []).filter(n => !(n.userId === userId && n.isoDate === isoDate));
+  const u = USERS.find(u => u.id === userId);
+  entry.items.push({ userId, isoDate, name: u ? u.name : 'Athlete', ts: Date.now(), read: false });
+  saveAdmNotifsEntry(entry).catch(() => {});
+  updateAdmNotifUI();
+}
+function markAdmResultRead(userId, isoDate) {
+  const entry = getAdmNotifsEntry();
+  entry.items = (entry.items || []).map(n =>
+    (n.userId === userId && n.isoDate === isoDate) ? { ...n, read: true } : n
+  );
+  saveAdmNotifsEntry(entry).catch(() => {});
+  updateAdmNotifUI();
+}
+function getAdmUnreadResults() {
+  const entry = getAdmNotifsEntry();
+  return (entry.items || []).filter(n => !n.read).sort((a,b) => (b.ts||0) - (a.ts||0));
+}
+
+function updateAdmNotifUI() {
+  const badge = document.getElementById('adm-notif-badge');
+  const list  = document.getElementById('adm-notif-list');
+  if (!badge || !list) return;
+  const unread = getAdmUnreadResults();
+  if (unread.length) {
+    badge.textContent = unread.length > 9 ? '9+' : unread.length;
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
+  if (unread.length === 0) {
+    list.innerHTML = '<div class="adm-notif-empty">No new results</div>';
+  } else {
+    list.innerHTML = unread.map(n =>
+      '<div class="adm-notif-item" onclick="admNotifClick(\'' + n.userId + '\',\'' + n.isoDate + '\')">' +
+        '<div class="adm-notif-item-name">' + escH(n.name) + '</div>' +
+        '<div class="adm-notif-item-date">Results logged — ' + n.isoDate + '</div>' +
+      '</div>'
+    ).join('');
+  }
+}
+
+function admNotifClick(userId, isoDate) {
+  markAdmResultRead(userId, isoDate);
+  closeAdmNotifDrop();
+  adminViewUser(userId).then(() => {
+    // Navigate to that date in admin day view
+    if (ADM.cache[userId]) adminOpenDay(isoDate);
+  });
+}
+
+function toggleAdmNotifDrop() {
+  const drop = document.getElementById('adm-notif-drop');
+  if (drop) drop.classList.toggle('open');
+}
+function closeAdmNotifDrop() {
+  const drop = document.getElementById('adm-notif-drop');
+  if (drop) drop.classList.remove('open');
+}
+async function clearAdmNotifs() {
+  const entry = getAdmNotifsEntry();
+  entry.items = (entry.items || []).map(n => ({ ...n, read: true }));
+  await saveAdmNotifsEntry(entry).catch(() => {});
+  updateAdmNotifUI();
+  closeAdmNotifDrop();
+  showToast('All results marked as read', 'ok');
+}
+
+// Close bell dropdown when clicking outside
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('adm-bell-btn')?.closest('.adm-notif-wrap');
+  if (wrap && !wrap.contains(e.target)) closeAdmNotifDrop();
+});
 
 function renderUserTable() {
   const tbody = document.getElementById('user-tbody');
@@ -1909,6 +2085,7 @@ function switchAdmTab(name,btn){
   document.querySelectorAll('.adm-tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.adm-panel').forEach(p=>p.classList.remove('active'));
   btn.classList.add('active'); document.getElementById('adm-'+name).classList.add('active');
+  if (name === 'settings') loadAdminEmailToggle();
 }
 function openChangeAdminPass(){ ['m-ap-cur','m-ap-new','m-ap-conf'].forEach(id=>document.getElementById(id).value=''); document.getElementById('m-ap-err').textContent=''; openModal('m-adminpass'); }
 async function saveAdminPass(){
@@ -1938,43 +2115,47 @@ function confirmReset(){
 // Apps Script instead of a public CORS proxy. This is reliable, fast,
 // and not subject to proxy blocking.
 
-function makeFetchWithTimeout(ms) {
-  const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), ms);
-  return { signal: ctrl.signal, clear: () => clearTimeout(tid) };
-}
-
 async function scriptFetch(scriptUrl, secret, action, params = {}) {
-  const qs  = new URLSearchParams({ action, secret, ...params }).toString();
+  const qs = new URLSearchParams({ action, secret, ...params }).toString();
   const url = scriptUrl + '?' + qs;
-  const enc = encodeURIComponent(url);
 
-  const attempts = [
-    { url: url,                                              ms: 12000, opts: { redirect: 'follow' } },
-    { url: 'https://api.allorigins.win/raw?url=' + enc,     ms: 8000,  opts: {} },
-    { url: 'https://api.codetabs.com/v1/proxy?quest=' + enc,ms: 8000,  opts: {} },
-    { url: 'https://cors.x2u.in/' + url,                    ms: 8000,  opts: {} },
-    { url: 'https://thingproxy.freeboard.io/fetch/' + url,  ms: 8000,  opts: {} },
-  ];
-
-  for (let i = 0; i < attempts.length; i++) {
-    const { url: u, ms, opts } = attempts[i];
-    const { signal, clear } = makeFetchWithTimeout(ms);
-    try {
-      const res = await fetch(u, { signal, ...opts });
-      clear();
-      if (!res.ok) { console.warn('scriptFetch attempt', i, 'HTTP', res.status); continue; }
-      const text = await res.text();
-      if (text && text.length > 10) return text;
-      console.warn('scriptFetch attempt', i, 'empty response');
-    } catch(err) {
-      clear();
-      console.warn('scriptFetch attempt', i, 'failed:', err.message);
+  // Apps Script web apps issue a 302 redirect to a googleusercontent.com URL.
+  // We must follow it. Try direct fetch first, then fall back to proxy which
+  // also handles the redirect transparently.
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), 20000);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal, redirect: 'follow' });
+    clearTimeout(tid);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    if (text && text.length > 0) return text;
+    throw new Error('Empty response');
+  } catch(err) {
+    clearTimeout(tid);
+    // Fall back: route the Apps Script URL through a proxy which follows
+    // the redirect server-side and returns the final content
+    console.warn('Direct script fetch failed (' + err.message + '), trying via proxy...');
+    const enc = encodeURIComponent(url);
+    const proxies = [
+      'https://api.codetabs.com/v1/proxy?quest=' + enc,
+      'https://corsproxy.io/?url=' + enc,
+      'https://api.allorigins.win/raw?url=' + enc,
+    ];
+    for (const p of proxies) {
+      try {
+        const ctrl2 = new AbortController();
+        const tid2 = setTimeout(() => ctrl2.abort(), 5000);
+        const res2 = await fetch(p, { signal: ctrl2.signal });
+        clearTimeout(tid2);
+        if (!res2.ok) continue;
+        const text2 = await res2.text();
+        if (text2 && text2.length > 0) return text2;
+      } catch(e2) { /* try next */ }
     }
+    throw new Error('Script unreachable via direct and proxy: ' + err.message);
   }
-  throw new Error('scriptFetch: all attempts failed for action=' + action);
 }
-
 
 async function loadTabsViaScript(scriptUrl, secret) {
   const text = await scriptFetch(scriptUrl, secret, 'tabs');
@@ -1983,75 +2164,86 @@ async function loadTabsViaScript(scriptUrl, secret) {
   return json.tabs; // [{title, gid}, ...]
 }
 
-async function loadCSVViaScript(scriptUrl, secret, tabNameOrGid) {
-  const isGid = /^\d+$/.test(String(tabNameOrGid));
-  const params = isGid ? { gid: String(tabNameOrGid) } : { sheet: String(tabNameOrGid) };
-  return await scriptFetch(scriptUrl, secret, 'csv', params);
+async function loadCSVViaScript(scriptUrl, secret, gid) {
+  return await scriptFetch(scriptUrl, secret, 'csv', { gid: String(gid) });
 }
 
 async function proxyFetch(url) {
   const enc = encodeURIComponent(url);
-
-  // Race the top 3 proxies simultaneously — first good response wins
-  // This is much faster than trying them sequentially
-  const top3 = [
-    'https://api.allorigins.win/raw?url=' + enc,
+  const proxies = [
     'https://api.codetabs.com/v1/proxy?quest=' + enc,
-    'https://cors.x2u.in/' + url,
-  ];
-
-  const tryProxy = async (p) => {
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 6000);
-    try {
-      const res = await fetch(p, { signal: ctrl.signal });
-      clearTimeout(tid);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const text = await res.text();
-      if (!text || text.length < 10) throw new Error('Empty response');
-      // Reject HTML error pages — a valid CSV never starts with <
-      if (text.trimStart().startsWith('<')) throw new Error('Got HTML instead of CSV');
-      return text;
-    } catch(err) {
-      clearTimeout(tid);
-      throw err;
-    }
-  };
-
-  // Try all 3 at once, return first success
-  try {
-    return await Promise.any(top3.map(p => tryProxy(p)));
-  } catch(e) {
-    // All 3 failed — try fallbacks sequentially
-    console.warn('Top proxies all failed, trying fallbacks...');
-  }
-
-  // Fallbacks
-  const fallbacks = [
-    'https://thingproxy.freeboard.io/fetch/' + url,
     'https://corsproxy.io/?url=' + enc,
+    'https://api.allorigins.win/raw?url=' + enc,
+    'https://thingproxy.freeboard.io/fetch/' + url,
+    'https://cors.eu.org/' + url,
+    'https://proxy.cors.sh/' + url,
   ];
-  for (const p of fallbacks) {
+  let lastErr;
+  for (const p of proxies) {
     try {
       const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 6000);
+      const tid = setTimeout(() => ctrl.abort(), 8000);  // 8s timeout per proxy
       const res = await fetch(p, { signal: ctrl.signal });
       clearTimeout(tid);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const text = await res.text();
-      if (!text || text.length < 10) throw new Error('Empty');
-      if (text.trimStart().startsWith('<')) throw new Error('Got HTML not CSV');
-      return text;
+      if (text.length > 10) return text;
+      throw new Error('Empty response');
     } catch(err) {
-      console.warn('Fallback proxy failed:', p.split('?')[0], err.message);
+      lastErr = err;
+      if (err.name !== 'AbortError') {
+        console.warn('Proxy failed:', p.split('?')[0], '-', err.message);
+      }
     }
   }
-  throw new Error('All proxies failed for: ' + url.slice(0, 80));
+  throw new Error('All proxies failed: ' + (lastErr&&lastErr.message));
 }
 
 // Discover all tabs by fetching the HTML preview of the spreadsheet
 // and extracting sheet GIDs from the tab bar — works on any publicly shared sheet
 // without requiring it to be "published to web".
+async function discoverTabs(spreadsheetId) {
+  // Method: feeds API via proxy (works if sheet is published to web)
+  try {
+    const feedUrl = 'https://spreadsheets.google.com/feeds/worksheets/' + spreadsheetId + '/public/basic?alt=json';
+    const text = await proxyFetch(feedUrl);
+    const json = JSON.parse(text);
+    const tabs = (json.feed?.entry || []).map(e => {
+      const selfLink = e.link?.find(l => l.rel === 'self');
+      const gid = selfLink ? selfLink.href.split('/').pop() : null;
+      return { title: e.title?.['$t'] || 'Tab', gid };
+    }).filter(t => t.gid);
+    if (tabs.length) {
+      console.log('Feeds discovery found:', tabs.map(t=>t.title).join(', '));
+      return tabs;
+    }
+  } catch(e) { console.warn('Feeds discovery failed:', e.message); }
+  return null;
+}
+
+// Scan all GIDs that exist in a spreadsheet by trying exports
+// Returns tabs that respond with actual CSV content
+async function scanAllGids(spreadsheetId, setStatus) {
+  // Common GID patterns: 0 (first sheet always), then random large numbers
+  // We fetch the sheet's HTML to extract GIDs without needing feeds API
+  const candidateGids = ['0'];
+
+  // Try fetching the sheet HTML directly to get GIDs from the DOM
+  try {
+    const html = await proxyFetch('https://docs.google.com/spreadsheets/d/' + spreadsheetId + '/edit');
+    const gidMatches = [...html.matchAll(/"gid\\u003d([0-9]+)"/g)];
+    const gidMatches2 = [...html.matchAll(/\\"gid=([0-9]+)\\"/g)];
+    const gidMatches3 = [...html.matchAll(/sheetId.{1,5}([0-9]{5,})/g)];
+    const found = new Set(['0']);
+    for (const m of [...gidMatches, ...gidMatches2, ...gidMatches3]) found.add(m[1]);
+    if (found.size > 1) {
+      console.log('GIDs from HTML scan:', [...found].join(', '));
+      return [...found].map(g => ({ gid: g, title: 'Tab' }));
+    }
+  } catch(e) { console.warn('HTML GID scan failed:', e.message); }
+
+  return candidateGids.map(g => ({ gid: g, title: 'Sheet' }));
+}
 
 async function loadAllSheets() {
   const { spreadsheetId, sheetGids, sheetTabNames } = S.user;
@@ -2072,54 +2264,69 @@ async function loadAllSheets() {
   setStatus('Loading your program…');
 
   try {
+    // ── Strategy 1: fetch by tab NAME (most reliable, GID-independent) ──
+    // If the admin has specified tab names, fetch each one directly by name.
+    // Google Sheets export supports ?sheet=TabName which always works on
+    // publicly shared sheets regardless of GID.
     const tabNames = sheetTabNames && sheetTabNames.length ? sheetTabNames : null;
-    const scriptUrl = S.user.scriptUrl;
-    const scriptSec = S.user.scriptSecret;
-    const useScript = !!(scriptUrl && scriptSec);
 
     if (tabNames) {
-      console.log('Loading tabs:', tabNames.join(', '), '| via:', useScript ? 'Apps Script' : 'proxy');
+      console.log('Fetching by tab names:', tabNames.join(', '));
+      const discovered = await discoverTabs(spreadsheetId) || [];
+      const nameToGid = {};
+      discovered.forEach(t => { nameToGid[t.title.trim()] = t.gid; });
 
       await Promise.all(tabNames.map(async tabName => {
         try {
-          let csv = null;
-
-          // Primary path: Apps Script doGet — authenticated, always works
-          if (useScript) {
-            try {
-              csv = await loadCSVViaScript(scriptUrl, scriptSec, tabName);
-              console.log('Got CSV via Apps Script for', tabName, '— length:', csv?.length);
-            } catch(se) {
-              console.warn('Apps Script failed for', tabName, ':', se.message);
-            }
-          }
-
-          // Fallback: proxy (only if Apps Script not configured or failed)
-          if (!csv || csv.length < 10) {
-            try {
-              const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
-                          '/export?format=csv&sheet=' + encodeURIComponent(tabName);
-              csv = await proxyFetch(url);
-              console.log('Got CSV via proxy for', tabName, '— length:', csv?.length);
-            } catch(pe) {
-              console.warn('Proxy also failed for', tabName, ':', pe.message);
-            }
-          }
-
-          if (csv && csvHasTrainingBlock(csv)) {
+          const gid = nameToGid[tabName.trim()];
+          const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
+                      (gid ? '/export?format=csv&gid=' + gid
+                           : '/export?format=csv&sheet=' + encodeURIComponent(tabName));
+          const csv = await proxyFetch(url);
+          if (csvHasTrainingBlock(csv)) {
             parseSheetCSV(csv, tabName, cutoff);
-            console.log('✓ Parsed', tabName, '— days found:', Object.keys(S.dayMap).length);
+            console.log('Parsed tab:', tabName, gid ? '(GID ' + gid + ')' : '(by name)', '— days:', Object.keys(S.dayMap).length);
           } else {
-            console.warn('✗ No training block in', tabName, '— first 120 chars:', csv ? csv.slice(0,120) : 'null');
+            console.log('Skipped (no Training row):', tabName);
           }
-        } catch(err) {
-          console.warn('Tab failed:', tabName, err.message);
-        }
+        } catch(err) { console.warn('Tab by name failed:', tabName, err.message); }
       }));
 
       if (Object.keys(S.dayMap).length > 0) { _finishLoad(); return; }
-      console.warn('No days loaded from named tabs — check console logs above');
+      console.warn('Named tabs returned no data, falling back to GID scan');
     }
+
+    // ── Strategy 2: discover tabs via feeds API (requires published sheet) ──
+    let tabs = await discoverTabs(spreadsheetId);
+
+    // ── Strategy 3: use stored sheetGids as fallback ──────────────────────
+    if (!tabs || !tabs.length) {
+      if (sheetGids && Object.keys(sheetGids).length) {
+        tabs = Object.entries(sheetGids).map(([title, gid]) => ({ title, gid }));
+        console.log('Using stored sheetGids:', tabs.map(t=>t.title).join(', '));
+      }
+    }
+
+    // ── Strategy 4: blind scan of first sheet (gid=0) ────────────────────
+    if (!tabs || !tabs.length) {
+      tabs = [{ title: 'Sheet', gid: '0' }];
+    }
+
+    setStatus('Loading ' + tabs.length + ' tab' + (tabs.length !== 1 ? 's' : '') + '…');
+
+    await Promise.all(tabs.map(async ({ title, gid }) => {
+      try {
+        const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
+                    '/export?format=csv&gid=' + gid;
+        const csv = await proxyFetch(url);
+        if (csvHasTrainingBlock(csv)) {
+          parseSheetCSV(csv, title, cutoff);
+          console.log('Parsed by GID:', title, gid);
+        } else {
+          console.log('Skipped:', title);
+        }
+      } catch(err) { console.warn('Tab failed:', title, err.message); }
+    }));
 
     _finishLoad();
 
@@ -2677,6 +2884,7 @@ async function autoSaveAll(silent=false) {
       if (stEl) { stEl.textContent='Saved ✓'; stEl.className='save-st ok'; }
     }
     // Notify admin even without script
+    if (!silent && S.user && S.selDate) notifyAdminOfResults(S.selDate, S.user.id);
     return null; // no script — local only
   }
 
@@ -2687,6 +2895,7 @@ async function autoSaveAll(silent=false) {
     sectionResults: secArr, feel: S.feel,
     athleteName: S.user.name || 'Athlete',
     dateLabel: S.selDate || day.tabName,
+    sendEmail: !silent && getAdminEmailAlerts(),
   };
 
   const proxies = [
@@ -2711,6 +2920,7 @@ async function autoSaveAll(silent=false) {
           const stEl=document.getElementById('save-st');
           if (stEl) { stEl.textContent='Synced ✓'; stEl.className='save-st ok'; }
         }
+        if (S.user && S.selDate) notifyAdminOfResults(S.selDate, S.user.id);
         return true;
       }
     } catch(e) { /* try next proxy */ }
@@ -2726,6 +2936,7 @@ async function autoSaveAll(silent=false) {
     if (stEl) { stEl.textContent='Saved ✓'; stEl.className='save-st ok'; }
   }
   // Notify admin even on unconfirmed send
+  if (S.user && S.selDate) notifyAdminOfResults(S.selDate, S.user.id);
   return null;
 }
 
@@ -2865,6 +3076,7 @@ function openAccountSettings() {
   document.getElementById('acct-new-pass').value = '';
   document.getElementById('acct-conf-pass').value= '';
   document.getElementById('m-acct-err').textContent = '';
+  loadAthleteEmailToggle();
   openModal('m-account');
 }
 
@@ -3098,51 +3310,55 @@ async function loadUserSheets(u) {
   const dayMap = {};
   if (!u.spreadsheetId) return dayMap;
 
-  const sid        = u.spreadsheetId;
-  const useScript  = !!(u.scriptUrl && u.scriptSecret);
-  const tabNames   = u.sheetTabNames && u.sheetTabNames.length ? u.sheetTabNames : null;
+  const sid = u.spreadsheetId;
 
-  // Apps Script primary, proxy fallback — identical to athlete loadAllSheets
-  if (tabNames) {
+  // Strategy 1: fetch by tab name (same as client path — GID-independent)
+  const tabNames = u.sheetTabNames && u.sheetTabNames.length ? u.sheetTabNames : null;
+ if (tabNames) {
+    const discovered = await discoverTabs(sid) || [];
+    const nameToGid = {};
+    discovered.forEach(t => { nameToGid[t.title.trim()] = t.gid; });
+
     await Promise.all(tabNames.map(async tabName => {
       try {
-        let csv = null;
-
-        // Primary: Apps Script doGet — authenticated, always works
-        if (useScript) {
-          try {
-            csv = await loadCSVViaScript(u.scriptUrl, u.scriptSecret, tabName);
-            console.log('Admin got CSV via Apps Script for', tabName, '— length:', csv?.length);
-          } catch(se) {
-            console.warn('Admin script failed for', tabName, ':', se.message);
-          }
-        }
-
-        // Fallback: proxy
-        if (!csv || csv.length < 10) {
-          try {
-            const url = 'https://docs.google.com/spreadsheets/d/' + sid +
-                        '/export?format=csv&sheet=' + encodeURIComponent(tabName);
-            csv = await proxyFetch(url);
-            console.log('Admin got CSV via proxy for', tabName, '— length:', csv?.length);
-          } catch(pe) {
-            console.warn('Admin proxy failed for', tabName, ':', pe.message);
-          }
-        }
-
-        if (!csv || !csvHasTrainingBlock(csv)) {
-          console.warn('Admin: no training block in', tabName, '— first 120 chars:', csv ? csv.slice(0,120) : 'null');
-          return;
-        }
+        const gid = nameToGid[tabName.trim()];
+        const url = 'https://docs.google.com/spreadsheets/d/' + sid +
+                    (gid ? '/export?format=csv&gid=' + gid
+                         : '/export?format=csv&sheet=' + encodeURIComponent(tabName));
+        const csv = await proxyFetch(url);
+        if (!csvHasTrainingBlock(csv)) return;
         const savedMap = S.dayMap; S.dayMap = dayMap;
         parseSheetCSV(csv, tabName, null);
         S.dayMap = savedMap;
-        console.log('Admin \u2713 Parsed', tabName, '— days found:', Object.keys(dayMap).length);
-      } catch(e) { console.warn('Admin tab failed:', tabName, e.message); }
+      } catch(e) { console.warn('Admin tab by name failed:', tabName, e.message); }
     }));
     if (Object.keys(dayMap).length) return dayMap;
   }
 
+  // Strategy 2: feeds API discovery
+  let tabs = await discoverTabs(sid);
+
+  // Strategy 3: stored sheetGids fallback
+  if (!tabs || !tabs.length) {
+    const gids = u.sheetGids || {};
+    if (Object.keys(gids).length) {
+      tabs = Object.entries(gids).map(([title,gid]) => ({title,gid}));
+    } else {
+      tabs = [{ title: 'Sheet', gid: '0' }];
+    }
+  }
+
+  await Promise.all(tabs.map(async ({title, gid}) => {
+    try {
+      const url = 'https://docs.google.com/spreadsheets/d/' + sid +
+                  '/export?format=csv&gid=' + gid;
+      const csv = await proxyFetch(url);
+      if (!csvHasTrainingBlock(csv)) return;
+      const savedMap = S.dayMap; S.dayMap = dayMap;
+      parseSheetCSV(csv, title, null);
+      S.dayMap = savedMap;
+    } catch(err) { console.warn('Admin tab failed:', title, err.message); }
+  }));
   return dayMap;
 }
 
@@ -3216,6 +3432,7 @@ async function adminRefreshDetail() {
 
 // ── Admin calendar view ──────────────────────────────────────────────────
 function renderDetailBody() {
+  updateAdmNotifUI();
   if (!ADM.detailUserId) return;
   const dm = ADM.cache[ADM.detailUserId]?.dayMap || {};
   const d = ADM.detailMonth, year = d.getFullYear(), month = d.getMonth();
@@ -3512,17 +3729,21 @@ async function syncCommentToSheet(u, day, sectionIdx, comment) {
   }
   const combinedComment = parts.join('\n');
 
+  // Check if athlete has opted into email notifications for coach feedback
   const athlete = USERS.find(a => a.id === u.id) || u;
+  const sendAthleteEmail = !!(athlete.coachEmailOptIn && athlete.email);
 
   const payload = {
-    secret:        u.scriptSecret || '',
-    action:        'comment',
-    sheetName:     day.tabName,
-    resultsRowIdx: day.resultsRowIdx,
-    colIndex:      day.colIndex,
-    comment:       combinedComment,
-    athleteName:   athlete.name || 'Athlete',
-    dateLabel:     day.isoDate || day.tabName,
+    secret:             u.scriptSecret || '',
+    action:             'comment',
+    sheetName:          day.tabName,
+    resultsRowIdx:      day.resultsRowIdx,
+    colIndex:           day.colIndex,
+    comment:            combinedComment,
+    sendAthleteEmail:   sendAthleteEmail,
+    athleteEmail:       sendAthleteEmail ? (athlete.email || '') : '',
+    athleteName:        athlete.name || 'Athlete',
+    dateLabel:          day.isoDate || day.tabName,
   };
 
   const commentProxies = [
