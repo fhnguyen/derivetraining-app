@@ -1,55 +1,97 @@
-// TRAINDERIVE Service Worker
-const CACHE = 'trainderive-v5';
+/* ============================================================================
+   TRAINDERIVE — Service Worker
 
-// On install — skip waiting immediately, take control right away
-self.addEventListener('install', e => {
-  self.skipWaiting();
+   IMPORTANT: I have not seen your existing sw.js, so this is a complete,
+   working replacement rather than a merge. If your current sw.js has custom
+   logic you want to keep, do NOT use this file — instead make two small edits
+   to your own:
+       1. add 'coach-editor.js' to the pre-cache list
+       2. bump the CACHE version string
+   That is all the coach editor needs from the service worker.
+
+   Strategy used here:
+     • App shell (html/js/json/icons) — network-first, cache as fallback.
+       Keeps athletes on the newest build while still working offline.
+     • Google Fonts — cache-first (they never change).
+     • Everything cross-origin (Apps Script, the Cloudflare worker, Google
+       Sheets, codetabs) — never touched. Live data must not be cached.
+   ============================================================================ */
+
+const CACHE = 'trainderive-v8';          // ← bump this on every deploy
+
+const SHELL = [
+  './',
+  './index.html',
+  './coach-editor.js',
+  './manifest.json',
+  './icon-192.png'
+];
+
+/* ── install: pre-cache the shell ─────────────────────────────────────────── */
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE)
+      // addAll fails the whole install if any one file 404s, so add
+      // individually and tolerate misses (e.g. a missing icon).
+      .then(cache => Promise.all(
+        SHELL.map(url => cache.add(url).catch(err => {
+          console.warn('SW: skipped pre-cache for', url, err.message);
+        }))
+      ))
+      .then(() => self.skipWaiting())   // activate immediately
+  );
 });
 
-// On activate — delete ALL old caches, claim all clients
-self.addEventListener('activate', e => {
-  e.waitUntil(
+/* ── activate: drop old caches ────────────────────────────────────────────── */
+self.addEventListener('activate', event => {
+  event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE).map(k => caches.delete(k))
+      ))
       .then(() => self.clients.claim())
   );
 });
 
-// Fetch strategy:
-// - index.html → ALWAYS network, never cache (ensures latest code)
-// - everything else → network first, cache fallback for offline
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
+/* ── fetch ────────────────────────────────────────────────────────────────── */
+self.addEventListener('fetch', event => {
+  const req = event.request;
+  if (req.method !== 'GET') return;                 // never cache POSTs
 
-  const url = new URL(e.request.url);
+  const url = new URL(req.url);
 
-  // Never intercept external APIs
-  if (
-    url.hostname.includes('google') ||
-    url.hostname.includes('corsproxy') ||
-    url.hostname.includes('allorigins') ||
-    url.hostname.includes('codetabs') ||
-    url.hostname.includes('fonts.g')
-  ) return;
-
-  // index.html — always fetch fresh, never serve from cache
-  if (url.pathname === '/' || url.pathname.endsWith('index.html')) {
-    e.respondWith(
-      fetch(e.request, { cache: 'no-store' }).catch(() => caches.match(e.request))
+  // Google Fonts — cache-first
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+    event.respondWith(
+      caches.match(req).then(hit => {
+        if (hit) return hit;
+        return fetch(req).then(res => {
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+          return res;
+        });
+        // If offline and uncached, the rejection propagates and the browser
+        // falls back to system fonts — which is correct. Returning undefined
+        // from respondWith would throw instead.
+      })
     );
     return;
   }
 
-  // Everything else (icons, manifest, sw) — network first, cache fallback
-  e.respondWith(
-    fetch(e.request)
+  // Anything else cross-origin (Apps Script, worker proxy, Sheets, codetabs)
+  // goes straight to the network — this is live data, never cache it.
+  if (url.origin !== self.location.origin) return;
+
+  // App shell — network-first, fall back to cache when offline
+  event.respondWith(
+    fetch(req)
       .then(res => {
-        if (res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
+        if (res && res.status === 200 && res.type === 'basic') {
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(req, copy));
         }
         return res;
       })
-      .catch(() => caches.match(e.request))
+      .catch(() => caches.match(req).then(hit => hit || caches.match('./index.html')))
   );
 });

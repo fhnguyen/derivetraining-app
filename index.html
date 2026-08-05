@@ -3875,5 +3875,9 @@ if ('serviceWorker' in navigator) {
     <button class="install-banner-close" onclick="dismissInstallBanner()" title="Dismiss">✕</button>
   </div>
 
+  <!-- Coach programming editor — must load AFTER the main script above,
+       since it wraps adminOpenDay() and renderDetailBody(). -->
+  <script src="coach-editor.js"></script>
+
 </body>
 </html>
