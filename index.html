@@ -505,6 +505,73 @@ html { touch-action: manipulation; }
   padding:.25rem .5rem; border-radius:2px;
 }
 
+/* ── Work-in-progress day ────────────────────────── */
+.wip-hero {
+  position:relative; overflow:hidden; margin-bottom:1.1rem;
+  padding:1rem 1rem .9rem; border-radius:var(--r);
+  background:var(--gold-bg); border:1.5px solid var(--gold-bdr);
+}
+.wip-hero::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:9px;
+  background:repeating-linear-gradient(45deg,
+    #1a1a18 0 10px, var(--gold) 10px 20px);
+}
+.wip-hero-tag {
+  display:inline-block; font-family:var(--mono); font-size:.55rem;
+  letter-spacing:.14em; text-transform:uppercase; color:#fff;
+  background:var(--gold); padding:.2rem .45rem; border-radius:2px;
+}
+.wip-hero-ttl {
+  font-family:var(--disp); font-size:1.75rem; letter-spacing:.05em;
+  line-height:1.05; color:#8a6212; margin-top:.45rem;
+}
+.wip-hero-txt {
+  font-size:.82rem; line-height:1.5; color:var(--muted2); margin-top:.35rem;
+}
+
+/* Sticky reminder — stays visible on long days */
+.wip-mode::before {
+  content:'⏳ In progress — not final';
+  position:sticky; top:0; z-index:5; display:block;
+  font-family:var(--mono); font-size:.55rem; letter-spacing:.14em;
+  text-transform:uppercase; text-align:center; color:#fff;
+  background:var(--gold); padding:.3rem;
+  margin:-.2rem -1.25rem .7rem;
+}
+
+/* Recolor every section card while the day is unfinished */
+.wip-mode .sec-card {
+  border-color:var(--gold-bdr);
+  border-left-color:var(--gold) !important;
+  background:rgba(215,155,40,.03);
+}
+.wip-mode .sec-card .sec-hd { background:rgba(215,155,40,.06) !important; }
+.wip-mode .sec-card.open .sec-hd { background:rgba(215,155,40,.10) !important; }
+.wip-mode .sec-n { color:var(--gold); }
+
+/* "Draft" tag in each card header, sitting left of the chevron */
+.wip-mode .sec-ch { order:2; }
+.wip-mode .sec-hd::after {
+  content:'DRAFT'; order:1; flex-shrink:0;
+  font-family:var(--mono); font-size:.5rem; letter-spacing:.12em;
+  color:var(--gold); border:1px solid var(--gold-bdr);
+  border-radius:2px; padding:.1rem .28rem;
+}
+
+.wip-mode .sec-body { background:rgba(215,155,40,.035); }
+
+/* Block containers + labels follow suit */
+.wip-mode .blk-sections[data-block="AM"],
+.wip-mode .blk-sections[data-block="PM"] {
+  border-color:var(--gold-bdr) !important; background:rgba(215,155,40,.02) !important;
+}
+.wip-mode .blk-lbl[data-block="AM"],
+.wip-mode .blk-lbl[data-block="PM"] {
+  background:var(--gold) !important; color:#fff !important;
+}
+.wip-mode .blk-lbl[data-block="Training"] { color:var(--gold); }
+.wip-mode .blk-lbl[data-block="Training"]::after { background:var(--gold-bdr); }
+
 /* ── Admin panel ─────────────────────────────────── */
 #s-admin { background:var(--bg); }
 .adm-hd {
@@ -798,6 +865,12 @@ html { touch-action: manipulation; }
 .notif-empty { padding:1.5rem .9rem; text-align:center; font-family:var(--mono); font-size:.7rem; color:var(--muted); letter-spacing:.08em; }
 
 /* Calendar cell with unread note */
+/* In-progress days — gold fill on calendar + week strip */
+.cc.is-wip { background:var(--gold-bg); border-color:var(--gold-bdr); }
+.cc.is-wip .cdot { background:var(--gold); }
+.cc.is-wip:hover { background:rgba(215,155,40,.18); border-color:var(--gold); }
+.wn-day.is-wip:not(.active) { background:var(--gold-bg); }
+
 .cc.has-note { box-shadow:0 0 0 2px var(--gold); }
 .cc.has-note.today { box-shadow:0 0 0 2px var(--accent), inset 0 0 0 1px var(--accent); }
 
@@ -2155,6 +2228,12 @@ const DATE_HEADER_RE = /^(?:[a-z]{2,3},?\s*)?\d{1,2}[-\/]\d{1,2}$/i;
 const FULL_DATE_RE = /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+(\d{4})/i;
 const MONTH_MAP = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
 
+// A training cell whose FIRST LINE is just one of these markers is flagged
+// "in progress" — the marker line is stripped and never shown to the athlete.
+// Accepts: WIP, DRAFT, IN PROGRESS, IN-PROGRESS, INCOMPLETE, TBD
+// with optional [brackets] and an optional trailing colon.
+const STATUS_MARKER_RE = /^\s*\[?\s*(WIP|DRAFT|IN[ -]?PROGRESS|INCOMPLETE|TBD)\s*\]?\s*:?\s*$/i;
+
 function isDateHeader(s) {
   if (!s) return false;
   const trimmed = s.trim();
@@ -2251,11 +2330,20 @@ function parseSheetCSV(csv, tabName, cutoff) {
       // Skip if this date already exists with more data
       if (S.dayMap[isoDate] && !S.dayMap[isoDate].isRestDay && !rawTraining) continue;
 
-      // Extract NOTE: prefix from top of training cell
+      // Extract status marker + NOTE: prefix from top of training cell
       let dailyNote = null;
+      let status = null;
       let trainingContent = rawTraining;
-      if (rawTraining && /^NOTE:/i.test(rawTraining)) {
-        const lines = rawTraining.split('\n');
+
+      // Status marker on line 1 — e.g. "WIP", "[DRAFT]", "In Progress"
+      const firstLine = trainingContent.split('\n')[0];
+      if (STATUS_MARKER_RE.test(firstLine)) {
+        status = 'wip';
+        trainingContent = trainingContent.split('\n').slice(1).join('\n').trim();
+      }
+
+      if (trainingContent && /^NOTE:/i.test(trainingContent)) {
+        const lines = trainingContent.split('\n');
         const noteLines = [];
         let i = 0;
         // Consume NOTE: line and any continuation lines until + or ___
@@ -2273,7 +2361,8 @@ function parseSheetCSV(csv, tabName, cutoff) {
         isoDate, dateStr, tabName,
         colIndex: col,
         resultsRowIdx: resultsRowIdx,
-        isRestDay: !rawTraining,
+        isRestDay: !trainingContent && !dailyNote && !status,
+        status,
         dailyNote,
         blocks: trainingContent ? parseTrainingBlocks(trainingContent) : [],
         results: rawResults ? parseResultSections(rawResults) : [],
@@ -2402,11 +2491,12 @@ function renderCal() {
     const data=S.dayMap[iso],isToday=iso===today;
     let cls='cc',dot='',click='';
     if(data){if(data.isRestDay){cls+=' is-rest';}else{cls+=' has-w';dot='<div class="cdot"></div>';click='onclick="navTo(\'day\',{date:\''+iso+'\'})"';}}
+    if(data&&data.status==='wip')cls+=' is-wip';
     if(isToday)cls+=' today';
     if(S.user&&data&&!data.isRestDay){const _dc=loadComments(S.user.id,iso);const _hu=Object.keys(_dc).some(function(i){return isCommentUnread(S.user.id,iso,parseInt(i));});if(_hu)cls+=' has-note';}
     h+='<div class="'+cls+'" '+click+'>'+dot+'<div class="cn">'+day+'</div></div>';
   }
-  h+='</div><div class="cal-legend"><div class="leg"><div class="lsw" style="background:var(--training);border:1px solid var(--train-bdr)"></div>Training</div><div class="leg"><div class="lsw" style="background:var(--surf);border:1px solid var(--border)"></div>Rest</div><div class="leg"><div class="lsw" style="border:1px solid var(--accent);background:transparent"></div>Today</div></div>';
+  h+='</div><div class="cal-legend"><div class="leg"><div class="lsw" style="background:var(--training);border:1px solid var(--train-bdr)"></div>Training</div><div class="leg"><div class="lsw" style="background:var(--surf);border:1px solid var(--border)"></div>Rest</div><div class="leg"><div class="lsw" style="background:var(--gold-bg);border:1px solid var(--gold)"></div>In progress</div><div class="leg"><div class="lsw" style="border:1px solid var(--accent);background:transparent"></div>Today</div></div>';
   document.getElementById('cal-body').innerHTML=h;
 }
 
@@ -2432,6 +2522,7 @@ function renderWeekNav(selISO) {
     let cls = 'wn-day';
     if (iso === selISO) cls += ' active';
     else if (data && !data.isRestDay) cls += ' has-w';
+    if (data && data.status === 'wip') cls += ' is-wip';
     if (iso === today) cls += ' is-today';
     const clickable = data && !data.isRestDay && iso !== selISO;
     const click = clickable ? 'onclick="navTo(\'day\',{date:\'' + iso + '\'})"' : '';
@@ -2485,7 +2576,7 @@ function _openDay(iso) {
   const dateObj = new Date(iso + 'T12:00:00');
   document.getElementById('d-title').textContent = dateObj.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   document.getElementById('d-sub').textContent = day
-    ? day.tabName + '  ·  ' + (day.isRestDay ? 'Rest Day' : 'Training Day')
+    ? day.tabName + '  ·  ' + (day.isRestDay ? 'Rest Day' : (day.status === 'wip' ? 'In Progress' : 'Training Day'))
     : 'No programming for this date';
 
   // Sync calendar month to match this date
@@ -2500,8 +2591,19 @@ function _openDay(iso) {
 
 function renderDayContent(day) {
   const el = document.getElementById('d-content'); el.innerHTML = '';
+  el.classList.toggle('wip-mode', !!(day && day.status === 'wip'));
   if (!day || day.isRestDay) {
     el.innerHTML = '<div class="rest-card"><div class="ri">🌿</div><h2>Rest Day</h2><p>Recovery is part of the program.</p></div>'; return;
+  }
+  if (day.status === 'wip') {
+    const w = document.createElement('div');
+    w.className = 'wip-hero';
+    w.innerHTML =
+      '<span class="wip-hero-tag">Not final</span>' +
+      '<div class="wip-hero-ttl">Programming in progress</div>' +
+      '<div class="wip-hero-txt">Your coach is still building this day. ' +
+      'You can train and log results, but sections may change or be added.</div>';
+    el.appendChild(w);
   }
   if (day.results?.length && day.results.some(r=>r.content)) {
     const b=document.createElement('div'); b.className='logged-badge'; b.innerHTML='✓ &nbsp;Results logged'; el.appendChild(b);
@@ -3232,6 +3334,7 @@ function renderDetailBody() {
         if (hasComment) dot += '<div class="cdot" style="background:var(--gold);width:3px;height:3px;margin-top:1px"></div>';
       }
     }
+    if (data && data.status === 'wip') cls += ' is-wip';
     if (isToday) cls += ' today';
 
     h += '<div class="' + cls + '" ' + click + '>' + dot + '<div class="cn">' + day + '</div></div>';
@@ -3265,7 +3368,7 @@ function adminOpenDay(iso) {
   document.getElementById('adm-day-title').textContent =
     dateObj.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
   document.getElementById('adm-day-sub').textContent =
-    day.tabName + '  ·  Training Day';
+    day.tabName + '  ·  ' + (day.status === 'wip' ? 'In Progress' : 'Training Day');
 
   // Render week strip (same as client)
   adminRenderWeekNav(iso);
@@ -3297,6 +3400,7 @@ function adminRenderWeekNav(selISO) {
     let cls = 'wn-day';
     if (iso === selISO) cls += ' active';
     else if (data && !data.isRestDay) cls += ' has-w';
+    if (data && data.status === 'wip') cls += ' is-wip';
     if (iso === today) cls += ' is-today';
     const clickable = data && !data.isRestDay && iso !== selISO;
     const click = clickable ? 'onclick="adminOpenDay(\'' + iso + '\')"' : '';
@@ -3325,9 +3429,21 @@ function adminShiftWeek(fromISO, dir) {
 function adminRenderDayContent(day) {
   const el = document.getElementById('adm-day-content');
   el.innerHTML = '';
+  el.classList.toggle('wip-mode', !!(day && day.status === 'wip'));
   if (!day || day.isRestDay) {
     el.innerHTML = '<div class="rest-card"><div class="ri">🌿</div><h2>Rest Day</h2></div>';
     return;
+  }
+
+  if (day.status === 'wip') {
+    const w = document.createElement('div');
+    w.className = 'wip-hero';
+    w.innerHTML =
+      '<span class="wip-hero-tag">Not final</span>' +
+      '<div class="wip-hero-ttl">Programming in progress</div>' +
+      '<div class="wip-hero-txt">This day is flagged in the sheet. ' +
+      'Remove the marker line from the training cell to publish it.</div>';
+    el.appendChild(w);
   }
 
   const hasResults = day.results && day.results.some(r=>r.content);
