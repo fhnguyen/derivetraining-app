@@ -2065,6 +2065,28 @@ const MONTH_MAP = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,
 // with optional [brackets] and an optional trailing colon.
 const STATUS_MARKER_RE = /^\s*\[?\s*(WIP|DRAFT|IN[ -]?PROGRESS|INCOMPLETE|TBD)\s*\]?\s*:?\s*$/i;
 
+// ── Private coach notes ───────────────────────────────────────────────────
+// Anything from "##" to the end of that line is coach-only. It is removed
+// from the training cell before any parsing happens, so it never reaches
+// the athlete's day view, the calendar, or notifications.
+//   "## revisit volume after her meet"     → whole line disappears
+//   "Squat 3x5 ## drop to 3x3 next week"   → athlete sees "Squat 3x5"
+// Scope is one line: a note ends at the newline, not at the end of the cell.
+const PRIVATE_NOTE_RE = /##.*$/;
+
+function stripPrivateNotes(text) {
+  if (!text || text.indexOf('##') === -1) return text;
+  const out = [];
+  for (const line of text.split('\n')) {
+    if (line.indexOf('##') === -1) { out.push(line); continue; }
+    const kept = line.replace(PRIVATE_NOTE_RE, '').replace(/\s+$/, '');
+    // A line that was nothing but a note is dropped entirely, so it doesn't
+    // leave a blank gap. Lines with real content keep their leading indent.
+    if (kept.trim() !== '') out.push(kept);
+  }
+  return out.join('\n').trim();
+}
+
 function isDateHeader(s) {
   if (!s) return false;
   const trimmed = s.trim();
@@ -2154,7 +2176,9 @@ function parseSheetCSV(csv, tabName, cutoff) {
       if (!isoDate) continue;
       if (cutoff && isoDate < cutoff) continue;
 
-      const rawTraining = (trainingRow[col]||'').trim();
+      // Strip coach-only "##" notes first, so they can't affect the WIP
+      // marker check, the NOTE: prefix, or the rest-day test below.
+      const rawTraining = stripPrivateNotes((trainingRow[col]||'').trim());
       const rawResults  = (resultsRow[col]||'').trim();
       const feel        = (feelRow[col]||'').trim();
 
