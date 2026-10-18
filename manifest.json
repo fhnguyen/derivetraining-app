@@ -6,7 +6,7 @@
   "scope": "https://app.trainderive.com/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#ede8df",
+  "background_color": "#ffffff",
   "theme_color": "#ffffff",
   "icons": [
     {
