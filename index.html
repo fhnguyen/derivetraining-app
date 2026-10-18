@@ -511,6 +511,51 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
 }
 .res-ta { resize:vertical; min-height:68px; }
 .sec-save-st { font-size:11px; font-weight:600; color:var(--ink-3); margin-top:6px; min-height:15px; transition:color .2s; }
+
+/* Collapsed card shows what was logged */
+.sec-sum {
+  margin-left:auto; padding-right:8px; max-width:44%;
+  font-size:11.5px; font-weight:700; color:var(--blue);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.sec-card.open .sec-sum { display:none; }
+.sec-sum:empty { display:none; }
+
+/* "Last time" — the most recent day this section was logged */
+.last-time {
+  display:block; width:100%; text-align:left; cursor:pointer;
+  background:var(--wash); border:1px solid var(--line); border-radius:4px;
+  padding:9px 11px; margin-top:12px; font:inherit; transition:border-color .15s;
+}
+.last-time:hover { border-color:var(--blue); }
+.lt-lbl {
+  display:block; font-size:9px; font-weight:800; letter-spacing:1.6px;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:4px;
+}
+.lt-txt { display:block; font-size:13px; line-height:1.55; color:var(--ink-2); white-space:pre-wrap; }
+
+/* Search */
+.cal-search { margin-bottom:14px; }
+.cal-search input {
+  width:100%; background:var(--paper); border:1px solid var(--line); border-radius:4px;
+  padding:11px 13px; font-family:inherit; font-size:16px; color:var(--ink); outline:none;
+  transition:border-color .15s;
+}
+.cal-search input:focus { border-color:var(--blue); }
+.cal-search input::placeholder { color:var(--ink-3); }
+.sr-count { font-size:11px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:var(--ink-3); margin-bottom:10px; }
+.sr-item {
+  display:block; width:100%; text-align:left; cursor:pointer; font:inherit;
+  background:var(--paper); border:1px solid var(--line); border-left:3px solid var(--blue);
+  border-radius:4px; padding:11px 13px; margin-bottom:8px; transition:box-shadow .15s;
+}
+.sr-item:hover { box-shadow:0 2px 8px rgba(0,0,0,.07); }
+.sr-date { font-size:10px; font-weight:800; letter-spacing:1.6px; text-transform:uppercase; color:var(--ink-3); }
+.sr-title { font-size:14px; font-weight:600; color:var(--ink); margin:3px 0 4px; }
+.sr-res { font-size:13px; line-height:1.5; color:var(--ink-2); white-space:pre-wrap; }
+.sr-res .sr-tag { font-size:9px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase; color:var(--blue); display:block; margin-bottom:2px; }
+.sr-empty { padding:36px 16px; text-align:center; font-size:13px; color:var(--ink-3); }
+mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:0 1px; }
 .sec-save-st.ok { color:var(--blue); }
 .sec-save-st.saving { color:var(--ink-3); }
 .sec-save-st.err { color:var(--magenta); }
@@ -842,6 +887,10 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
               <button class="cal-arr" onclick="shiftMonth(1)">&#8594;</button>
             </div>
           </div>
+          <div class="cal-search">
+            <input type="search" id="cal-search" placeholder="Search your workouts…" oninput="runSearch(this.value)" autocomplete="off">
+          </div>
+          <div id="search-body" style="display:none"></div>
           <div id="cal-body"><div class="sbox"><div class="spinner"></div><p>Loading program…</p></div></div>
         </div>
       </section>
@@ -2059,6 +2108,7 @@ function shiftWeek(fromISO, dir) {
 // DAY VIEW
 // ═══════════════════════════════════════════════════════════════
 function _openDay(iso) {
+  clearSearch();
   const day = S.dayMap[iso];
   S.selDate = iso;
   S.feel = day?.feel ? parseFloat(day.feel) : null;
@@ -2108,13 +2158,11 @@ function renderDayContent(day) {
       'You can train and log results, but sections may change or be added.</div>';
     el.appendChild(w);
   }
-  if (day.results?.length && day.results.some(r=>r.content)) {
-    const b=document.createElement('div'); b.className='logged-badge'; b.innerHTML='✓ &nbsp;Results logged'; el.appendChild(b);
-  }
+  const pg=document.createElement('div'); pg.className='logged-badge'; pg.id='day-progress'; el.appendChild(pg);
   if (day.dailyNote) {
     const n=document.createElement('div'); n.className='daily-note';
     n.innerHTML='<div class="daily-note-label">📋 Today\'s Training Note</div>' +
-      '<div class="daily-note-text">'+escH(day.dailyNote)+'</div>';
+      '<div class="daily-note-text">'+richText(escH(day.dailyNote))+'</div>';
     el.appendChild(n);
   }
   let gIdx = 0;
@@ -2140,6 +2188,8 @@ function renderDayContent(day) {
   sr.innerHTML='<button class="btn-save" onclick="saveResults()">Save Results</button><span class="save-st" id="save-st"></span>';
   el.appendChild(sr);
 
+  refreshProgress();
+
   // Inject any coach notes left by admin
   requestAnimationFrame(() => {
     injectCoachNotes(day, el, gIdx);
@@ -2154,10 +2204,13 @@ function buildSecCard(text, idx, blockLabel, secIdx) {
   card.dataset.si    = String((secIdx !== undefined ? secIdx : idx) % 8);
   const lines=text.trim().split('\n'), title=lines[0].trim();
   const hd=document.createElement('div'); hd.className='sec-hd';
-  hd.innerHTML='<span class="sec-n">'+toAlpha(idx)+'</span><span class="sec-t">'+escH(title)+'</span><span class="sec-ch">▼</span>';
+  const sumText=(S.secResults[idx]||'').trim().split('\n')[0];
+  hd.innerHTML='<span class="sec-n">'+toAlpha(idx)+'</span><span class="sec-t">'+escH(title)+'</span>'+
+    '<span class="sec-sum">'+escH(sumText.length>26?sumText.slice(0,26)+'…':sumText)+'</span>'+
+    '<span class="sec-ch">▼</span>';
   hd.addEventListener('click',()=>card.classList.toggle('open'));
   const body=document.createElement('div'); body.className='sec-body';
-  const pre=document.createElement('div'); pre.className='t-text'; pre.innerHTML=linkify(escH(text));
+  const pre=document.createElement('div'); pre.className='t-text'; pre.innerHTML=richText(escH(text));
   const rl=document.createElement('div'); rl.className='res-lbl'; rl.textContent='Your Results';
   const ta=document.createElement('textarea'); ta.className='res-ta';
   ta.placeholder='Log weights, reps, times, notes…'; ta.value=S.secResults[idx]||'';
@@ -2174,11 +2227,155 @@ function buildSecCard(text, idx, blockLabel, secIdx) {
     _autoTimer = setTimeout(() => autoSaveSection(idx, secSt), 1500);
   });
 
-  body.appendChild(pre); body.appendChild(rl); body.appendChild(ta);
+  body.appendChild(pre);
+
+  // What they did the last time this came up
+  const lt = findLastTime(title, S.selDate || isoToday());
+  if (lt) {
+    const ltEl=document.createElement('button');
+    ltEl.type='button'; ltEl.className='last-time';
+    ltEl.innerHTML='<span class="lt-lbl">Last time · '+escH(shortDate(lt.iso))+'</span>' +
+      '<span class="lt-txt">'+escH(lt.content.split('\n').slice(0,3).join('\n'))+'</span>';
+    ltEl.onclick=()=>navTo('day',{date:lt.iso});
+    body.appendChild(ltEl);
+  }
+
+  body.appendChild(rl); body.appendChild(ta);
   body.appendChild(secSt);
   card.appendChild(hd); card.appendChild(body);
   if(idx===0||S.secResults[idx]) card.classList.add('open');
   return card;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOOKING BACK
+// Everything an athlete has ever been given is already loaded into
+// S.dayMap when the app starts, results included, so none of this
+// needs the network.
+// ═══════════════════════════════════════════════════════════════
+
+// "A. Back Squat (tempo)" → "back squat". Two words is enough to match
+// the same lift across days without matching every other exercise.
+function sectionKey(title) {
+  const words = String(title || '')
+    .replace(/^[A-Za-z]{1,3}[.):\-]\s*/, '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[^A-Za-z0-9 ]/g, ' ')
+    .toLowerCase().split(/\s+/).filter(Boolean);
+  return words.slice(0, 2).join(' ');
+}
+
+function shortDate(iso) {
+  return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' });
+}
+
+// The most recent earlier day where this section was logged.
+function findLastTime(title, beforeISO) {
+  const key = sectionKey(title);
+  if (!key) return null;
+  const dates = Object.keys(S.dayMap).filter(d => d < beforeISO).sort().reverse();
+  for (const iso of dates) {
+    const day = S.dayMap[iso];
+    if (!day || day.isRestDay || !day.results || !day.results.length) continue;
+    let gi = 0, hit = null;
+    for (const b of day.blocks) {
+      for (const sec of b.sections) {
+        if (!hit && sectionKey(sec.trim().split('\n')[0]) === key) {
+          const r = day.results.find(r => r.label === toAlpha(gi));
+          if (r && r.content && r.content.trim()) hit = { iso, content: r.content.trim() };
+        }
+        gi++;
+      }
+    }
+    if (hit) return hit;
+  }
+  return null;
+}
+
+// ── Search ──────────────────────────────────────────────────────
+function highlight(text, term) {
+  const esc = escH(text);
+  if (!term) return esc;
+  const safe = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return esc.replace(new RegExp(safe, 'gi'), m => '<mark>' + m + '</mark>');
+}
+
+function runSearch(q) {
+  const term = (q || '').trim().toLowerCase();
+  const cal  = document.getElementById('cal-body');
+  const out  = document.getElementById('search-body');
+  if (!cal || !out) return;
+
+  if (term.length < 2) {
+    out.style.display = 'none'; out.innerHTML = '';
+    cal.style.display = '';
+    return;
+  }
+  cal.style.display = 'none';
+  out.style.display = '';
+
+  const hits = [];
+  Object.keys(S.dayMap).sort().reverse().forEach(iso => {
+    const day = S.dayMap[iso];
+    if (!day || day.isRestDay || !day.blocks) return;
+    let gi = 0;
+    day.blocks.forEach(b => b.sections.forEach(sec => {
+      const r = (day.results || []).find(r => r.label === toAlpha(gi));
+      const result = r && r.content ? r.content.trim() : '';
+      if ((sec + ' ' + result).toLowerCase().includes(term)) {
+        hits.push({ iso, title: sec.trim().split('\n')[0], result });
+      }
+      gi++;
+    }));
+  });
+
+  if (!hits.length) {
+    out.innerHTML = '<div class="sr-empty">Nothing found for “' + escH(q.trim()) + '”.</div>';
+    return;
+  }
+
+  const shown = hits.slice(0, 40);
+  let h = '<div class="sr-count">' + hits.length + ' result' + (hits.length === 1 ? '' : 's') +
+          (hits.length > shown.length ? ' · showing the ' + shown.length + ' most recent' : '') + '</div>';
+  shown.forEach(hit => {
+    h += '<button type="button" class="sr-item" onclick="navTo(\'day\',{date:\'' + hit.iso + '\'})">' +
+         '<div class="sr-date">' + escH(new Date(hit.iso + 'T12:00:00')
+             .toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' })) + '</div>' +
+         '<div class="sr-title">' + highlight(hit.title, term) + '</div>' +
+         (hit.result
+           ? '<div class="sr-res"><span class="sr-tag">You logged</span>' + highlight(hit.result, term) + '</div>'
+           : '') +
+         '</button>';
+  });
+  out.innerHTML = h;
+}
+
+function clearSearch() {
+  const box = document.getElementById('cal-search');
+  if (box) box.value = '';
+  runSearch('');
+}
+
+// ── Progress + collapsed summaries ──────────────────────────────
+function refreshProgress() {
+  const el = document.getElementById('day-progress');
+  const day = S.dayMap[S.selDate];
+  if (!el || !day || !day.blocks) return;
+  const total = day.blocks.reduce((n, b) => n + b.sections.length, 0);
+  const done  = Object.keys(S.secResults).filter(k => (S.secResults[k] || '').trim()).length;
+  el.innerHTML = done >= total && total > 0
+    ? '✓ &nbsp;All ' + total + ' logged'
+    : 'Logged ' + done + ' of ' + total;
+}
+
+function updateSecSummary(idx) {
+  const cards = document.querySelectorAll('#d-content .sec-card');
+  const card = cards[idx];
+  if (!card) return;
+  const sum = card.querySelector('.sec-sum');
+  if (!sum) return;
+  const first = (S.secResults[idx] || '').trim().split('\n')[0];
+  sum.textContent = first ? (first.length > 26 ? first.slice(0, 26) + '…' : first) : '';
 }
 
 function pickFeel(n){
@@ -2223,15 +2420,8 @@ async function autoSaveSection(sectionIdx, statusEl) {
 
   if (statusEl) { statusEl.textContent='Saved \u2713'; statusEl.className='sec-save-st ok'; }
 
-  // Update logged badge
-  const loggedBadge = document.querySelector('.logged-badge');
-  const anyContent = Object.values(S.secResults).some(v=>v&&v.trim());
-  if (anyContent && !loggedBadge) {
-    const b=document.createElement('div'); b.className='logged-badge';
-    b.innerHTML='\u2713 &nbsp;Results logged';
-    const cont=document.getElementById('d-content');
-    if (cont) cont.insertBefore(b, cont.firstChild);
-  }
+  refreshProgress();
+  updateSecSummary(sectionIdx);
 
   // Sync to sheet — same full path as the main Save button
   if (statusEl) { statusEl.textContent='Syncing…'; statusEl.className='sec-save-st saving'; }
@@ -2382,6 +2572,21 @@ function getVideoEmbed(url) {
   if (ig) return null; // Instagram opens externally
 
   return null;
+}
+
+// ── Bold and italic in programming text ──────────────────────────────
+// **text** and _text_ in the sheet, rendered here. Runs on already-escaped
+// text, so nothing in a cell can inject markup.
+function formatInline(html) {
+  return html
+    .replace(/\*\*(?=\S)([^\n]*?\S)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[\s(\[>;])_(?=[^\s_])([^_\n]*?[^\s_]|[^\s_])_(?=$|[\s.,;:!?)\]<&])/gm, '$1<em>$2</em>');
+}
+
+// Links are handled separately so a URL never gets mangled by the above.
+function richText(html) {
+  return html.split(/(\bhttps?:\/\/[^\s<]+)/g)
+    .map((part, i) => i % 2 ? linkify(part) : formatInline(part)).join('');
 }
 
 let _videoCounter = 0;
@@ -2892,7 +3097,7 @@ function adminRenderDayContent(day) {
   if (day.dailyNote) {
     const n=document.createElement('div'); n.className='daily-note';
     n.innerHTML='<div class="daily-note-label">📋 Today\'s Training Note</div>' +
-      '<div class="daily-note-text">'+escH(day.dailyNote)+'</div>';
+      '<div class="daily-note-text">'+richText(escH(day.dailyNote))+'</div>';
     el.appendChild(n);
   }
   let gIdx = 0;
@@ -2932,7 +3137,7 @@ function adminBuildSecCard(text, idx, blockLabel, secIdx, day) {
 
   // Training text
   const pre = document.createElement('div'); pre.className = 't-text';
-  pre.innerHTML = linkify(escH(text));
+  pre.innerHTML = richText(escH(text));
   body.appendChild(pre);
 
   // Client result (read-only) — match by label only, never fall back to position
@@ -3066,7 +3271,7 @@ function injectCoachNotes(day, container, totalSections) {
     noteDiv.className = 'coach-note';
     noteDiv.innerHTML =
       '<div class="coach-note-label">&#x1F4AC; Coach Feedback</div>' +
-      '<div class="coach-note-text">' + escH(comment.trim()) + '</div>';
+      '<div class="coach-note-text">' + richText(escH(comment.trim())) + '</div>';
     const secBody = card.querySelector('.sec-body');
     if (secBody) secBody.appendChild(noteDiv);
 
