@@ -1,5 +1,5 @@
 /* ============================================================================
-   TRAINDERIVE — Coach Programming Editor  (v2 — calendar-first design)
+   TRAINDERIVE — Coach Programming Editor  (v3 — Supabase bridge)
 
    Matches the approved mockup:
      • Admin athlete calendar: empty days show a "+" on hover and are clickable
@@ -21,8 +21,14 @@
 
    REQUIRES
      The Apps Script actions from coach-actions.gs deployed in each
-     athlete's sheet ('training' and 'newWeek'), and that athlete's
-     Script URL + Secret saved in Admin → Edit User.
+     athlete's sheet ('training' and 'newWeek'), that athlete's Script URL
+     saved in Admin → Edit User, and their Script Secret stored in Supabase.
+
+   CHANGED IN v3
+     Writes no longer go straight to the Apps Script through public
+     proxies. They go through window.sheetCall(), the bridge in
+     index.html, which asks the "sheet" server function to make the call.
+     The secret lives on the server, so this file never sees one.
    ============================================================================ */
 (function () {
   'use strict';
@@ -32,15 +38,13 @@
   var DIVIDER = '____________________';
   var SEC_SEP = '+';
   var BAD_LINE = /^(?:\+\s*|_{5,})$/;
-  var WORKER   = 'https://trainderive.frank-467.workers.dev/?url=';
-  var CODETABS = 'https://api.codetabs.com/v1/proxy?quest=';
 
   var EDIT = { iso: null, model: null, mode: 'view', dirty: false };
 
   function esc(s)        { return window.escH(String(s == null ? '' : s)); }
-  function currentUser() { return USERS.find(function (u) { return u.id === ADM.detailUserId; }); }
+  function currentUser() { return (window.USERS || []).find(function (u) { return u.id === ADM.detailUserId; }); }
   function currentMap()  { return (ADM.cache[ADM.detailUserId] || {}).dayMap || {}; }
-  function canWrite()    { var u = currentUser(); return !!(u && u.scriptUrl && u.scriptSecret); }
+  function canWrite()    { var u = currentUser(); return !!(u && u.scriptUrl); }
 
   /* ── coach clipboard — persists across days AND athletes ── */
   var CLIP_KEY = 'td_clipboard';
@@ -124,31 +128,20 @@
     return { dailyNote: dailyNote, blocks: content ? window.parseTrainingBlocks(content) : [] };
   }
 
-  /* ══════════════════════ 2. NETWORK ══════════════════════ */
+  /* ══════════════════════ 2. NETWORK ══════════════════════
+     One call, through the app's server bridge. No proxies, no secret. */
 
-  async function post(scriptUrl, payload) {
-    var targets = [WORKER + encodeURIComponent(scriptUrl), CODETABS + encodeURIComponent(scriptUrl)];
-    for (var i = 0; i < targets.length; i++) {
-      try {
-        var ctrl = new AbortController();
-        var tid = setTimeout(function () { ctrl.abort(); }, 10000);
-        var res = await fetch(targets[i], {
-          method: 'POST', signal: ctrl.signal,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        clearTimeout(tid);
-        if (!res.ok) continue;
-        var txt = await res.text();
-        try { return JSON.parse(txt); } catch (e) { return { ok: true, unconfirmed: true }; }
-      } catch (e) { /* next proxy */ }
+  async function post(action, payload) {
+    var u = currentUser();
+    if (!u) return { ok: false, error: 'No athlete selected' };
+    if (typeof window.sheetCall !== 'function') {
+      return { ok: false, error: 'App bridge not loaded — refresh the page' };
     }
     try {
-      fetch(scriptUrl, { method: 'POST', mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload) }).catch(function () {});
-    } catch (e) {}
-    return { ok: true, unconfirmed: true };
+      return await window.sheetCall(action, payload, u.id);
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
   }
 
   /* ══════════════════════ 3. STYLES ══════════════════════ */
@@ -164,11 +157,11 @@
   '.td-st{font-family:var(--mono);font-size:.62rem;letter-spacing:.06em;color:var(--muted2)}' +
   '.td-st.ok{color:var(--accent)}.td-st.err{color:var(--danger)}' +
 
-  '.td-note{background:#fdf6e8;border-left:4px solid var(--gold);border-radius:0 var(--r) var(--r) 0;padding:.7rem .9rem;margin-bottom:1.2rem}' +
+  '.td-note{background:var(--gold-bg);border-left:4px solid var(--gold);border-radius:0 var(--r) var(--r) 0;padding:.7rem .9rem;margin-bottom:1.2rem}' +
   '.td-note-lbl{font-family:var(--mono);font-size:.56rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin-bottom:.35rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:.3rem}' +
   '.td-note-lbl .opt{font-weight:400;opacity:.6;letter-spacing:.08em}' +
   '.td-note-ta{width:100%;background:transparent;border:none;outline:none;font-family:var(--sans);font-size:16px;line-height:1.6;color:var(--text);resize:none;overflow:hidden;min-height:28px}' +
-  '.td-note-ta::placeholder{color:#c9a86a}' +
+  '.td-note-ta::placeholder{color:var(--muted)}' +
 
   '.td-blk{margin-bottom:1.4rem}' +
   '.td-bar{display:flex;align-items:center;gap:.6rem;color:#fff;border-radius:4px 4px 0 0;padding:.3rem .65rem;font-family:var(--mono);font-size:.6rem;letter-spacing:.18em;text-transform:uppercase}' +
@@ -176,18 +169,18 @@
   '.td-bar .x{margin-left:auto;background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:.75rem;padding:.1rem .3rem}' +
   '.td-bar .x:hover{color:#fff}' +
   '.td-body{border:1.5px solid;border-top:none;border-radius:0 0 6px 6px;padding:.6rem .6rem .2rem}' +
-  '.td-blk.am .td-body{border-color:rgba(40,100,215,.35);background:rgba(40,100,215,.02)}' +
-  '.td-blk.pm .td-body{border-color:rgba(215,155,40,.45);background:rgba(215,155,40,.02)}' +
+  '.td-blk.am .td-body{border-color:var(--accent-bdr);background:var(--accent-bg)}' +
+  '.td-blk.pm .td-body{border-color:var(--gold-bdr);background:var(--gold-bg)}' +
 
   '.td-sec{background:var(--surf);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--r);margin-bottom:.55rem;overflow:hidden;transition:box-shadow .15s}' +
   '.td-sec:hover{box-shadow:0 2px 8px rgba(0,0,0,.07)}' +
   '.td-sec[data-c="1"]{border-left-color:var(--gold)}' +
   '.td-sec[data-c="2"]{border-left-color:#C0288A}' +
   '.td-sec[data-c="3"]{border-left-color:#28A87A}' +
-  '.td-sec-hd{display:flex;align-items:center;gap:.55rem;padding:.5rem .7rem;background:rgba(40,100,215,.04)}' +
-  '.td-sec[data-c="1"] .td-sec-hd{background:rgba(215,155,40,.05)}' +
-  '.td-sec[data-c="2"] .td-sec-hd{background:rgba(192,40,138,.04)}' +
-  '.td-sec[data-c="3"] .td-sec-hd{background:rgba(40,168,122,.04)}' +
+  '.td-sec-hd{display:flex;align-items:center;gap:.55rem;padding:.5rem .7rem;background:var(--accent-bg)}' +
+  '.td-sec[data-c="1"] .td-sec-hd{background:var(--gold-bg)}' +
+  '.td-sec[data-c="2"] .td-sec-hd{background:rgba(192,40,138,.06)}' +
+  '.td-sec[data-c="3"] .td-sec-hd{background:rgba(40,168,122,.06)}' +
   '.td-sec-n{font-family:var(--mono);font-size:.56rem;letter-spacing:.1em;color:var(--muted);min-width:1.1rem}' +
   '.td-title{flex:1;background:transparent;border:none;outline:none;font-family:var(--sans);font-size:16px;font-weight:500;color:var(--text);min-width:0}' +
   '.td-title::placeholder{color:var(--muted)}' +
@@ -195,19 +188,19 @@
   '.td-mini{background:none;border:1px solid transparent;color:var(--muted);font-size:.7rem;width:1.7rem;height:1.7rem;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;transition:color .12s,border-color .12s}' +
   '.td-mini:hover{color:var(--accent);border-color:var(--border)}' +
   '.td-mini.del:hover{color:var(--danger)}' +
-  '.td-sec-bd{padding:.55rem .7rem .7rem;background:#faf9f6;border-top:1px solid var(--border)}' +
-  '.td-ta{width:100%;background:#f5f0e8;border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.7;padding:.55rem .65rem;resize:none;overflow:hidden;outline:none;transition:border-color .15s;min-height:56px}' +
+  '.td-sec-bd{padding:.55rem .7rem .7rem;background:var(--bg);border-top:1px solid var(--border)}' +
+  '.td-ta{width:100%;background:var(--surf);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.7;padding:.55rem .65rem;resize:none;overflow:hidden;outline:none;transition:border-color .15s;min-height:56px}' +
   '.td-ta:focus{border-color:var(--accent)}' +
   '.td-ta::placeholder{color:var(--muted)}' +
 
   '.td-add-sec{width:100%;background:none;border:1.5px dashed var(--border2);border-radius:var(--r);color:var(--muted2);font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;padding:.55rem;cursor:pointer;margin-bottom:.55rem;transition:border-color .15s,color .15s,background .15s}' +
-  '.td-add-sec:hover{border-color:var(--accent);color:var(--accent);background:rgba(40,100,215,.04)}' +
+  '.td-add-sec:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}' +
   '.td-add-pm{background:none;border:1.5px dashed var(--gold-bdr);border-radius:var(--r);color:var(--gold);font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;padding:.55rem 1rem;cursor:pointer;transition:background .15s}' +
   '.td-add-pm:hover{background:var(--gold-bg)}' +
 
   '.td-prev-toggle{background:none;border:none;color:var(--muted2);font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;text-decoration:underline dotted;padding:0}' +
   '.td-prev-toggle:hover{color:var(--accent)}' +
-  '.td-prev{display:none;font-family:var(--mono);font-size:.68rem;line-height:1.6;white-space:pre-wrap;background:#f5f0e8;border:1px solid var(--border);border-radius:var(--r);padding:.7rem;margin-top:.6rem;color:var(--muted2);max-height:220px;overflow:auto}' +
+  '.td-prev{display:none;font-family:var(--mono);font-size:.68rem;line-height:1.6;white-space:pre-wrap;background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:.7rem;margin-top:.6rem;color:var(--muted2);max-height:220px;overflow:auto}' +
   '.td-prev.on{display:block}' +
 
   '.td-chip{display:inline-flex;align-items:center;gap:.45rem;font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);background:var(--accent-bg);border:1px solid var(--accent-bdr);border-radius:2px;padding:.28rem .55rem;max-width:100%;overflow:hidden}' +
@@ -284,7 +277,7 @@
       window.adminRenderDayContent(day);
     } else {
       if (!canWrite()) {
-        bar.innerHTML = '<span class="td-st err">This athlete needs an Apps Script URL + Secret ' +
+        bar.innerHTML = '<span class="td-st err">This athlete needs an Apps Script URL ' +
           '(Admin → Users → Edit) before programming can be written to their sheet.</span>' +
           (day.isRestDay ? '' : ' <button class="td-btn ghost" data-td="cancel">Back to view</button>');
         window.adminRenderDayContent(day);
@@ -304,7 +297,7 @@
     var h = '';
 
     h += '<div class="td-note"><div class="td-note-lbl"><span>📋 Daily Note</span>' +
-         '<span class="opt">optional — gold banner on athlete\u2019s day</span></div>' +
+         '<span class="opt">optional — gold banner on athlete’s day</span></div>' +
          '<textarea class="td-note-ta" data-td="note" rows="1" ' +
          'placeholder="e.g. Deload week — keep everything crisp and submaximal.">' +
          esc(m.note) + '</textarea></div>';
@@ -449,9 +442,7 @@
     btn.disabled = true;
     setSt('Saving…', '');
 
-    var res = await post(u.scriptUrl, {
-      secret: u.scriptSecret || '',
-      action: 'training',
+    var res = await post('training', {
       sheetName: day.tabName,
       trainingRowIdx: trainingRowIdx,
       colIndex: day.colIndex,
@@ -475,9 +466,9 @@
     EDIT.dirty = false;
     EDIT.mode = day.isRestDay ? 'edit' : 'view';
 
-    window.showToast(res.unconfirmed ? 'Sent to sheet' : 'Workout saved to sheet ✓', 'ok');
+    window.showToast('Workout saved to sheet ✓', 'ok');
     renderDay();
-    setSt(res.unconfirmed ? 'Sent — refresh to confirm' : 'Saved to sheet ✓', 'ok');
+    setSt('Saved to sheet ✓', 'ok');
   }
 
   /* ── clipboard: copy / paste whole days ── */
@@ -567,7 +558,7 @@
       '<div class="modal-title">Copy a Day</div><button class="modal-close" data-x="1">✕</button></div>' +
       '<div class="modal-body"><div class="fld"><label>Copy programming from</label>' +
       '<select id="td-copy-sel">' + opts + '</select></div>' +
-      '<div class="form-hint">Replaces what\u2019s in the editor. Nothing is written to the sheet until you press Save.</div>' +
+      '<div class="form-hint">Replaces what’s in the editor. Nothing is written to the sheet until you press Save.</div>' +
       '</div><div class="modal-foot"><button class="btn-cancel" data-x="1">Cancel</button>' +
       '<button class="btn-confirm" id="td-copy-go">Load Into Editor</button></div></div>';
     document.body.appendChild(bg);
@@ -621,8 +612,7 @@
       if (!tab) { err.textContent = 'Tab name is required.'; return; }
       ev.target.disabled = true; ev.target.textContent = 'Creating…';
 
-      var res = await post(u.scriptUrl, {
-        secret: u.scriptSecret || '', action: 'newWeek',
+      var res = await post('newWeek', {
         sheetName: tab, templateRowIdx: dateRowIdx,
         startDate: start, numDays: 7
       });
