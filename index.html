@@ -13,6 +13,22 @@
 <meta name="apple-mobile-web-app-title" content="TRAINDERIVE">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<!-- Supabase: accounts, and the bridge to each athlete's sheet -->
+<script>
+  window.SB_URL = 'https://riuplbhthhcojimkuqgj.supabase.co';
+  window.SB_KEY = 'sb_publishable_gOOVAyff-U8kWcSuOUHYFQ_oxEMA1wa';
+  // An invite or password-reset link arrives as a URL hash. Supabase clears
+  // it the moment it loads, so remember which kind it was first.
+  window._authFlow = (/type=(recovery|invite|signup)/.exec(location.hash + location.search) || [])[1] || null;
+  window._sbReady  = new Promise(function (r) { window._sbReadyResolve = r; });
+</script>
+<script type="module">
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+  window.SB = createClient(window.SB_URL, window.SB_KEY, {
+    auth: { flowType: 'implicit', detectSessionInUrl: true, persistSession: true, autoRefreshToken: true }
+  });
+  window._sbReadyResolve();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet">
 <style>
 /* ══════════════════════════════════════════════════════
@@ -497,6 +513,7 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
 .sec-save-st { font-size:11px; font-weight:600; color:var(--ink-3); margin-top:6px; min-height:15px; transition:color .2s; }
 .sec-save-st.ok { color:var(--blue); }
 .sec-save-st.saving { color:var(--ink-3); }
+.sec-save-st.err { color:var(--magenta); }
 
 .coach-note { margin-top:12px; background:#FCF5E8; border-left:4px solid var(--gold); border-radius:0 4px 4px 0; padding:12px 14px; }
 .coach-note-label { margin-bottom:5px; }
@@ -776,7 +793,8 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
     <div class="fld"><label>Password</label><div class="pw-wrap"><input type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
     <div class="l-err" id="l-err"></div>
     <button class="btn-main" id="l-btn" onclick="doLogin()">Sign In</button>
-    <div class="login-admin-link"><a href="#" onclick="showAdminLogin();return false;">Admin access →</a></div>
+    <div class="login-admin-link" style="margin-top:.8rem"><a href="#" onclick="forgotPassword();return false;">Forgot your password?</a></div>
+    <div class="login-admin-link"><a href="#" onclick="showAdminLogin();return false;">Coach access →</a></div>
   </div>
 </div>
 
@@ -813,11 +831,6 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
       <section class="hero">
         <div class="hero-photo" aria-hidden="true"></div>
         <div class="hero-in">
-          <div id="first-login-banner" class="first-login-banner" style="display:none">
-            <div class="flb-icon">👋</div>
-            <p>Welcome! Please set a personal email and password for your account.</p>
-            <button onclick="openAccountSettings()">Set Up Account</button>
-          </div>
           <div class="cal-nav">
             <div class="cal-month-wrap">
               <div class="cal-month" id="cal-month"></div>
@@ -890,16 +903,12 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
       <div class="section-title" style="margin-bottom:1.2rem">Settings</div>
 
       <div class="setting-row">
-        <div><div class="setting-label">Sync Users</div><div class="setting-desc">Pull latest user list from master database</div></div>
-        <button class="btn-sm" id="btn-sync-master" onclick="adminSyncMaster()">Sync Now</button>
+        <div><div class="setting-label">Refresh Athletes</div><div class="setting-desc">Reload the athlete list from the database</div></div>
+        <button class="btn-sm" id="btn-sync-master" onclick="adminSyncMaster()">Refresh</button>
       </div>
       <div class="setting-row">
-        <div><div class="setting-label">Admin Password</div><div class="setting-desc">Change the password for admin access</div></div>
+        <div><div class="setting-label">Your Password</div><div class="setting-desc">Change the password for your coach account</div></div>
         <button class="btn-sm" onclick="openChangeAdminPass()">Change</button>
-      </div>
-      <div class="setting-row">
-        <div><div class="setting-label">Reset All Data</div><div class="setting-desc">Clear all users and restore defaults. Cannot be undone.</div></div>
-        <button class="btn-sm danger" onclick="openResetData()">Reset</button>
       </div>
     </div>
 
@@ -956,8 +965,8 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
       <div class="form-err" id="m-user-err"></div>
       <div class="fld"><label>Full Name</label><input type="text" id="m-name" placeholder="Alex Rodriguez"></div>
       <div class="fld"><label>Email</label><input type="email" id="m-email" placeholder="athlete@example.com"></div>
-      <div class="fld"><label>Password</label><div class="pw-wrap"><input type="password" id="m-pass" placeholder="Set a password"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
-      <div class="fld"><label>Role</label><select id="m-role"><option value="athlete">Athlete</option><option value="admin">Admin</option></select></div>
+      <div class="form-hint" style="margin:-.5rem 0 1rem">New athletes get an email inviting them to set their own password. You never see or set it.</div>
+      <div class="fld"><label>Role</label><select id="m-role"><option value="athlete">Athlete</option><option value="coach">Coach</option></select></div>
       <div class="fld">
         <label>Google Sheets URL or ID</label>
         <input type="text" id="m-sheet-url" placeholder="https://docs.google.com/spreadsheets/d/…" oninput="previewSheetId()">
@@ -981,7 +990,8 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
       </div>
       <div class="fld">
         <label>Script Secret <span style="font-weight:400;opacity:.6">(must match BLOC_SECRET in Code.gs)</span></label>
-        <input type="text" id="m-script-secret" placeholder="your-secret-token" autocomplete="off">
+        <input type="text" id="m-script-secret" placeholder="Leave blank to keep the stored one" autocomplete="off">
+        <div class="form-hint">Stored on the server, never sent to a browser — which is why it can be set here but not read back.</div>
       </div>
     </div>
     <div class="modal-foot"><button class="btn-cancel" onclick="closeModal('m-user')">Cancel</button><button class="btn-confirm" onclick="saveUser()">Save User</button></div>
@@ -1009,23 +1019,26 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
   </div>
 </div>
 
-<div class="modal-bg" id="m-reset">
+<div class="modal-bg" id="m-setpass">
   <div class="modal">
-    <div class="modal-hd"><div class="modal-title">Reset All Data</div><button class="modal-close" onclick="closeModal('m-reset')">✕</button></div>
+    <div class="modal-hd"><div class="modal-title">Set Your Password</div></div>
     <div class="modal-body">
-      <p style="font-family:var(--mono);font-size:.8rem;line-height:1.6;color:var(--muted2);margin-bottom:1rem">Type <strong style="color:var(--danger)">RESET</strong> to confirm. All users will be deleted.</p>
-      <div class="fld"><input type="text" id="m-reset-confirm" placeholder="Type RESET"></div>
+      <div class="form-err" id="m-sp-err"></div>
+      <p style="font-size:.85rem;line-height:1.6;color:var(--muted2);margin-bottom:1rem">Choose a password for your account. You'll use it with your email to sign in from now on.</p>
+      <div class="fld"><label>New Password</label><div class="pw-wrap"><input type="password" id="sp-new" autocomplete="new-password"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
+      <div class="fld"><label>Confirm Password</label><div class="pw-wrap"><input type="password" id="sp-conf" autocomplete="new-password"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
     </div>
-    <div class="modal-foot"><button class="btn-cancel" onclick="closeModal('m-reset')">Cancel</button><button class="btn-confirm danger-btn" onclick="confirmReset()">Reset Everything</button></div>
+    <div class="modal-foot"><button class="btn-confirm" onclick="saveNewPassword()">Save Password</button></div>
   </div>
 </div>
 
 <div class="modal-bg" id="m-adminlogin">
   <div class="modal">
-    <div class="modal-hd"><div class="modal-title">Admin Access</div><button class="modal-close" onclick="closeModal('m-adminlogin')">✕</button></div>
+    <div class="modal-hd"><div class="modal-title">Coach Access</div><button class="modal-close" onclick="closeModal('m-adminlogin')">✕</button></div>
     <div class="modal-body">
       <div class="form-err" id="m-al-err"></div>
-      <div class="fld"><label>Admin Password</label><div class="pw-wrap"><input type="password" id="m-al-pass" placeholder="••••••••"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
+      <div class="fld"><label>Coach Email</label><input type="email" id="m-al-email" placeholder="coach@trainderive.com" autocomplete="email"></div>
+      <div class="fld"><label>Password</label><div class="pw-wrap"><input type="password" id="m-al-pass" placeholder="••••••••" autocomplete="current-password"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
     </div>
     <div class="modal-foot"><button class="btn-cancel" onclick="closeModal('m-adminlogin')">Cancel</button><button class="btn-confirm" onclick="doAdminLogin()">Enter Admin</button></div>
   </div>
@@ -1069,350 +1082,85 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
 // ═══════════════════════════════════════════════════════════════
 // DATA STORE
 // ═══════════════════════════════════════════════════════════════
-const DEFAULT_ADMIN_PASS = 'admin123';
+// ═══════════════════════════════════════════════════════════════
+// ACCOUNTS — Supabase
+// Replaces the master DB spreadsheet. Sign-in, the athlete list and
+// every request to a Google Sheet now go through Supabase. No user
+// list, no passwords and no sheet secrets are held in this page.
+// ═══════════════════════════════════════════════════════════════
+let SB = null;              // the Supabase client, set during init
+var PROFILES = [];          // coach panel only: everyone's profile
+var USERS    = PROFILES;    // coach-editor.js reads USERS
 
-// ── Master database (shared across all devices/browsers) ─────────────
-// BAKED INTO CODE — available on every device without any configuration.
-// The admin Settings panel can override these with localStorage values,
-// but these hardcoded defaults ensure every fresh device can sync.
-const _MASTER_URL_DEFAULT    = 'https://script.google.com/macros/s/AKfycbxk90aICTYWcL_UqF1_ID67wJUY3HfUowqKhyN8DwVku_NRccueYWMrM5Z5YoHvvxd6/exec';
-const _MASTER_SECRET_DEFAULT = 'derive-master';
-
-function getMasterUrl()    { return _MASTER_URL_DEFAULT; }
-function getMasterSecret() { return _MASTER_SECRET_DEFAULT; }
-Object.defineProperty(window, 'MASTER_SCRIPT_URL', { get: getMasterUrl });
-Object.defineProperty(window, 'MASTER_SECRET',     { get: getMasterSecret });
-const DATA_VERSION = 7;  // Bumped: removed demo athlete for public release
-
-// ── Password hashing (SHA-256 via Web Crypto) ─────────────────────────
-async function hashPass(plain) {
-  if (!plain) return '';
-  const buf = await crypto.subtle.digest('SHA-256',
-    new TextEncoder().encode(plain));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+// A profile row as stored → the shape the rest of the app already uses.
+function toAppUser(p) {
+  return {
+    id:            p.id,
+    name:          p.name || '',
+    email:         p.email || '',
+    role:          p.role,
+    spreadsheetId: p.spreadsheet_id || '',
+    sheetTabNames: p.tab_names || [],
+    createdAt:     p.data_from || '2024-01-01',
+    scriptUrl:     p.script_url || '',
+    lastSynced:    p.last_synced ? new Date(p.last_synced).getTime() : null,
+  };
 }
 
-// Hash of DEFAULT_ADMIN_PASS — pre-computed so first-run comparison works
-// If you change DEFAULT_ADMIN_PASS, update this too by running:
-//   hashPass('yourpassword').then(console.log) in the browser console
-const DEFAULT_ADMIN_HASH = '7c4f0e3e8ac7ea7b8c9b4c3a6f1e2d5e9b0f3a2c8d4e1b6a9c7f2e5d8b3a4f1c';
-
-async function getAdminHash() {
-  // 1. localStorage — fast path
-  const stored = localStorage.getItem('bloc_admin_hash');
-  if (stored) return stored;
-  // 2. Master DB _admin_settings entry — survives localStorage wipes
-  const settingsEntry = USERS.find(u => u.id === '_admin_settings');
-  if (settingsEntry && settingsEntry.adminHash) {
-    localStorage.setItem('bloc_admin_hash', settingsEntry.adminHash);
-    return settingsEntry.adminHash;
-  }
-  // 3. First run — hash default and store
-  const h = await hashPass(DEFAULT_ADMIN_PASS);
-  localStorage.setItem('bloc_admin_hash', h);
-  return h;
-}
-
-async function setAdminPass(plain) {
-  const h = await hashPass(plain);
-  localStorage.setItem('bloc_admin_hash', h);
-  // Persist in master DB so hash survives localStorage clears on any device
+// ── Calling our server functions ───────────────────────────────
+async function fnCall(name, body) {
+  if (!SB) return { ok: false, error: 'Still starting up — try again' };
+  const { data: { session } } = await SB.auth.getSession();
+  if (!session) return { ok: false, error: 'Not signed in' };
   try {
-    let entry = USERS.find(u => u.id === '_admin_settings');
-    if (!entry) {
-      entry = { id: '_admin_settings', _type: 'settings', adminHash: h };
-      USERS.push(entry);
-    } else {
-      entry.adminHash = h;
-    }
-    localStorage.setItem('bloc_users', JSON.stringify(USERS));
-    pushUsersToMaster(USERS).catch(() => {});
-  } catch(e) {}
-}
-const DEFAULT_USERS = [];
-
-// ── Migrate existing users: add createdAt if missing ──────────────────
-// For any user without createdAt, default to 2026-01-01 so they don't
-// re-fetch historical data they've never had access to anyway.
-function migrateUsers(users, fromMaster = false) {
-  let changed = false;
-
-  if (!fromMaster) {
-    // Version migration only applies to locally-cached users, never to master data.
-    // This prevents demo/default users from being injected into a master-synced list.
-    const storedVersion = parseInt(localStorage.getItem('bloc_data_version') || '0');
-    if (storedVersion < DATA_VERSION) {
-      DEFAULT_USERS.forEach(def => {
-        const idx = users.findIndex(u => u.id === def.id);
-        if (idx >= 0) {
-          const pass  = users[idx].pass;
-          const email = users[idx].email;
-          users[idx] = { ...def, pass, email };
-        } else {
-          users.push({...def});
-        }
-        changed = true;
-      });
-      localStorage.setItem('bloc_data_version', String(DATA_VERSION));
-      console.log('Users synced to version', DATA_VERSION);
-    }
-  }
-
-  users.forEach(u => {
-    if (!u.createdAt) { u.createdAt = '2024-01-01'; changed = true; }
-  });
-
-  if (changed && !fromMaster) localStorage.setItem('bloc_users', JSON.stringify(users));
-  return users;
-}
-
-// Hash any plain-text passwords still in storage (migration from old format)
-// Called once after USERS is loaded. Plain passwords are short & don't look like hex.
-async function migratePasswords(users) {
-  const HEX64 = /^[0-9a-f]{64}$/;
-  let changed = false;
-  for (const u of users) {
-    if (u.pass && !HEX64.test(u.pass)) {
-      u.pass = await hashPass(u.pass);
-      changed = true;
-    }
-  }
-  if (changed) { localStorage.setItem('bloc_users', JSON.stringify(users)); console.log('Passwords migrated to hashed format.'); }
-}
-
-// ── User storage — master DB first, localStorage as cache ────────────
-function loadUsers() {
-  try {
-    const r = localStorage.getItem('bloc_users');
-    return r ? JSON.parse(r) : null;
-  } catch { return null; }
-}
-
-function saveUsers(users) {
-  // localStorage ONLY — never pushes to master DB
-  // Master DB writes only happen via saveUsersAndSync (explicit admin actions)
-  localStorage.setItem('bloc_users', JSON.stringify(users));
-}
-
-// Safe write to master DB.
-// Always fetches latest master state first, applies the provided users list
-// (which came from a fresh sync + local edit), then pushes.
-// This prevents race conditions where stale local state overwrites master.
-async function saveUsersAndSync(users) {
-  // Write to local cache immediately
-  localStorage.setItem('bloc_users', JSON.stringify(users));
-  if (!MASTER_SCRIPT_URL || !MASTER_SECRET) return;
-  const result = await pushUsersToMaster(users);
-  // result === false means all proxy attempts failed
-  // Caller handles success toast; we only surface a failure
-  if (result === false) {
-    console.warn('Master DB push failed — changes saved locally only');
-    showToast('Sync to master failed — try again', 'err');
-  }
-}
-
-// Fetch users from master DB.
-// Smart merge: if master has MORE users than local → master wins.
-// If local has MORE users → push local to master first, then return local.
-// This prevents a sync from erasing users added before master was configured.
-async function syncUsersFromMaster() {
-  if (!MASTER_SCRIPT_URL || !MASTER_SECRET) return false;
-  try {
-    const url = MASTER_SCRIPT_URL + '?action=getUsers&secret=' + encodeURIComponent(MASTER_SECRET);
-    const workerUrl = 'https://trainderive.frank-467.workers.dev/?url=' + encodeURIComponent(url);
-    const res = await fetch(workerUrl);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'Master DB error');
-    if (!Array.isArray(data.users)) throw new Error('Invalid users response');
-
-    const masterUsers = data.users;
-
-    // Master DB is READ ONLY here — never push during a sync.
-    // Writes to master only happen from explicit admin save/delete actions.
-    // This prevents empty local state from ever overwriting the master sheet.
-
-    if (masterUsers.length === 0) {
-      // Master is empty — don't trust it, keep local cache
-      console.warn('Master DB returned 0 users — keeping local cache');
-      return false;
-    }
-
-    // Deduplicate master users by email, preserving special entries
-    const specialEntries = masterUsers.filter(u => u._type);
-    const realMasterUsers = masterUsers.filter(u => !u._type);
-    const seenEmails = new Map();
-    realMasterUsers.forEach(u => {
-      const key = (u.email || '').toLowerCase();
-      if (key) seenEmails.set(key, u);
+    const res = await fetch(window.SB_URL + '/functions/v1/' + name, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: window.SB_KEY,
+        Authorization: 'Bearer ' + session.access_token,
+      },
+      body: JSON.stringify(body),
     });
-    const cleanUsers = [...Array.from(seenEmails.values()), ...specialEntries];
-    if (cleanUsers.length !== masterUsers.length) {
-      console.warn('syncUsersFromMaster: found', masterUsers.length - cleanUsers.length,
-        'duplicate(s) in master sheet — will auto-clean after init');
-      setTimeout(() => pushUsersToMaster(cleanUsers).catch(() => {}), 3000);
-    }
-
-    // Preserve locally pending password changes that are newer than master
-    const HEX64 = /^[0-9a-f]{64}$/;
-    const pendingChange = (() => {
-      try { return JSON.parse(localStorage.getItem('bloc_pending_account_change') || 'null'); } catch { return null; }
-    })();
-    const sessionUser = (() => {
-      try { return JSON.parse(localStorage.getItem('bloc_session_user') || 'null'); } catch { return null; }
-    })();
-    const localCandidate = pendingChange || sessionUser;
-    if (localCandidate && localCandidate.email && localCandidate.pass && HEX64.test(localCandidate.pass)) {
-      const idx = cleanUsers.findIndex(u =>
-        u.email && u.email.toLowerCase() === localCandidate.email.toLowerCase()
-      );
-      if (idx >= 0 && cleanUsers[idx].pass !== localCandidate.pass) {
-        const masterTs = cleanUsers[idx]._passChangedAt || 0;
-        const localTs  = localCandidate._passChangedAt  || 0;
-        if (localTs >= masterTs) {
-          console.log('Local password is newer — preserving for', localCandidate.email);
-          cleanUsers[idx] = { ...cleanUsers[idx], pass: localCandidate.pass,
-            mustChangePassword: false, _passChangedAt: localTs };
-          setTimeout(() => {
-            pushUsersToMaster(cleanUsers)
-              .then(ok => { if (ok === true) localStorage.removeItem('bloc_pending_account_change'); })
-              .catch(() => {});
-          }, 3000);
-        }
-      }
-    }
-
-    // Master has users — use them as source of truth, update local cache
-    localStorage.setItem('bloc_users', JSON.stringify(cleanUsers));
-    console.log('Synced', cleanUsers.length, 'users from master DB');
-    return cleanUsers;
+    const data = await res.json().catch(() => null);
+    if (!data) return { ok: false, error: 'Server returned HTTP ' + res.status };
+    return data;
   } catch (err) {
-    console.warn('Master DB sync failed, using local cache:', err.message);
-    return false;
+    return { ok: false, error: err.message };
   }
 }
 
-// Pending push queue — if a push fails, retry when next opportunity arises
-let _pendingPush = null;
-
-async function pushUsersToMaster(users, retries = 3) {
-  if (!MASTER_SCRIPT_URL || !MASTER_SECRET) return false;
-
-  if (!window._initComplete) {
-    console.warn('pushUsersToMaster blocked — init not yet complete');
-    return false;
-  }
-
-  // Separate special system entries from real users before dedup
-  const special   = users.filter(u => u._type);
-  const realUsers = users.filter(u => !u._type);
-  const seen = new Map();
-  realUsers.forEach(u => {
-    const key = (u.email || '').toLowerCase();
-    if (key) seen.set(key, u);
-  });
-  const deduped = [...Array.from(seen.values()), ...special];
-
-  if (deduped.length !== users.length) {
-    console.warn('pushUsersToMaster: removed', users.length - deduped.length, 'duplicate(s) before write');
-  }
-
-  console.warn('⚠️ MASTER DB WRITE:', deduped.length, 'users:', deduped.map(u=>u.email).join(', '));
-  console.trace('pushUsersToMaster called from:');
-
-  const payload = { secret: MASTER_SECRET, action: 'saveUsers', users: deduped };
-  const url = MASTER_SCRIPT_URL;
-
-  // Apps Script POSTs must go through a proxy — direct POST is blocked by CORS redirect
-  const proxies = [
-    'https://trainderive.frank-467.workers.dev/?url=' + encodeURIComponent(url),
-    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
-  ];
-
-  for (const proxyUrl of proxies) {
-    try {
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 5000);
-      const res = await fetch(proxyUrl, {
-        method: 'POST', signal: ctrl.signal,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      clearTimeout(tid);
-      if (!res.ok) continue;
-      const text = await res.text();
-      try {
-        const data = JSON.parse(text);
-        if (data.ok) {
-          console.log('Users saved to master DB via proxy:', proxyUrl.split('?')[0]);
-          return true;
-        }
-      } catch(e) {
-        // Non-JSON response but 200 — treat as success (some proxies strip JSON)
-        console.log('Users pushed to master DB (non-JSON response)');
-        return true;
-      }
-    } catch(e) {
-      console.warn('Push via proxy failed:', proxyUrl.split('?')[0], e.message);
-    }
-  }
-
-  // Last resort: no-cors fire-and-forget (can't confirm success but write still happens)
-  try {
-    fetch(url, {
-      method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    console.log('Users push sent (no-cors, unconfirmed)');
-    return null; // unknown — may have worked
-  } catch(e) {}
-
-  // All proxies failed — queue for retry
-  if (retries > 0) {
-    console.warn('Push failed, retrying in 5s... (' + retries + ' retries left)');
-    _pendingPush = deduped;
-    setTimeout(async () => {
-      if (_pendingPush) {
-        const r = await pushUsersToMaster(_pendingPush, retries - 1);
-        if (r !== false) _pendingPush = null;
-      }
-    }, 5000);
-  }
-
-  console.error('All push attempts failed');
-  return false;
+// Everything that touches a Google Sheet goes through here. The secret
+// stays on the server. athleteId is only ever passed by the coach panel.
+function sheetCall(action, params = {}, athleteId = null) {
+  return fnCall('sheet', Object.assign({ action, athleteId }, params));
 }
-// getAdminPass / setAdminPass replaced by async getAdminHash / setAdminPass above
+window.sheetCall = sheetCall;   // coach-editor.js uses this too
 
-// Load from localStorage cache immediately (synchronous, fast)
-const _storedUsers = loadUsers();
-let USERS = _storedUsers || DEFAULT_USERS;
-if (_storedUsers) {
-  // Only migrate if there's real stored data — never write DEFAULT_USERS to localStorage
-  // on a fresh device before master sync has a chance to run
-  USERS = migrateUsers(USERS);
-  migratePasswords(USERS);  // async — hashes any plain-text passwords
-} else {
-  // Fresh device — mark version as current so migrateUsers never injects
-  // DEFAULT_USERS after master sync loads real users
-  localStorage.setItem('bloc_data_version', String(DATA_VERSION));
+// ── Profiles ───────────────────────────────────────────────────
+async function loadMyProfile() {
+  if (!SB) return null;
+  const { data: { user } } = await SB.auth.getUser();
+  if (!user) return null;
+  const { data, error } = await SB.from('profiles').select('*').eq('id', user.id).single();
+  if (error || !data) { console.warn('No profile for this account:', error && error.message); return null; }
+  if (!data.email) data.email = user.email || '';
+  return toAppUser(data);
 }
 
-// Periodic background re-sync every 5 minutes to pick up changes from other devices
-setInterval(async () => {
-  if (!getMasterUrl() || !getMasterSecret()) return;
-  const synced = await syncUsersFromMaster();
-  if (!synced) return;
-  // Only update if count changed — avoids unnecessary re-renders
-  const prevCount = USERS.length;
-  USERS = migrateUsers(synced, true);
-  await migratePasswords(USERS);
-  const adminPanel = document.getElementById('adm-users');
-  if (adminPanel && adminPanel.classList.contains('active') && USERS.length !== prevCount) {
-    renderUserTable();
-  }
-}, 5 * 60 * 1000);
+async function loadProfiles() {
+  if (!SB) return false;
+  const { data, error } = await SB.from('profiles').select('*').order('name');
+  if (error) { console.warn('Could not load athletes:', error.message); return false; }
+  PROFILES = data.map(toAppUser);
+  USERS = PROFILES;
+  return true;
+}
+
+function showAthleteHeader(user) {
+  document.getElementById('h-name').textContent = user.name || '';
+  document.getElementById('h-avatar').textContent = (user.name || '?').charAt(0).toUpperCase();
+}
 
 // ═══════════════════════════════════════════════════════════════
 // STATE
@@ -1464,95 +1212,33 @@ window.addEventListener('popstate', e => {
   applyRoute(e.state.route, e.state);
 });
 
-function restoreSession() {
-  const savedId = localStorage.getItem('bloc_session');
-  if (!savedId) return false;
-  // First try live USERS array, then fall back to cached user object
-  let user = USERS.find(u => u.id === savedId && u.role === 'athlete');
-  if (!user) {
-    try {
-      const cached = JSON.parse(localStorage.getItem('bloc_session_user') || 'null');
-      if (cached && cached.role === 'athlete') {
-        // First try to find by email in master-synced USERS (id may have changed)
-        const byEmail = USERS.find(u =>
-          u.email && cached.email &&
-          u.email.toLowerCase() === cached.email.toLowerCase()
-        );
-        if (byEmail) {
-          // Found in master under possibly different id — update session to master version
-          user = byEmail;
-          localStorage.setItem('bloc_session', byEmail.id);
-          localStorage.setItem('bloc_session_user', JSON.stringify(byEmail));
-        } else if (cached.id === savedId) {
-          // Not in master at all — use cached version (offline fallback only)
-          // Do NOT push to USERS — avoids creating duplicates
-          user = cached;
-        }
-      }
-    } catch(e) {}
-  }
-  if (!user) { localStorage.removeItem('bloc_session'); localStorage.removeItem('bloc_session_user'); return false; }
-  // Sync latest user data from USERS if available — use email match preferentially
-  // so a restored session always gets the freshest master data by email, not stale id
-  const liveByEmail = user.email && USERS.find(u =>
-    !u._type && u.email && u.email.toLowerCase() === user.email.toLowerCase()
-  );
-  if (liveByEmail) {
-    // Check if master version has a newer password change than our session user
-    const sessionTs = user._passChangedAt || 0;
-    const masterTs  = liveByEmail._passChangedAt || 0;
-    if (sessionTs > masterTs && user.pass) {
-      // Session has a newer password — merge it onto master data
-      user = { ...liveByEmail, pass: user.pass, mustChangePassword: false, _passChangedAt: sessionTs };
-    } else {
-      user = liveByEmail;
-    }
-  }
-  S.user = user;
-  document.getElementById('h-name').textContent = user.name;
-  document.getElementById('h-avatar').textContent = user.name.charAt(0).toUpperCase();
-  const banner = document.getElementById('first-login-banner');
-  if (banner) banner.style.display = user.mustChangePassword ? 'flex' : 'none';
-  updateNotifUI();
-  return true;
-}
-
-function parseHashAndRoute() {
+async function parseHashAndRoute() {
   const hash = window.location.hash || '';
+  const me   = await loadMyProfile();
 
-  // Admin path — restore session if previously logged in
-  if (hash === '#admin') {
-    if (localStorage.getItem('bloc_admin_session')) {
-      document.getElementById('adm-hd-name').textContent = 'Administrator';
-      applyRoute('admin');
-    } else {
-      showAdminLogin();
-    }
+  if (!me) { history.replaceState({ route:'login' }, '', '#login'); showScreen('s-login'); return; }
+
+  // Coaches land in the admin panel.
+  if (me.role === 'coach') {
+    S.user = me;
+    document.getElementById('adm-hd-name').textContent = me.name || 'Coach';
+    await loadProfiles();
+    history.replaceState({ route:'admin' }, '', '#admin');
+    applyRoute('admin');
     return;
   }
 
-  // Always attempt session restore first
-  const hasSession = S.user || restoreSession();
+  S.user = me;
+  showAthleteHeader(me);
+  updateNotifUI();
 
   if (hash.startsWith('#day/')) {
     const date = hash.slice(5);
-    if (hasSession) { loadAllSheets().then(() => applyRoute('day', { date })); }
-    else showScreen('s-login');
-  } else if (hash === '#cal') {
-    if (hasSession) { loadAllSheets().then(() => applyRoute('cal')); }
-    else showScreen('s-login');
+    await loadAllSheets();
+    if (S.dayMap[date]) applyRoute('day', { date });
   } else {
-    // Check for admin session first
-    if (localStorage.getItem('bloc_admin_session')) {
-      document.getElementById('adm-hd-name').textContent = 'Administrator';
-      history.replaceState({ route:'admin' }, '', '#admin');
-      applyRoute('admin');
-    } else if (hasSession) {
-      history.replaceState({ route:'cal' }, '', '#cal');
-      loadAllSheets().then(() => applyRoute('cal'));
-    } else {
-      showScreen('s-login');
-    }
+    history.replaceState({ route:'cal' }, '', '#cal');
+    await loadAllSheets();
   }
 }
 
@@ -1571,32 +1257,83 @@ async function doLogin() {
   const email = document.getElementById('l-email').value.trim().toLowerCase();
   const pass  = document.getElementById('l-pass').value;
   const errEl = document.getElementById('l-err');
-  const passHash = await hashPass(pass);
-  const user = USERS.find(u => !u._type && u.email === email && u.pass === passHash && u.role === 'athlete');
-  if (!user) { errEl.textContent = 'Invalid email or password.'; return; }
-  S.user = user;
-  localStorage.setItem('bloc_session', user.id);
-  localStorage.setItem('bloc_session_user', JSON.stringify(user));  // cache full user
-  document.getElementById('h-name').textContent = user.name;
-  document.getElementById('h-avatar').textContent = user.name.charAt(0).toUpperCase();
+  const btn   = document.getElementById('l-btn');
+  errEl.textContent = '';
+  if (!email || !pass) { errEl.textContent = 'Enter your email and password.'; return; }
+
+  btn.disabled = true; btn.textContent = 'Signing In…';
+  const { error } = await SB.auth.signInWithPassword({ email, password: pass });
+  btn.disabled = false; btn.textContent = 'Sign In';
+
+  if (error) {
+    errEl.textContent = /invalid login/i.test(error.message)
+      ? 'Invalid email or password.' : error.message;
+    return;
+  }
+
+  const me = await loadMyProfile();
+  if (!me) {
+    errEl.textContent = 'Signed in, but no profile was found. Contact your coach.';
+    await SB.auth.signOut();
+    return;
+  }
+  S.user = me;
+  document.getElementById('l-pass').value = '';
+
+  if (me.role === 'coach') {
+    document.getElementById('adm-hd-name').textContent = me.name || 'Coach';
+    await loadProfiles();
+    history.pushState({ route:'admin' }, '', '#admin');
+    applyRoute('admin');
+    return;
+  }
+
+  showAthleteHeader(me);
   updateNotifUI();
   history.replaceState({ route:'cal' }, '', '#cal');
   showScreen('s-app');
-  // Show first-login banner if this is a default/temp password
-  const banner = document.getElementById('first-login-banner');
-  if (user.mustChangePassword) {
-    banner.style.display = 'flex';
-  } else {
-    banner.style.display = 'none';
-  }
   loadAllSheets();
 }
 document.getElementById('l-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 
-function doLogout() {
+// Emails a reset link. Works for athletes and for the coach account.
+async function forgotPassword() {
+  const email = document.getElementById('l-email').value.trim().toLowerCase();
+  const errEl = document.getElementById('l-err');
+  errEl.textContent = '';
+  if (!email) { errEl.textContent = 'Type your email above first, then tap Forgot password.'; return; }
+  const { error } = await SB.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname,
+  });
+  if (error) { errEl.textContent = error.message; return; }
+  showToast('Reset link sent — check your email', 'ok');
+}
+
+// Shown after an invite or reset link opens the app.
+function openSetPassword() {
+  document.getElementById('sp-new').value  = '';
+  document.getElementById('sp-conf').value = '';
+  document.getElementById('m-sp-err').textContent = '';
+  openModal('m-setpass');
+}
+
+async function saveNewPassword() {
+  const nw   = document.getElementById('sp-new').value;
+  const conf = document.getElementById('sp-conf').value;
+  const err  = document.getElementById('m-sp-err');
+  err.textContent = '';
+  if (!nw || nw.length < 6) { err.textContent = 'Password must be at least 6 characters.'; return; }
+  if (nw !== conf)          { err.textContent = 'Passwords do not match.'; return; }
+  const { error } = await SB.auth.updateUser({ password: nw });
+  if (error) { err.textContent = error.message; return; }
+  window._authFlow = null;
+  closeModal('m-setpass');
+  showToast('Password set ✓', 'ok');
+}
+
+async function doLogout() {
+  await SB.auth.signOut();
   Object.assign(S, { user:null, dayMap:{}, viewMonth:new Date(), selDate:null, feel:null, secResults:{} });
-  localStorage.removeItem('bloc_session');
-  localStorage.removeItem('bloc_session_user');
   stopClientChangePoll();
   document.getElementById('cal-body').innerHTML = '<div class="sbox"><div class="spinner"></div><p>Loading program…</p></div>';
   document.getElementById('cal-badge').style.display = 'none';
@@ -1609,26 +1346,44 @@ function doLogout() {
 }
 
 function showAdminLogin() {
+  document.getElementById('m-al-email').value = document.getElementById('l-email').value || '';
   document.getElementById('m-al-pass').value = '';
   document.getElementById('m-al-err').textContent = '';
   openModal('m-adminlogin');
 }
 
+// The shared admin password is gone. A coach signs in with their own
+// account; the coach panel opens only if their profile says 'coach'.
 async function doAdminLogin() {
-  const pass = document.getElementById('m-al-pass').value;
-  const entered = await hashPass(pass);
-  const stored  = await getAdminHash();
-  if (entered !== stored) { document.getElementById('m-al-err').textContent = 'Incorrect password.'; return; }
+  const email = document.getElementById('m-al-email').value.trim().toLowerCase();
+  const pass  = document.getElementById('m-al-pass').value;
+  const err   = document.getElementById('m-al-err');
+  err.textContent = '';
+  if (!email || !pass) { err.textContent = 'Enter your email and password.'; return; }
+
+  const { error } = await SB.auth.signInWithPassword({ email, password: pass });
+  if (error) {
+    err.textContent = /invalid login/i.test(error.message) ? 'Incorrect email or password.' : error.message;
+    return;
+  }
+  const me = await loadMyProfile();
+  if (!me || me.role !== 'coach') {
+    err.textContent = 'That account is not a coach account.';
+    await SB.auth.signOut();
+    return;
+  }
+  S.user = me;
   closeModal('m-adminlogin');
-  document.getElementById('adm-hd-name').textContent = 'Administrator';
-  localStorage.setItem('bloc_admin_session', '1');
+  document.getElementById('adm-hd-name').textContent = me.name || 'Coach';
+  await loadProfiles();
   history.pushState({ route:'admin' }, '', '#admin');
   applyRoute('admin');
 }
 document.getElementById('m-al-pass').addEventListener('keydown', e => { if(e.key==='Enter') doAdminLogin(); });
 
-function doAdminLogout() {
-  localStorage.removeItem('bloc_admin_session');
+async function doAdminLogout() {
+  await SB.auth.signOut();
+  S.user = null;
   history.pushState({ route:'login' }, '', '#login');
   showScreen('s-login');
 }
@@ -1637,30 +1392,22 @@ function doAdminLogout() {
 // ADMIN — USER TABLE
 // ═══════════════════════════════════════════════════════════════
 async function adminSyncMaster() {
-  if (!MASTER_SCRIPT_URL || !MASTER_SECRET) {
-    showToast('Master DB not configured in code', 'err'); return;
-  }
   const btn = document.getElementById('btn-sync-master');
-  if (btn) { btn.disabled = true; btn.textContent = 'Syncing…'; }
-
-  // Pull only — never push during sync. Master DB is the source of truth.
-  // Writes only happen from explicit add/edit/delete actions.
-  const synced = await syncUsersFromMaster();
-  if (synced) {
-    USERS = migrateUsers(synced, true);
-    migratePasswords(USERS);
-    renderUserTable();
-    showToast('Synced — ' + USERS.length + ' users from master DB', 'ok');
-  } else {
-    showToast('Sync failed — check console', 'err');
-  }
-  if (btn) { btn.disabled = false; btn.textContent = 'Sync Now'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Refreshing…'; }
+  const ok = await loadProfiles();
+  if (ok) { renderUserTable(); showToast('Loaded ' + PROFILES.length + ' people', 'ok'); }
+  else    { showToast('Could not load the athlete list', 'err'); }
+  if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
 }
 
 function renderUserTable() {
   const tbody = document.getElementById('user-tbody');
   tbody.innerHTML = '';
-  USERS.filter(u => !u._type).forEach(u => {
+  if (!PROFILES.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="u-sheet none">No athletes yet — use + Add User</div></td></tr>';
+    return;
+  }
+  PROFILES.forEach(u => {
     const hasSheet = !!u.spreadsheetId;
     const sheetUrl = hasSheet ? 'https://docs.google.com/spreadsheets/d/' + u.spreadsheetId : '';
     const tr = document.createElement('tr');
@@ -1671,11 +1418,14 @@ function renderUserTable() {
       '<td>' + (hasSheet
         ? '<div class="u-sheet"><a href="' + escH(sheetUrl) + '" target="_blank" rel="noopener">' + escH(u.spreadsheetId.slice(0,24)) + '…</a></div>'
         : '<div class="u-sheet none">No sheet linked</div>') + '</td>' +
+      '<td><div class="u-sync" id="sync-' + u.id + '">' + formatSyncTime(u.lastSynced) + '</div></td>' +
       '<td><div class="row-actions">' +
-        '<button class="btn-sm" onclick="adminViewUser(\'' + u.id + '\')">⛶ View</button>' +
-        '<button class="btn-sm" id="rbtn-' + u.id + '" onclick="adminRefreshUser(\'' + u.id + '\', this)">↺ Refresh</button>' +
+        (u.role === 'coach' ? '' :
+          '<button class="btn-sm" onclick="adminViewUser(\'' + u.id + '\')">⛶ View</button>' +
+          '<button class="btn-sm" id="rbtn-' + u.id + '" onclick="adminRefreshUser(\'' + u.id + '\', this)">↺ Refresh</button>') +
         '<button class="btn-sm" onclick="openEditUser(\'' + u.id + '\')" >Edit</button>' +
-        '<button class="btn-sm danger" onclick="openDeleteUser(\'' + u.id + '\')" >Delete</button>' +
+        (u.id === (S.user && S.user.id) ? '' :
+          '<button class="btn-sm danger" onclick="openDeleteUser(\'' + u.id + '\')" >Delete</button>') +
       '</div></td>';
     tbody.appendChild(tr);
   });
@@ -1686,31 +1436,30 @@ let editingUserId = null;
 function openAddUser() {
   editingUserId = null;
   document.getElementById('m-user-title').textContent = 'Add User';
-  ['m-name','m-email','m-pass','m-sheet-url','m-sheet-gid','m-script-url','m-script-secret'].forEach(id => document.getElementById(id).value = '');
+  ['m-name','m-email','m-sheet-url','m-sheet-gid','m-script-url','m-script-secret'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('m-created-at').value = isoToday();  // new athletes default to today
   document.getElementById('m-role').value = 'athlete';
   document.getElementById('m-user-err').textContent = '';
   document.getElementById('m-sheet-preview').style.display = 'none';
-  document.getElementById('m-pass').placeholder = 'Set a password';
+  document.getElementById('m-email').disabled = false;
   openModal('m-user');
 }
 
 function openEditUser(id) {
-  const u = USERS.find(u => u.id === id); if (!u) return;
+  const u = PROFILES.find(u => u.id === id); if (!u) return;
   editingUserId = id;
   document.getElementById('m-user-title').textContent = 'Edit User';
   document.getElementById('m-name').value  = u.name;
   document.getElementById('m-email').value = u.email;
-  document.getElementById('m-pass').value  = '';
-  document.getElementById('m-pass').placeholder = 'Leave blank to keep current';
+  document.getElementById('m-email').disabled = false;
   document.getElementById('m-role').value  = u.role;
   document.getElementById('m-sheet-url').value = u.spreadsheetId
     ? 'https://docs.google.com/spreadsheets/d/' + u.spreadsheetId + '/edit' : '';
   document.getElementById('m-script-url').value    = u.scriptUrl    || '';
-  document.getElementById('m-script-secret').value = u.scriptSecret || '';
+  document.getElementById('m-script-secret').value = '';   // write-only; never read back
   document.getElementById('m-created-at').value    = u.createdAt    || '2024-01-01';
   // Populate tab names field
-  const tabNamesArr = u.sheetTabNames || (u.sheetGids ? Object.keys(u.sheetGids) : []);
+  const tabNamesArr = u.sheetTabNames || [];
   document.getElementById('m-sheet-gid').value = tabNamesArr.join(', ');
   document.getElementById('m-user-err').textContent = '';
   previewSheetId();
@@ -1736,77 +1485,75 @@ function extractSheetId(input) {
 
 async function saveUser() {
   const errEl = document.getElementById('m-user-err'); errEl.textContent = '';
-  // Always pull latest master state before modifying — prevents stale overwrites
-  if (MASTER_SCRIPT_URL && MASTER_SECRET) {
-    const latest = await syncUsersFromMaster();
-    if (latest) {
-      USERS = migrateUsers(latest, true);
-    }
-  }
-  const name  = document.getElementById('m-name').value.trim();
-  const email = document.getElementById('m-email').value.trim().toLowerCase();
-  const passRaw = document.getElementById('m-pass').value;
-  const pass = passRaw ? await hashPass(passRaw) : null;
-  const role  = document.getElementById('m-role').value;
+
+  const name     = document.getElementById('m-name').value.trim();
+  const email    = document.getElementById('m-email').value.trim().toLowerCase();
+  const role     = document.getElementById('m-role').value === 'admin' ? 'coach' : document.getElementById('m-role').value;
   const sheetRaw = document.getElementById('m-sheet-url').value.trim();
+  const scriptUrl    = document.getElementById('m-script-url').value.trim();
+  const scriptSecret = document.getElementById('m-script-secret').value.trim();
+  const dataFrom     = document.getElementById('m-created-at').value.trim() || '2024-01-01';
+  const tabRaw       = document.getElementById('m-sheet-gid').value.trim();
+  const tabNames     = tabRaw ? tabRaw.split(',').map(t=>t.trim()).filter(Boolean) : [];
+
   if (!name)  { errEl.textContent = 'Name is required.'; return; }
   if (!email) { errEl.textContent = 'Email is required.'; return; }
-  if (!editingUserId && !pass) { errEl.textContent = 'Password is required for new users.'; return; }
-  if (USERS.find(u => u.email === email && u.id !== editingUserId)) { errEl.textContent = 'Email already in use.'; return; }
   const spreadsheetId = sheetRaw ? extractSheetId(sheetRaw) : '';
   if (sheetRaw && !spreadsheetId) { errEl.textContent = 'Could not parse spreadsheet ID.'; return; }
+
+  const fields = {
+    name, role,
+    spreadsheet_id: spreadsheetId || null,
+    tab_names:      tabNames,
+    data_from:      dataFrom,
+    script_url:     scriptUrl || null,
+  };
+
+  const btn = document.querySelector('#m-user .btn-confirm');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+  let targetId = editingUserId;
+
   if (editingUserId) {
-    const idx = USERS.findIndex(u => u.id === editingUserId); if (idx < 0) return;
-    const scriptUrl    = document.getElementById('m-script-url').value.trim();
-    const scriptSecret = document.getElementById('m-script-secret').value.trim();
-    const createdAt    = document.getElementById('m-created-at').value.trim() || '2024-01-01';
-    const tabNamesRaw  = document.getElementById('m-sheet-gid').value.trim();
-    const tabNames     = tabNamesRaw ? tabNamesRaw.split(',').map(t=>t.trim()).filter(Boolean) : null;
-    USERS[idx] = { ...USERS[idx], name, email, role,
-      spreadsheetId: spreadsheetId || USERS[idx].spreadsheetId,
-      sheetTabNames: tabNames || USERS[idx].sheetTabNames || null,
-      createdAt,
-      ...(scriptUrl    ? {scriptUrl}    : {}),
-      ...(scriptSecret ? {scriptSecret} : {}),
-      ...(pass ? {pass, mustChangePassword:true} : {}) };
-  } else {
-    const newScriptUrl    = document.getElementById('m-script-url').value.trim();
-    const newScriptSecret = document.getElementById('m-script-secret').value.trim();
-    const newTabNamesRaw = document.getElementById('m-sheet-gid').value.trim();
-    const newTabNames    = newTabNamesRaw ? newTabNamesRaw.split(',').map(t=>t.trim()).filter(Boolean) : null;
-    // Check email doesn't already exist after fresh sync
-    if (USERS.find(u => (u.email||'').toLowerCase() === email && u.id !== editingUserId)) {
-      errEl.textContent = 'A user with this email already exists.'; return;
+    const existing = PROFILES.find(u => u.id === editingUserId);
+    if (existing && email !== existing.email) {
+      const r = await fnCall('manage-users', { action: 'setEmail', id: editingUserId, email });
+      if (!r.ok) { errEl.textContent = r.error || 'Could not change the email.'; if (btn) { btn.disabled=false; btn.textContent='Save User'; } return; }
+      fields.email = email;
     }
-    USERS.push({ id:'u'+Date.now(), name, email, pass, role,
-      spreadsheetId: spreadsheetId||'',
-      sheetTabNames: newTabNames,
-      scriptUrl: newScriptUrl, scriptSecret: newScriptSecret,
-      mustChangePassword: true,
-      createdAt: isoToday(),
-    });
+    const { error } = await SB.from('profiles').update(fields).eq('id', editingUserId);
+    if (error) { errEl.textContent = error.message; if (btn) { btn.disabled=false; btn.textContent='Save User'; } return; }
+  } else {
+    // New athlete: create the account and email them an invite to set a password.
+    const r = await fnCall('manage-users', { action: 'invite', email, name, role });
+    if (!r.ok) { errEl.textContent = r.error || 'Could not invite that person.'; if (btn) { btn.disabled=false; btn.textContent='Save User'; } return; }
+    targetId = r.id;
+    const { error } = await SB.from('profiles').update(fields).eq('id', targetId);
+    if (error) { errEl.textContent = error.message; if (btn) { btn.disabled=false; btn.textContent='Save User'; } return; }
   }
-  const _msg = editingUserId ? 'User updated' : 'User added';
-  saveUsersAndSync(USERS).then(()=>{ closeModal('m-user'); renderUserTable(); showToast(_msg, 'ok'); });
+
+  if (scriptSecret && targetId) {
+    const r2 = await fnCall('manage-users', { action: 'setSecret', id: targetId, secret: scriptSecret });
+    if (!r2.ok) { errEl.textContent = 'Saved, but the script secret did not store: ' + (r2.error || ''); }
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Save User'; }
+  await loadProfiles();
+  renderUserTable();
+  closeModal('m-user');
+  showToast(editingUserId ? 'User updated' : 'User added — invite email sent', 'ok');
 }
 
 let deleteTargetId = null;
-function openDeleteUser(id){ const u=USERS.find(u=>u.id===id); if(!u) return; deleteTargetId=id; document.getElementById('m-del-name').textContent=u.name; openModal('m-delete'); }
-function confirmDelete(){
-  // Pull latest master state first, then delete, then push
-  // This prevents deleting users added by another device since last sync
-  const doDelete = async () => {
-    if (MASTER_SCRIPT_URL && MASTER_SECRET) {
-      const latest = await syncUsersFromMaster();
-      if (latest) USERS = migrateUsers(latest, true);
-    }
-    USERS = USERS.filter(u => u.id !== deleteTargetId);
-    await saveUsersAndSync(USERS);
-    closeModal('m-delete');
-    renderUserTable();
-    showToast('User deleted', 'ok');
-  };
-  doDelete();
+function openDeleteUser(id){ const u=PROFILES.find(u=>u.id===id); if(!u) return; deleteTargetId=id; document.getElementById('m-del-name').textContent=u.name; openModal('m-delete'); }
+
+async function confirmDelete(){
+  const r = await fnCall('manage-users', { action: 'delete', id: deleteTargetId });
+  if (!r.ok) { showToast(r.error || 'Could not delete that account', 'err'); return; }
+  await loadProfiles();
+  closeModal('m-delete');
+  renderUserTable();
+  showToast('User deleted', 'ok');
 }
 
 function switchAdmTab(name,btn){
@@ -1815,118 +1562,44 @@ function switchAdmTab(name,btn){
   btn.classList.add('active'); document.getElementById('adm-'+name).classList.add('active');
 }
 function openChangeAdminPass(){ ['m-ap-cur','m-ap-new','m-ap-conf'].forEach(id=>document.getElementById(id).value=''); document.getElementById('m-ap-err').textContent=''; openModal('m-adminpass'); }
+
 async function saveAdminPass(){
   const cur=document.getElementById('m-ap-cur').value, nw=document.getElementById('m-ap-new').value, conf=document.getElementById('m-ap-conf').value;
   const e=document.getElementById('m-ap-err'); e.textContent='';
-  const curHash = await hashPass(cur);
-  const storedHash = await getAdminHash();
-  if(curHash!==storedHash){e.textContent='Current password incorrect.';return;}
   if(!nw||nw.length<6){e.textContent='New password must be at least 6 characters.';return;}
   if(nw!==conf){e.textContent='Passwords do not match.';return;}
-  await setAdminPass(nw);
-  localStorage.removeItem('bloc_admin_pass');
+
+  // Confirm the current password by signing in with it again.
+  const { data: { user } } = await SB.auth.getUser();
+  if (!user) { e.textContent='Session expired — sign in again.'; return; }
+  const check = await SB.auth.signInWithPassword({ email: user.email, password: cur });
+  if (check.error) { e.textContent='Current password incorrect.'; return; }
+
+  const { error } = await SB.auth.updateUser({ password: nw });
+  if (error) { e.textContent = error.message; return; }
   closeModal('m-adminpass'); showToast('Password updated','ok');
-}
-function openResetData(){ document.getElementById('m-reset-confirm').value=''; openModal('m-reset'); }
-function confirmReset(){
-  if(document.getElementById('m-reset-confirm').value!=='RESET'){showToast('Type RESET to confirm','err');return;}
-  USERS=[...DEFAULT_USERS]; localStorage.setItem('bloc_users', JSON.stringify(USERS)); localStorage.removeItem('bloc_admin_pass'); localStorage.removeItem('bloc_admin_hash');
-  closeModal('m-reset'); renderUserTable(); showToast('Data reset to defaults','ok');
 }
 
 // ═══════════════════════════════════════════════════════════════
 // SHEET LOADING
 // ═══════════════════════════════════════════════════════════════
-// ── Direct fetch via Apps Script (no proxy needed) ───────────────────────
-// When a user has a scriptUrl configured, we fetch CSV through their own
-// Apps Script instead of a public CORS proxy. This is reliable, fast,
-// and not subject to proxy blocking.
+// ── Reading a sheet ──────────────────────────────────────────────────
+// All of it now goes through the "sheet" server function (sheetCall,
+// defined up top). That function holds each athlete's script secret and
+// calls their Apps Script directly, so there are no public proxies left
+// and nothing sensitive is in this page.
 
-function makeFetchWithTimeout(ms) {
-  const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), ms);
-  return { signal: ctrl.signal, clear: () => clearTimeout(tid) };
+async function loadCSVForTab(tabName, athleteId = null) {
+  const r = await sheetCall('csv', { sheet: tabName }, athleteId);
+  if (!r.ok) throw new Error(r.error || 'Could not read ' + tabName);
+  return r.csv || '';
 }
 
-async function scriptFetch(scriptUrl, secret, action, params = {}) {
-  const qs  = new URLSearchParams({ action, secret, ...params }).toString();
-  const url = scriptUrl + '?' + qs;
-  const enc = encodeURIComponent(url);
-
-  const attempts = [
-    { url: url,                                                ms: 12000, opts: { redirect: 'follow' } },
-    { url: 'https://trainderive.frank-467.workers.dev/?url=' + enc,                          ms: 8000,  opts: {} },
-    { url: 'https://api.codetabs.com/v1/proxy?quest=' + enc,  ms: 8000,  opts: {} },
-  ];
-
-  for (let i = 0; i < attempts.length; i++) {
-    const { url: u, ms, opts } = attempts[i];
-    const { signal, clear } = makeFetchWithTimeout(ms);
-    try {
-      const res = await fetch(u, { signal, ...opts });
-      clear();
-      if (!res.ok) { console.warn('scriptFetch attempt', i, 'HTTP', res.status); continue; }
-      const text = await res.text();
-      if (text && text.length > 10) return text;
-      console.warn('scriptFetch attempt', i, 'empty response');
-    } catch(err) {
-      clear();
-      console.warn('scriptFetch attempt', i, 'failed:', err.message);
-    }
-  }
-  throw new Error('scriptFetch: all attempts failed for action=' + action);
+async function loadTabList(athleteId = null) {
+  const r = await sheetCall('tabs', {}, athleteId);
+  if (!r.ok) throw new Error(r.error || 'Could not list tabs');
+  return r.tabs || [];
 }
-
-
-async function loadTabsViaScript(scriptUrl, secret) {
-  const text = await scriptFetch(scriptUrl, secret, 'tabs');
-  const json = JSON.parse(text);
-  if (!json.ok) throw new Error(json.error || 'tabs failed');
-  return json.tabs; // [{title, gid}, ...]
-}
-
-async function loadCSVViaScript(scriptUrl, secret, tabNameOrGid) {
-  const isGid = /^\d+$/.test(String(tabNameOrGid));
-  const params = isGid ? { gid: String(tabNameOrGid) } : { sheet: String(tabNameOrGid) };
-  return await scriptFetch(scriptUrl, secret, 'csv', params);
-}
-
-async function proxyFetch(url) {
-  const enc = encodeURIComponent(url);
-
-  const tryProxy = async (p) => {
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 8000);
-    try {
-      const res = await fetch(p, { signal: ctrl.signal });
-      clearTimeout(tid);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const text = await res.text();
-      if (!text || text.length < 10) throw new Error('Empty response');
-      if (text.trimStart().startsWith('<')) throw new Error('Got HTML not CSV');
-      return text;
-    } catch(err) {
-      clearTimeout(tid);
-      throw err;
-    }
-  };
-
-  // Race all proxies simultaneously — first valid response wins
-  const proxies = [
-    'https://trainderive.frank-467.workers.dev/?url=' + enc,
-    'https://api.codetabs.com/v1/proxy?quest=' + enc,
-  ];
-
-  try {
-    return await Promise.any(proxies.map(p => tryProxy(p)));
-  } catch(e) {
-    throw new Error('All proxies failed for: ' + url.slice(0, 80));
-  }
-}
-
-// Discover all tabs by fetching the HTML preview of the spreadsheet
-// and extracting sheet GIDs from the tab bar — works on any publicly shared sheet
-// without requiring it to be "published to web".
 
 async function loadAllSheets() {
   const { spreadsheetId, sheetGids, sheetTabNames } = S.user;
@@ -1948,45 +1621,20 @@ async function loadAllSheets() {
 
   try {
     const tabNames = sheetTabNames && sheetTabNames.length ? sheetTabNames : null;
-    const scriptUrl = S.user.scriptUrl;
-    const scriptSec = S.user.scriptSecret;
-    const useScript = !!(scriptUrl && scriptSec);
 
     if (tabNames) {
-      setStatus('Fetching ' + tabNames.join(', ') + '...');
       await Promise.all(tabNames.map(async tabName => {
         try {
-          let csv = null;
-
-          if (useScript) {
-            try {
-              setStatus('Trying Apps Script for ' + tabName + '...');
-              csv = await loadCSVViaScript(scriptUrl, scriptSec, tabName);
-              setStatus('Got CSV via Apps Script (' + (csv ? csv.length : 0) + ' chars)');
-            } catch(se) {
-              setStatus('Apps Script failed: ' + se.message);
-            }
-          }
-
-          if (!csv || csv.length < 10) {
-            try {
-              setStatus('Trying proxy for ' + tabName + '...');
-              const url = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
-                          '/export?format=csv&sheet=' + encodeURIComponent(tabName);
-              csv = await proxyFetch(url);
-              setStatus('Got CSV via proxy (' + (csv ? csv.length : 0) + ' chars)');
-            } catch(pe) {
-              setStatus('Proxy failed: ' + pe.message);
-            }
-          }
-
+          const csv = await loadCSVForTab(tabName);
           if (csv && csvHasTrainingBlock(csv)) {
             parseSheetCSV(csv, tabName, cutoff);
-            setStatus('Parsed ' + tabName + ' - ' + Object.keys(S.dayMap).length + ' days found');
           } else {
-            setStatus('No training block. CSV starts: ' + (csv ? csv.slice(0,80) : 'null'));
+            console.warn('No training block found in', tabName);
           }
-        } catch(err) { setStatus('Error: ' + err.message); }
+        } catch(err) {
+          console.warn('Could not load', tabName, '—', err.message);
+          setStatus(err.message);
+        }
       }));
       if (Object.keys(S.dayMap).length > 0) { _finishLoad(); return; }
     }
@@ -2589,8 +2237,13 @@ async function autoSaveSection(sectionIdx, statusEl) {
   if (statusEl) { statusEl.textContent='Syncing…'; statusEl.className='sec-save-st saving'; }
   const synced = await autoSaveAll(true);
   if (statusEl) {
-    statusEl.textContent = synced === false ? 'Saved locally' : 'Synced ✓';
-    statusEl.className = 'sec-save-st ok';
+    if (synced === false) {
+      statusEl.textContent = 'Not saved to the sheet — kept on this device';
+      statusEl.className = 'sec-save-st err';
+    } else {
+      statusEl.textContent = 'Synced ✓';
+      statusEl.className = 'sec-save-st ok';
+    }
   }
 }
 
@@ -2608,69 +2261,48 @@ async function autoSaveAll(silent=false) {
     if (stEl) { stEl.textContent='Saving…'; stEl.className='save-st'; }
   }
 
-  const scriptUrl    = S.user.scriptUrl    || '';
-  const scriptSecret = S.user.scriptSecret || '';
+  const scriptUrl = S.user.scriptUrl || '';
   if (!scriptUrl) {
     if (!silent) {
       const stEl=document.getElementById('save-st');
       if (stEl) { stEl.textContent='Saved ✓'; stEl.className='save-st ok'; }
     }
-    // Notify admin even without script
-    return null; // no script — local only
+    return null; // no sheet bridge set up — saved on this device only
   }
 
-  const payload = {
-    secret: scriptSecret, action: 'results',
-    sheetName: day.tabName,
-    resultsRowIdx: day.resultsRowIdx, colIndex: day.colIndex,
-    sectionResults: secArr, feel: S.feel,
-    athleteName: S.user.name || 'Athlete',
-    dateLabel: S.selDate || day.tabName,
-  };
+  const r = await sheetCall('results', {
+    sheetName:      day.tabName,
+    resultsRowIdx:  day.resultsRowIdx,
+    colIndex:       day.colIndex,
+    sectionResults: secArr,
+    feel:           S.feel,
+    dateLabel:      S.selDate || day.tabName,
+  });
 
-  const proxies = [
-    'https://trainderive.frank-467.workers.dev/?url=' + encodeURIComponent(scriptUrl),
-    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(scriptUrl),
-  ];
-
-  for (const proxyUrl of proxies) {
-    try {
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 5000);
-      const res = await fetch(proxyUrl, {
-        method:'POST', signal: ctrl.signal,
-        headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
-      });
-      clearTimeout(tid);
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (data.ok) {
-        if (!silent) {
-          const stEl=document.getElementById('save-st');
-          if (stEl) { stEl.textContent='Synced ✓'; stEl.className='save-st ok'; }
-        }
-        return true;
-      }
-    } catch(e) { /* try next proxy */ }
+  if (r.ok) {
+    if (!silent) {
+      const stEl=document.getElementById('save-st');
+      if (stEl) { stEl.textContent='Synced ✓'; stEl.className='save-st ok'; }
+    }
+    return true;
   }
 
-  // Last resort: no-cors fire-and-forget
-  try {
-    fetch(scriptUrl,{method:'POST',mode:'no-cors',
-      headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(()=>{});
-  } catch(e){}
   if (!silent) {
     const stEl=document.getElementById('save-st');
-    if (stEl) { stEl.textContent='Saved ✓'; stEl.className='save-st ok'; }
+    if (stEl) { stEl.textContent = r.error || 'Saved on this device only'; stEl.className='save-st err'; }
   }
-  // Notify admin even on unconfirmed send
-  return null;
+  console.warn('Saving results failed:', r.error);
+  return false;
 }
 
 async function saveResults(){
   const stEl=document.getElementById('save-st');
   stEl.textContent='Saving\u2026'; stEl.className='save-st';
-  await autoSaveAll(false);
+  const synced = await autoSaveAll(false);
+  if (synced === false) {
+    showToast('Could not save to the sheet — your entry is kept here','err');
+    return;   // keep the draft so nothing is lost
+  }
   if (S.selDate) clearDraft(S.selDate);
   showToast('Results saved!','ok');
   renderCal();
@@ -2807,7 +2439,7 @@ function openAccountSettings() {
 }
 
 async function saveAccountSettings() {
-  const errEl   = document.getElementById('m-acct-err');
+  const errEl = document.getElementById('m-acct-err');
   errEl.textContent = '';
 
   const newName  = document.getElementById('acct-name').value.trim();
@@ -2818,77 +2450,44 @@ async function saveAccountSettings() {
 
   if (!newName)  { errEl.textContent = 'Name cannot be empty.'; return; }
   if (!newEmail) { errEl.textContent = 'Email cannot be empty.'; return; }
-
-  // Email format check
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(newEmail)) {
     errEl.textContent = 'Please enter a valid email address.'; return;
   }
 
-  // Check email not taken by another user
-  const conflict = USERS.find(u => u.email === newEmail && u.id !== S.user.id);
-  if (conflict) { errEl.textContent = 'That email is already in use.'; return; }
-
-  // Password change requested?
   const changingPassword = newPass || curPass || confPass;
   if (changingPassword) {
     if (!curPass) { errEl.textContent = 'Enter your current password to set a new one.'; return; }
-    const curHash = await hashPass(curPass);
-    if (curHash !== S.user.pass) { errEl.textContent = 'Current password is incorrect.'; return; }
     if (!newPass) { errEl.textContent = 'New password cannot be empty.'; return; }
     if (newPass.length < 6) { errEl.textContent = 'New password must be at least 6 characters.'; return; }
     if (newPass !== confPass) { errEl.textContent = 'New passwords do not match.'; return; }
+    const check = await SB.auth.signInWithPassword({ email: S.user.email, password: curPass });
+    if (check.error) { errEl.textContent = 'Current password is incorrect.'; return; }
   }
 
-  // Always pull fresh master state before writing — prevents stale createdAt
-  // or other admin-set fields from being overwritten by cached local data
-  if (MASTER_SCRIPT_URL && MASTER_SECRET) {
-    const latest = await syncUsersFromMaster();
-    if (latest) USERS = migrateUsers(latest, true);
+  // Name lives on the profile; email and password belong to the account.
+  if (newName !== S.user.name) {
+    const { error } = await SB.from('profiles').update({ name: newName }).eq('id', S.user.id);
+    if (error) { errEl.textContent = error.message; return; }
+    S.user.name = newName;
+    showAthleteHeader(S.user);
   }
 
-  // Apply changes to USERS array
-  const idx = USERS.findIndex(u => u.id === S.user.id);
-  if (idx < 0) { errEl.textContent = 'User not found.'; return; }
+  let emailPending = false;
+  if (newEmail !== (S.user.email || '').toLowerCase()) {
+    const { error } = await SB.auth.updateUser({ email: newEmail });
+    if (error) { errEl.textContent = error.message; return; }
+    emailPending = true;
+  }
 
-  const updated = {
-    ...USERS[idx],       // base from fresh master — preserves createdAt, sheetTabNames etc.
-    name:  newName,
-    email: newEmail,
-    mustChangePassword: false,
-    ...(changingPassword ? { pass: await hashPass(newPass) } : {}),
-  };
-
-  // Stamp the update time so sync can compare timestamps
-  updated._passChangedAt = Date.now();
-
-  USERS[idx] = updated;
-  S.user = updated;
-  localStorage.setItem('bloc_users', JSON.stringify(USERS));
-  localStorage.setItem('bloc_session_user', JSON.stringify(updated));
-
-  document.getElementById('h-name').textContent = updated.name;
-  document.getElementById('h-avatar').textContent = updated.name.charAt(0).toUpperCase();
-  document.getElementById('first-login-banner').style.display = 'none';
+  if (changingPassword) {
+    const { error } = await SB.auth.updateUser({ password: newPass });
+    if (error) { errEl.textContent = error.message; return; }
+  }
 
   closeModal('m-account');
-
-  // Push with retries
-  let pushed = false;
-  for (let attempt = 0; attempt < 3 && !pushed; attempt++) {
-    if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
-    const result = await pushUsersToMaster(USERS);
-    if (result === true) { pushed = true; }
-  }
-
-  if (pushed) {
-    localStorage.removeItem('bloc_pending_account_change');
-    showToast(changingPassword ? 'Password changed ✔' : 'Account updated ✔', 'ok');
-  } else {
-    localStorage.setItem('bloc_pending_account_change', JSON.stringify(updated));
-    showToast(changingPassword ? 'Password saved — syncing in background' : 'Saved — will sync when connection improves', 'ok');
-  }
+  showToast(emailPending ? 'Saved — check your new inbox to confirm the email'
+          : changingPassword ? 'Password changed ✔' : 'Account updated ✔', 'ok');
 }
-
 
 // ═══════════════════════════════════════════════════════════════
 // ADMIN — PER-USER REFRESH + AUTO-REFRESH
@@ -2918,15 +2517,19 @@ function formatSyncTime(ts) {
 }
 
 async function adminRefreshUser(userId, btn) {
-  const u = USERS.find(u => u.id === userId);
+  const u = PROFILES.find(u => u.id === userId);
   if (!u || !u.spreadsheetId) { showToast('No spreadsheet linked', 'err'); return; }
   if (btn) { btn.disabled = true; btn.textContent = '\u21BA Loading\u2026'; }
   try {
     const dayMap = await loadUserSheets(u);
     ADM.cache[userId] = { dayMap, loadedAt: Date.now() };
     // Update last-synced timestamp on user
-    const idx = USERS.findIndex(u => u.id === userId);
-    if (idx >= 0) { USERS[idx].lastSynced = Date.now(); localStorage.setItem('bloc_users', JSON.stringify(USERS)); }
+    const idx = PROFILES.findIndex(u => u.id === userId);
+    if (idx >= 0) {
+      PROFILES[idx].lastSynced = Date.now();
+      SB.from('profiles').update({ last_synced: new Date().toISOString() }).eq('id', userId)
+        .then(({ error }) => { if (error) console.warn('last_synced not saved:', error.message); });
+    }
     // Update sync cell in table
     const syncEl = document.getElementById('sync-' + userId);
     if (syncEl) syncEl.innerHTML = '<span class="fresh">Just now</span>';
@@ -2963,7 +2566,7 @@ function stopAutoRefresh(userId) {
 // If it's newer than our last load, we trigger a refresh.
 function startChangePoll(userId) {
   stopChangePoll(userId);
-  const u = USERS.find(u => u.id === userId);
+  const u = PROFILES.find(u => u.id === userId);
   if (!u || !u.scriptUrl) return;
   ADM_POLL_TIMERS[userId] = setInterval(() => pollForChanges(userId), POLL_INTERVAL_MS);
   // Also do an immediate check
@@ -2978,13 +2581,10 @@ function stopChangePoll(userId) {
 }
 
 async function pollForChanges(userId) {
-  const u = USERS.find(u => u.id === userId);
+  const u = PROFILES.find(u => u.id === userId);
   if (!u || !u.scriptUrl) return;
   try {
-    const enc = encodeURIComponent(u.scriptUrl);
-    const res = await fetch('https://trainderive.frank-467.workers.dev/?url=' + enc);
-    if (!res.ok) return;
-    const data = await res.json();
+    const data = await sheetCall('changed', {}, userId);
     if (!data.ok || !data.lastChanged) return;
     const cached = ADM.cache[userId];
     // If sheet changed after our last load, trigger a refresh
@@ -3004,10 +2604,7 @@ function startClientChangePoll() {
   window._clientPollTimer = setInterval(async () => {
     if (!S.user || !S.user.scriptUrl) return;
     try {
-      const enc = encodeURIComponent(S.user.scriptUrl);
-      const res = await fetch('https://trainderive.frank-467.workers.dev/?url=' + enc);
-      if (!res.ok) return;
-      const data = await res.json();
+      const data = await sheetCall('changed');
       if (!data.ok || !data.lastChanged) return;
       if (!window._clientLastLoaded) return;
       if (data.lastChanged > window._clientLastLoaded) {
@@ -3031,42 +2628,25 @@ function stopClientChangePoll() {
   }
 }
 
-// Load all sheets for any user (reuses proxyFetch + parsers)
+// Load an athlete's sheets for the coach panel, through the server function.
 async function loadUserSheets(u) {
   const dayMap = {};
   if (!u.spreadsheetId) return dayMap;
 
-  const sid        = u.spreadsheetId;
-  const useScript  = !!(u.scriptUrl && u.scriptSecret);
-  const tabNames   = u.sheetTabNames && u.sheetTabNames.length ? u.sheetTabNames : null;
+  const tabNames = u.sheetTabNames && u.sheetTabNames.length ? u.sheetTabNames : null;
 
-  // Apps Script primary, proxy fallback
   if (tabNames) {
     await Promise.all(tabNames.map(async tabName => {
       try {
-        let csv = null;
-        if (useScript) {
-          try {
-            csv = await loadCSVViaScript(u.scriptUrl, u.scriptSecret, tabName);
-          } catch(se) { console.warn('Admin script failed for', tabName, ':', se.message); }
-        }
-        if (!csv || csv.length < 10) {
-          try {
-            const url = 'https://docs.google.com/spreadsheets/d/' + sid +
-                        '/export?format=csv&sheet=' + encodeURIComponent(tabName);
-            csv = await proxyFetch(url);
-          } catch(pe) { console.warn('Admin proxy failed for', tabName, ':', pe.message); }
-        }
+        const csv = await loadCSVForTab(tabName, u.id);
         if (!csv || !csvHasTrainingBlock(csv)) {
-          console.warn('Admin: no training block in', tabName, ':', csv ? csv.slice(0,120) : 'null');
+          console.warn('Coach view: no training block in', tabName);
           return;
         }
-        console.log('Admin CSV preview for', tabName, ':', csv.slice(0, 300));
         const savedMap = S.dayMap; S.dayMap = dayMap;
         parseSheetCSV(csv, tabName, null);
         S.dayMap = savedMap;
-        console.log('Admin ✓ Parsed', tabName, '— days:', Object.keys(dayMap).length);
-      } catch(e) { console.warn('Admin tab failed:', tabName, e.message); }
+      } catch(e) { console.warn('Coach view: tab failed:', tabName, e.message); }
     }));
     if (Object.keys(dayMap).length) return dayMap;
   }
@@ -3078,7 +2658,7 @@ async function loadUserSheets(u) {
 // ADMIN — USER DETAIL VIEW
 // ═══════════════════════════════════════════════════════════════
 async function adminViewUser(userId) {
-  const u = USERS.find(u => u.id === userId);
+  const u = PROFILES.find(u => u.id === userId);
   if (!u) return;
   ADM.detailUserId = userId;
 
@@ -3130,7 +2710,7 @@ async function adminRefreshDetail() {
   if (!ADM.detailUserId) return;
   const btn = document.getElementById('detail-refresh-btn');
   btn.textContent = 'Loading\u2026'; btn.disabled = true;
-  const u = USERS.find(u => u.id === ADM.detailUserId);
+  const u = PROFILES.find(u => u.id === ADM.detailUserId);
   if (u) {
     try {
       const dayMap = await loadUserSheets(u);
@@ -3423,7 +3003,7 @@ function saveComment(userId, isoDate, sectionIdx) {
   updateNotifUI();
 
   // Also sync to sheet if the user has Apps Script configured
-  const u = USERS.find(u => u.id === userId);
+  const u = PROFILES.find(u => u.id === userId);
   if (u && u.scriptUrl) {
     const dm = ADM.cache[userId]?.dayMap;
     const day = dm && dm[isoDate];
@@ -3454,36 +3034,18 @@ async function syncCommentToSheet(u, day, sectionIdx, comment) {
   }
   const combinedComment = parts.join('\n');
 
-  const athlete = USERS.find(a => a.id === u.id) || u;
-
   const payload = {
-    secret:        u.scriptSecret || '',
-    action:        'comment',
     sheetName:     day.tabName,
     resultsRowIdx: day.resultsRowIdx,
     colIndex:      day.colIndex,
-    comment:       combinedComment,
-    athleteName:   athlete.name || 'Athlete',
+    note:          combinedComment,
     dateLabel:     day.isoDate || day.tabName,
   };
 
-  const commentProxies = [
-    'https://trainderive.frank-467.workers.dev/?url=' + encodeURIComponent(u.scriptUrl),
-    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u.scriptUrl),
-  ];
-  let commentSynced = false;
-  for (const proxyUrl of commentProxies) {
-    try {
-      const res = await fetch(proxyUrl, {
-        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
-      });
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (data.ok) { commentSynced = true; break; }
-    } catch(e) {}
-  }
-  if (!commentSynced) {
-    fetch(u.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(()=>{});
+  const res = await sheetCall('comment', payload, u.id);
+  if (!res.ok) {
+    console.warn('Coach note did not reach the sheet:', res.error);
+    showToast('Note saved here, but not written to the sheet', 'err');
   }
 }
 
@@ -3780,41 +3342,37 @@ async function refreshDayView() {
 // available even after Safari cache clear, reinstall, or fresh device.
 // Master DB is the single source of truth. localStorage is just a fast cache.
 
-// Global flag — prevents any master DB writes during app initialisation
-// Set to true once init is complete and it's safe to write
+// ── Init ────────────────────────────────────────────────────────────────
+// Wait for the Supabase client, restore the session if there is one, then
+// route. An invite or reset link lands here too, and opens the
+// set-a-password box once the rest of the app is up.
+
 window._initComplete = false;
 
 (async () => {
-  const hasSession = !!localStorage.getItem('bloc_session') ||
-                     !!localStorage.getItem('bloc_admin_session');
-
-  // Show loading screen immediately — prevents any flash of login screen
+  // Show the loading screen immediately — no flash of the login box.
   document.getElementById('s-login').classList.remove('active');
   document.getElementById('s-loading').classList.add('active');
 
-  // Always pull from master DB first
-  if (getMasterUrl() && getMasterSecret()) {
-    try {
-      const synced = await syncUsersFromMaster();
-      if (synced) {
-        USERS = migrateUsers(synced, true);
-        await migratePasswords(USERS);
-      }
-    } catch(e) {
-      console.warn('Master sync failed on init:', e.message);
-    }
-  }
+  await window._sbReady;
+  SB = window.SB;
 
-  // Init complete — master writes now permitted
+  SB.auth.onAuthStateChange((evt) => {
+    if (evt === 'PASSWORD_RECOVERY') openSetPassword();
+  });
+
   window._initComplete = true;
 
-  // Now route — users are loaded from master regardless of localStorage state
-  parseHashAndRoute();
-  initInstallBanner();
+  try {
+    await parseHashAndRoute();
+  } catch (err) {
+    console.error('Startup failed:', err);
+    showScreen('s-login');
+  }
 
-  // Background re-sync for admin panel
-  const admUsers = document.getElementById('adm-users');
-  if (admUsers && admUsers.classList.contains('active')) renderUserTable();
+  if (window._authFlow === 'invite' || window._authFlow === 'recovery') openSetPassword();
+
+  initInstallBanner();
 })();
 
 // ── Register Service Worker ──────────────────────────────────────
