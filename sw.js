@@ -17,7 +17,7 @@
        Sheets, codetabs) — never touched. Live data must not be cached.
    ============================================================================ */
 
-const CACHE = 'trainderive-v8';          // ← bump this on every deploy
+const CACHE = 'trainderive-v9';          // ← bump this on every deploy
 
 const SHELL = [
   './',
