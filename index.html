@@ -13,6 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="TRAINDERIVE">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://riuplbhthhcojimkuqgj.supabase.co" crossorigin>
 <!-- Supabase: accounts, and the bridge to each athlete's sheet -->
 <script>
   window.SB_URL = 'https://riuplbhthhcojimkuqgj.supabase.co';
@@ -23,7 +24,9 @@
   window._sbReady  = new Promise(function (r) { window._sbReadyResolve = r; });
 </script>
 <script type="module">
-  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+  // Served from this repo rather than a CDN: one less lookup before the
+  // app can start, and nothing to go wrong if a CDN has a bad day.
+  import { createClient } from './supabase.js';
   window.SB = createClient(window.SB_URL, window.SB_KEY, {
     auth: { flowType: 'implicit', detectSessionInUrl: true, persistSession: true, autoRefreshToken: true }
   });
@@ -66,7 +69,7 @@
   --hd-h: 58px;
 
   /* Original TrainDerive variable names — kept so inline styles and
-     coach-editor.js pick up the new palette automatically */
+     any add-on script picks up the new palette automatically */
   --bg:        var(--paper);
   --surf:      var(--wash);
   --surf2:     #EEF1F7;
@@ -139,7 +142,7 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
 .btn-sm.spinning { opacity:.5; pointer-events:none; }
 .btn-sm.spinning::after { content:' …'; }
 
-.btn-cancel, .back-btn, .detail-back, .adm-day-back, .notif-mark-all {
+.btn-cancel, .back-btn, .detail-back, .adm-day-back {
   font-family:var(--sans); font-size:9.5px; font-weight:800; letter-spacing:1.8px; text-transform:uppercase;
   background:none; border:0; cursor:pointer; transition:color .15s;
 }
@@ -189,15 +192,8 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
   display:block; font-size:9px; font-weight:800; letter-spacing:2px; text-transform:uppercase;
   color:var(--ink-3); margin-bottom:6px;
 }
-.fld input, .fld select, .fld textarea, .res-ta, .coach-comment-ta {
-  width:100%; background:var(--paper); border:1px solid var(--line); border-radius:3px;
-  color:var(--ink); font-family:var(--sans); font-size:16px; line-height:1.5;
-  padding:11px 13px; outline:none; transition:border-color .15s;
-}
-.fld input:focus, .fld select:focus, .fld textarea:focus, .res-ta:focus, .coach-comment-ta:focus { border-color:var(--blue); }
 .fld textarea { resize:vertical; min-height:70px; }
 .fld select { cursor:pointer; }
-.res-ta::placeholder, .fld input::placeholder, .coach-comment-ta::placeholder { color:#A3ACBC; }
 .pw-wrap { position:relative; }
 .pw-wrap input { padding-right:44px; }
 .pw-eye {
@@ -273,45 +269,8 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
 .btn-ghost:hover { border-color:var(--magenta); color:var(--magenta); }
 
 /* Notification bell */
-.notif-btn {
-  position:relative; width:38px; height:38px; flex-shrink:0;
-  background:var(--paper); border:1px solid var(--line); border-radius:3px;
-  color:var(--ink-2); font-size:15px; cursor:pointer;
-  display:flex; align-items:center; justify-content:center; transition:border-color .15s;
-}
-.notif-btn:hover { border-color:var(--gold); }
-.notif-badge {
-  position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 4px;
-  background:var(--gold); color:var(--ink); border:2px solid var(--paper); border-radius:9px;
-  font-size:9px; font-weight:800; line-height:1;
-  display:flex; align-items:center; justify-content:center;
-  animation:badge-pop .25s cubic-bezier(.34,1.56,.64,1);
-}
 @keyframes badge-pop { from { transform:scale(0); } to { transform:scale(1); } }
-.notif-drop {
-  position:absolute; top:calc(100% + 10px); right:0; z-index:200; overflow:hidden;
-  width:min(320px, calc(100vw - 2rem));
-  background:var(--paper); border:1px solid var(--line); border-radius:4px;
-  box-shadow:0 16px 40px rgba(20,22,28,.18);
-  animation:drop-in .18s ease;
-}
-.notif-drop::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--grad); }
 @keyframes drop-in { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
-.notif-drop-hd { display:flex; align-items:center; justify-content:space-between; padding:15px 14px 10px; border-bottom:1px solid var(--line); }
-.notif-drop-title { font-family:var(--display); font-size:21px; line-height:1; color:var(--ink); }
-.notif-mark-all { color:var(--blue); padding:4px 0; }
-.notif-mark-all:hover { color:var(--gold-ink); }
-.notif-list { max-height:320px; overflow-y:auto; }
-.notif-item { display:flex; align-items:flex-start; gap:10px; padding:12px 14px; border-bottom:1px solid var(--line); cursor:pointer; transition:background .12s; }
-.notif-item:last-child { border-bottom:none; }
-.notif-item:hover { background:var(--wash); }
-.notif-item.read { opacity:.55; }
-.notif-dot { width:7px; height:7px; border-radius:50%; background:var(--gold); flex-shrink:0; margin-top:5px; }
-.notif-item.read .notif-dot { background:var(--border2); }
-.notif-item-body { flex:1; min-width:0; }
-.notif-item-date { font-family:var(--display); font-size:17px; letter-spacing:.3px; line-height:1; color:var(--ink); margin-bottom:3px; }
-.notif-item-text { font-size:12.5px; color:var(--ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.notif-empty { padding:24px 14px; text-align:center; font-size:9.5px; font-weight:700; letter-spacing:2.5px; text-transform:uppercase; color:var(--ink-3); }
 
 /* ── App main + views ────────────────────────────── */
 .app-main { flex:1; width:100%; padding-bottom:calc(64px + env(safe-area-inset-bottom, 0px)); }
@@ -385,7 +344,6 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
 .cc.is-wip:hover { background:rgba(220,142,9,.18); border-color:var(--gold); }
 .cc.today { border-color:var(--blue); border-top-color:var(--blue); background:var(--blue-soft); }
 .cc.today .cn { color:var(--blue); }
-.cc.has-note { box-shadow:0 0 0 2px var(--gold); }
 .cc.emp { background:transparent; border-color:transparent; box-shadow:none; pointer-events:none; }
 .cal-legend { display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
 .leg { display:flex; align-items:center; gap:6px; font-size:9px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--ink-2); }
@@ -441,21 +399,12 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
   background:#FCF5E8; border-left:4px solid var(--gold); border-radius:0 4px 4px 0;
   padding:14px 18px; margin-bottom:12px;
 }
-.daily-note-label, .coach-note-label, .coach-comment-label, .adm-result-label {
+.daily-note-label, .adm-result-label {
   font-size:9px; font-weight:800; letter-spacing:2px; text-transform:uppercase; color:var(--gold-ink); margin-bottom:6px;
 }
 .daily-note-text { font-size:13.5px; line-height:1.65; color:var(--ink-2); white-space:pre-wrap; }
 
-.unread-banner {
-  display:flex; align-items:center; gap:10px; margin-bottom:12px;
-  background:var(--paper); border:1px solid var(--gold-bdr); border-left:4px solid var(--gold); border-radius:0 4px 4px 0;
-  padding:11px 12px 11px 14px; animation:fade-in .25s ease;
-}
 @keyframes fade-in { from { opacity:0; } to { opacity:1; } }
-.unread-banner-icon { font-size:15px; flex-shrink:0; }
-.unread-banner-text { flex:1; font-size:13px; line-height:1.45; color:var(--ink-2); }
-.unread-banner-dismiss { background:none; border:none; color:var(--ink-3); font-size:13px; cursor:pointer; padding:4px 6px; flex-shrink:0; }
-.unread-banner-dismiss:hover { color:var(--ink); }
 
 /* Block headings (AM / PM / Training) */
 .blk-wrap { margin-bottom:6px; }
@@ -512,6 +461,19 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
 .res-ta { resize:vertical; min-height:68px; }
 .sec-save-st { font-size:11px; font-weight:600; color:var(--ink-3); margin-top:6px; min-height:15px; transition:color .2s; }
 
+/* Pick a day to move to */
+.mv-list { display:flex; flex-direction:column; gap:7px; max-height:48vh; overflow-y:auto; }
+.mv-day {
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  width:100%; text-align:left; font:inherit; cursor:pointer;
+  background:var(--paper); border:1px solid var(--line); border-radius:4px;
+  padding:12px 13px; transition:border-color .15s, background .15s;
+}
+.mv-day:hover { border-color:var(--blue); background:var(--wash); }
+.mv-day-date { font-size:14px; font-weight:600; color:var(--ink); }
+.mv-day-rel { font-size:11px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:var(--ink-3); }
+.mv-none { padding:28px 10px; text-align:center; font-size:13px; line-height:1.6; color:var(--ink-3); }
+
 /* Collapsed card shows what was logged */
 .sec-sum {
   margin-left:auto; padding-right:8px; max-width:44%;
@@ -560,9 +522,6 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
 .sec-save-st.saving { color:var(--ink-3); }
 .sec-save-st.err { color:var(--magenta); }
 
-.coach-note { margin-top:12px; background:#FCF5E8; border-left:4px solid var(--gold); border-radius:0 4px 4px 0; padding:12px 14px; }
-.coach-note-label { margin-bottom:5px; }
-.coach-note-text { font-size:13.5px; line-height:1.6; color:var(--ink-2); white-space:pre-wrap; }
 
 /* Feel: HERD plain card with gradient bar + segmented scale */
 .feel-wrap { position:relative; overflow:hidden; margin-top:16px; background:var(--paper); border:1px solid var(--line); border-radius:4px; padding:22px 16px 16px; }
@@ -701,17 +660,6 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
 .adm-result-label { color:var(--blue); margin-bottom:5px; }
 .adm-result-text { font-size:13.5px; line-height:1.6; color:var(--ink-2); white-space:pre-wrap; }
 .adm-no-result { font-size:12.5px; color:var(--ink-3); font-style:italic; padding:10px 0 2px; }
-.coach-comment-wrap { margin-top:12px; padding-top:12px; border-top:1px dashed var(--line); }
-.coach-comment-label { display:flex; align-items:center; gap:6px; }
-.coach-comment-ta { resize:vertical; min-height:62px; }
-.comment-save-row { display:flex; align-items:center; gap:10px; margin-top:8px; }
-.btn-comment-save {
-  background:var(--gold); color:var(--ink); border:none; border-radius:3px; cursor:pointer;
-  font-size:9.5px; font-weight:800; letter-spacing:1.8px; text-transform:uppercase; padding:10px 14px; transition:background .15s;
-}
-.btn-comment-save:hover { background:var(--gold-lt); }
-.comment-save-st { font-size:11px; font-weight:600; color:var(--ink-3); }
-.comment-save-st.ok { color:var(--gold-ink); }
 
 /* Day result cards */
 .result-day-card { background:var(--paper); border:1px solid var(--line); border-radius:4px; margin-bottom:10px; overflow:hidden; }
@@ -730,10 +678,6 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
 .res-sec-label { font-size:9px; font-weight:800; letter-spacing:2px; text-transform:uppercase; color:var(--ink-3); margin-bottom:5px; }
 .res-sec-content { font-size:13.5px; line-height:1.65; color:var(--ink-2); white-space:pre-wrap; }
 .res-sec-empty { font-size:12.5px; color:var(--ink-3); font-style:italic; }
-
-/* coach-editor.js hardcodes a couple of cream backgrounds — neutralise them */
-#s-admin .td-sec { background:var(--paper); }
-#s-admin .td-prev { background:var(--wash); }
 
 /* ── Modals → HERD sheets ────────────────────────── */
 .modal-bg {
@@ -803,7 +747,6 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
   .btn-save, .btn-main { width:100%; }
   .sub-row { flex-direction:column; align-items:stretch; }
   .save-st { text-align:center; }
-  .notif-drop { width:calc(100vw - 2rem); right:-.5rem; }
   .day-sub { letter-spacing:3px; }
   .first-login-banner { flex-wrap:wrap; }
   .first-login-banner p { flex-basis:calc(100% - 40px); }
@@ -848,21 +791,7 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
   <header class="app-hd">
     <div class="hd-logo"><span style="color:var(--accent)">TRAIN</span><span style="color:var(--gold)">DERIVE</span></div>
     <div class="hd-right">
-      <!-- Notification bell -->
-      <div style="position:relative">
-        <button class="notif-btn" id="notif-btn" onclick="toggleNotifDrop(event)" title="Coach feedback" style="display:none">
-          🔔
-          <span class="notif-badge" id="notif-badge" style="display:none"></span>
-        </button>
-        <div class="notif-drop" id="notif-drop" style="display:none">
-          <div class="notif-drop-hd">
-            <span class="notif-drop-title">Coach Feedback</span>
-            <button class="notif-mark-all" onclick="markAllNotificationsRead()">Mark all read</button>
-          </div>
-          <div class="notif-list" id="notif-list"></div>
-        </div>
-      </div>
-      <button class="acct-btn" onclick="openAccountSettings()" title="Account settings">
+      <button class="acct-btn" onclick="openAccountSettings()" title="Account settings">      <button class="acct-btn" onclick="openAccountSettings()" title="Account settings">
         <div class="acct-avatar" id="h-avatar">A</div>
         <span class="hd-name" id="h-name"></span>
       </button>
@@ -1139,7 +1068,7 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
 // ═══════════════════════════════════════════════════════════════
 let SB = null;              // the Supabase client, set during init
 var PROFILES = [];          // coach panel only: everyone's profile
-var USERS    = PROFILES;    // coach-editor.js reads USERS
+var USERS    = PROFILES;    // kept as an alias for any add-on script
 
 // A profile row as stored → the shape the rest of the app already uses.
 function toAppUser(p) {
@@ -1184,12 +1113,16 @@ async function fnCall(name, body) {
 function sheetCall(action, params = {}, athleteId = null) {
   return fnCall('sheet', Object.assign({ action, athleteId }, params));
 }
-window.sheetCall = sheetCall;   // coach-editor.js uses this too
+window.sheetCall = sheetCall;   // exposed for any add-on script
 
 // ── Profiles ───────────────────────────────────────────────────
 async function loadMyProfile() {
   if (!SB) return null;
-  const { data: { user } } = await SB.auth.getUser();
+  // getSession reads the session already stored on this device, and only
+  // touches the network if the token needs refreshing. getUser always made
+  // a round trip before anything else could start.
+  const { data: { session } } = await SB.auth.getSession();
+  const user = session && session.user;
   if (!user) return null;
   const { data, error } = await SB.from('profiles').select('*').eq('id', user.id).single();
   if (error || !data) { console.warn('No profile for this account:', error && error.message); return null; }
@@ -1279,15 +1212,19 @@ async function parseHashAndRoute() {
 
   S.user = me;
   showAthleteHeader(me);
-  updateNotifUI();
 
-  if (hash.startsWith('#day/')) {
-    const date = hash.slice(5);
-    await loadAllSheets();
-    if (S.dayMap[date]) applyRoute('day', { date });
+  const target = hash.startsWith('#day/') ? hash.slice(5) : null;
+  if (!target) history.replaceState({ route:'cal' }, '', '#cal');
+
+  // Draw from the saved copy first — the athlete sees their workout now —
+  // then fetch the sheet behind it and update if anything moved.
+  const cached = loadProgramCache();
+  if (cached) {
+    S.dayMap = cached.dayMap;
+    openBestDay(target);
+    loadAllSheets({ quiet: true, target });
   } else {
-    history.replaceState({ route:'cal' }, '', '#cal');
-    await loadAllSheets();
+    await loadAllSheets({ target });
   }
 }
 
@@ -1338,10 +1275,17 @@ async function doLogin() {
   }
 
   showAthleteHeader(me);
-  updateNotifUI();
   history.replaceState({ route:'cal' }, '', '#cal');
   showScreen('s-app');
-  loadAllSheets();
+
+  const cached = loadProgramCache();
+  if (cached) {
+    S.dayMap = cached.dayMap;
+    openBestDay(null);
+    loadAllSheets({ quiet: true });
+  } else {
+    loadAllSheets();
+  }
 }
 document.getElementById('l-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 
@@ -1381,6 +1325,7 @@ async function saveNewPassword() {
 }
 
 async function doLogout() {
+  clearProgramCache();
   await SB.auth.signOut();
   Object.assign(S, { user:null, dayMap:{}, viewMonth:new Date(), selDate:null, feel:null, secResults:{} });
   stopClientChangePoll();
@@ -1606,9 +1551,25 @@ async function confirmDelete(){
 }
 
 function switchAdmTab(name,btn){
+  // Close any athlete that's open. Without this the detail panel stays
+  // on screen underneath the list, since it isn't one of the .adm-panel
+  // tabs and nothing else was hiding it.
+  closeAthleteDetail();
   document.querySelectorAll('.adm-tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.adm-panel').forEach(p=>p.classList.remove('active'));
   btn.classList.add('active'); document.getElementById('adm-'+name).classList.add('active');
+}
+
+// Hide the athlete panel and put it back to its calendar, so the next
+// athlete opened doesn't inherit the last one's day view.
+function closeAthleteDetail(){
+  const detail = document.getElementById('adm-detail');
+  if (detail) detail.style.display = 'none';
+  const dayView = document.getElementById('adm-day-view');
+  if (dayView) dayView.classList.remove('active');
+  const body = document.getElementById('detail-body');
+  if (body) body.style.display = '';
+  ADM.detailUserId = null;
 }
 function openChangeAdminPass(){ ['m-ap-cur','m-ap-new','m-ap-conf'].forEach(id=>document.getElementById(id).value=''); document.getElementById('m-ap-err').textContent=''; openModal('m-adminpass'); }
 
@@ -1650,94 +1611,169 @@ async function loadTabList(athleteId = null) {
   return r.tabs || [];
 }
 
-async function loadAllSheets() {
-  const { spreadsheetId, sheetGids, sheetTabNames } = S.user;
-  S.dayMap = {};
+// ═══════════════════════════════════════════════════════════════
+// LOADING THE PROGRAM
+//
+// The parsed program is kept on the device, so opening the app draws
+// the workout immediately instead of waiting on the sheet. The sheet is
+// still fetched every time, in the background; if anything changed, the
+// screen updates itself. The cache is only ever a head start — it never
+// decides what is current.
+// ═══════════════════════════════════════════════════════════════
+
+const CACHE_PREFIX = 'td_program_v1_';
+
+function cacheKey() { return S.user ? CACHE_PREFIX + S.user.id : null; }
+
+function saveProgramCache() {
+  const k = cacheKey();
+  if (!k || !Object.keys(S.dayMap).length) return;
+  try {
+    localStorage.setItem(k, JSON.stringify({ savedAt: Date.now(), dayMap: S.dayMap }));
+  } catch (e) {
+    // Out of room, or storage blocked. The app works without it.
+    try { localStorage.removeItem(k); } catch (_) {}
+    console.warn('Could not cache the program:', e.message);
+  }
+}
+
+function loadProgramCache() {
+  const k = cacheKey();
+  if (!k) return null;
+  try {
+    const raw = localStorage.getItem(k);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    return obj && obj.dayMap && Object.keys(obj.dayMap).length ? obj : null;
+  } catch (e) { return null; }
+}
+
+function clearProgramCache() {
+  const k = cacheKey();
+  if (k) { try { localStorage.removeItem(k); } catch (e) {} }
+}
+
+// Where to land after a load: the requested day, else today, else the
+// nearest training day either side of it, else the calendar.
+function openBestDay(target) {
+  if (target && S.dayMap[target]) { navTo('day', { date: target }); return; }
+
+  const todayISO = isoToday();
+  if (S.dayMap[todayISO] && !S.dayMap[todayISO].isRestDay) {
+    navTo('day', { date: todayISO }); return;
+  }
+  let found = null;
+  for (let i = 1; i <= 7 && !found; i++) {
+    const d = new Date(todayISO + 'T12:00:00'); d.setDate(d.getDate() + i);
+    const iso = isoFmt(d);
+    if (S.dayMap[iso] && !S.dayMap[iso].isRestDay) found = iso;
+  }
+  for (let i = 1; i <= 7 && !found; i++) {
+    const d = new Date(todayISO + 'T12:00:00'); d.setDate(d.getDate() - i);
+    const iso = isoFmt(d);
+    if (S.dayMap[iso] && !S.dayMap[iso].isRestDay) found = iso;
+  }
+  if (found) { navTo('day', { date: found }); return; }
+
+  const dates = Object.keys(S.dayMap).sort();
+  if (dates.length) {
+    const d = new Date(dates[dates.length - 1] + 'T12:00:00');
+    S.viewMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+  }
+  navTo('cal');
+}
+
+// Redraw whatever is on screen after a background refresh, keeping
+// anything the athlete has typed.
+function refreshCurrentView() {
+  const onDay = document.getElementById('v-day').classList.contains('active');
+  if (onDay && S.selDate) {
+    if (S.dayMap[S.selDate]) {
+      saveDraft(S.selDate);     // protect anything typed but not yet saved
+      _openDay(S.selDate);
+      showToast('Updated', 'ok');
+    } else {
+      navTo('cal');             // that day is gone from the sheet
+    }
+  } else {
+    renderCal();
+  }
+}
+
+// opts.quiet   — background refresh: no spinner, no navigation
+// opts.target  — the day to open once loaded
+async function loadAllSheets(opts = {}) {
+  const quiet  = !!opts.quiet;
+  const target = opts.target || null;
+  const { spreadsheetId, sheetTabNames } = S.user || {};
 
   if (!spreadsheetId) {
-    document.getElementById('cal-body').innerHTML =
-      '<div class="sbox"><p class="e">No spreadsheet linked.</p><p>Contact your coach.</p></div>';
-    navTo('cal'); return;
+    if (!quiet) {
+      document.getElementById('cal-body').innerHTML =
+        '<div class="sbox"><p class="e">No spreadsheet linked.</p><p>Contact your coach.</p></div>';
+      navTo('cal');
+    }
+    return;
   }
 
   const setStatus = msg => {
+    if (quiet) return;
     document.getElementById('cal-body').innerHTML =
       '<div class="sbox"><div class="spinner"></div><p>' + escH(msg) + '</p></div>';
   };
 
-  const cutoff = S.user.createdAt || null;
+  const cutoff   = S.user.createdAt || null;
+  const tabNames = sheetTabNames && sheetTabNames.length ? sheetTabNames : null;
   setStatus('Loading your program…');
 
-  try {
-    const tabNames = sheetTabNames && sheetTabNames.length ? sheetTabNames : null;
+  // Parse into a fresh map so a failed fetch never empties what is on screen.
+  const previous = S.dayMap;
+  S.dayMap = {};
+  let fresh = {};
+  let failed = null;
 
+  try {
     if (tabNames) {
       await Promise.all(tabNames.map(async tabName => {
         try {
           const csv = await loadCSVForTab(tabName);
-          if (csv && csvHasTrainingBlock(csv)) {
-            parseSheetCSV(csv, tabName, cutoff);
-          } else {
-            console.warn('No training block found in', tabName);
-          }
-        } catch(err) {
+          if (csv && csvHasTrainingBlock(csv)) parseSheetCSV(csv, tabName, cutoff);
+          else console.warn('No training block found in', tabName);
+        } catch (err) {
+          failed = err;
           console.warn('Could not load', tabName, '—', err.message);
-          setStatus(err.message);
         }
       }));
-      if (Object.keys(S.dayMap).length > 0) { _finishLoad(); return; }
     }
+    fresh = S.dayMap;
+  } catch (err) {
+    failed = err;
+    fresh = {};
+  }
 
-    _finishLoad();
+  S.dayMap = previous;
 
-  } catch(err) {
-    console.error('loadAllSheets error:', err);
+  if (!Object.keys(fresh).length) {
+    // Nothing came back. Keep whatever is already loaded rather than
+    // wiping the calendar over a bad connection.
+    if (quiet) { console.warn('Background refresh found nothing — keeping what is loaded'); return; }
+    if (Object.keys(previous).length) { openBestDay(target); return; }
     document.getElementById('cal-body').innerHTML =
-      '<div class="sbox"><p class="e">' + escH(err.message) + '</p>' +
-      '<p style="margin-bottom:.8rem">Make sure the sheet is shared as “Anyone with the link can view”.</p>' +
+      '<div class="sbox"><p class="e">' + escH(failed ? failed.message : 'No programming found') + '</p>' +
+      '<p style="margin-bottom:.8rem">Check with your coach that your sheet is set up.</p>' +
       '<button class="btn-sm" onclick="loadAllSheets()">Retry</button></div>';
     navTo('cal');
+    return;
   }
 
-  function _finishLoad() {
-    console.log('Load complete. Total days:', Object.keys(S.dayMap).length);
-    window._clientLastLoaded = Date.now();
-    startClientChangePoll();
-    initNotificationsFromDayMap();
-    const todayISO = isoToday();
-    if (S.dayMap[todayISO] && !S.dayMap[todayISO].isRestDay) {
-      // Today has training — go straight to it
-      navTo('day', { date: todayISO });
-    } else {
-      // Find the nearest training day (look forward up to 7 days, then backward)
-      let found = null;
-      for (let i = 1; i <= 7 && !found; i++) {
-        const d = new Date(todayISO + 'T12:00:00');
-        d.setDate(d.getDate() + i);
-        const iso = isoFmt(d);
-        if (S.dayMap[iso] && !S.dayMap[iso].isRestDay) found = iso;
-      }
-      if (!found) {
-        for (let i = 1; i <= 7 && !found; i++) {
-          const d = new Date(todayISO + 'T12:00:00');
-          d.setDate(d.getDate() - i);
-          const iso = isoFmt(d);
-          if (S.dayMap[iso] && !S.dayMap[iso].isRestDay) found = iso;
-        }
-      }
-      if (found) {
-        navTo('day', { date: found });
-      } else {
-        // No training days near today — show calendar at most recent month
-        const dates = Object.keys(S.dayMap).sort();
-        if (dates.length) {
-          const d = new Date(dates[dates.length - 1] + 'T12:00:00');
-          S.viewMonth = new Date(d.getFullYear(), d.getMonth(), 1);
-        }
-        navTo('cal');
-      }
-    }
-  }
+  const changed = JSON.stringify(fresh) !== JSON.stringify(previous);
+  S.dayMap = fresh;
+  saveProgramCache();
+  window._clientLastLoaded = Date.now();
+  startClientChangePoll();
+
+  if (quiet) { if (changed) refreshCurrentView(); return; }
+  openBestDay(target);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2045,7 +2081,6 @@ function renderCal() {
     if(data){if(data.isRestDay){cls+=' is-rest';}else{cls+=' has-w';dot='<div class="cdot"></div>';click='onclick="navTo(\'day\',{date:\''+iso+'\'})"';}}
     if(data&&data.status==='wip')cls+=' is-wip';
     if(isToday)cls+=' today';
-    if(S.user&&data&&!data.isRestDay){const _dc=loadComments(S.user.id,iso);const _hu=Object.keys(_dc).some(function(i){return isCommentUnread(S.user.id,iso,parseInt(i));});if(_hu)cls+=' has-note';}
     h+='<div class="'+cls+'" '+click+'>'+dot+'<div class="cn">'+day+'</div></div>';
   }
   h+='</div><div class="cal-legend"><div class="leg"><div class="lsw" style="background:var(--training);border:1px solid var(--train-bdr)"></div>Training</div><div class="leg"><div class="lsw" style="background:var(--surf);border:1px solid var(--border)"></div>Rest</div><div class="leg"><div class="lsw" style="background:var(--gold-bg);border:1px solid var(--gold)"></div>In progress</div><div class="leg"><div class="lsw" style="border:1px solid var(--accent);background:transparent"></div>Today</div></div>';
@@ -2148,6 +2183,7 @@ function renderDayContent(day) {
   if (!day || day.isRestDay) {
     el.innerHTML = '<div class="rest-card"><div class="ri">🌿</div><h2>Rest Day</h2><p>Recovery is part of the program.</p></div>'; return;
   }
+
   if (day.status === 'wip') {
     const w = document.createElement('div');
     w.className = 'wip-hero';
@@ -2188,13 +2224,18 @@ function renderDayContent(day) {
   sr.innerHTML='<button class="btn-save" onclick="saveResults()">Save Results</button><span class="save-st" id="save-st"></span>';
   el.appendChild(sr);
 
-  refreshProgress();
+  // Move this day — only before anything has been logged for it
+  const logged = (day.results || []).some(r => r.content && r.content.trim()) ||
+                 Object.values(S.secResults).some(v => v && v.trim());
+  if (!logged && moveTargets(day.isoDate).length) {
+    const mv = document.createElement('div');
+    mv.style.cssText = 'margin-top:14px;text-align:center';
+    mv.innerHTML = '<button class="btn-sm" onclick="openMovePicker(\'' +
+      day.isoDate + '\')">Doing this another day?</button>';
+    el.appendChild(mv);
+  }
 
-  // Inject any coach notes left by admin
-  requestAnimationFrame(() => {
-    injectCoachNotes(day, el, gIdx);
-    renderUnreadBanner(day, el);
-  });
+  refreshProgress();
 }
 
 function buildSecCard(text, idx, blockLabel, secIdx) {
@@ -2245,6 +2286,101 @@ function buildSecCard(text, idx, blockLabel, secIdx) {
   card.appendChild(hd); card.appendChild(body);
   if(idx===0||S.secResults[idx]) card.classList.add('open');
   return card;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MOVING A DAY
+//
+// An athlete on three days a week can slide a session onto an open day.
+// The move happens in the Google Sheet itself, through the moveDay
+// action in Code.gs, so the spreadsheet stays the single record: the
+// session really is on the new date, results land in the right column
+// on their own, and nothing has to be kept in step on this side.
+//
+// Rules, all re-checked inside the sheet before anything is written:
+// whole days only, the destination must be a day the sheet has with no
+// programming on it, and a day that's been logged can't move.
+// ═══════════════════════════════════════════════════════════════
+
+const MOVE_WINDOW_DAYS = 7;   // how far either side a day can be moved
+
+// Open days this one could move onto.
+function moveTargets(iso) {
+  const out = [];
+  for (let d = -MOVE_WINDOW_DAYS; d <= MOVE_WINDOW_DAYS; d++) {
+    if (d === 0) continue;
+    const t = new Date(iso + 'T12:00:00'); t.setDate(t.getDate() + d);
+    const key = isoFmt(t);
+    const day = S.dayMap[key];
+    if (!day || !day.isRestDay) continue;
+    out.push({ iso: key, offset: d });
+  }
+  return out.sort((a, b) => a.iso.localeCompare(b.iso));
+}
+
+function openMovePicker(iso) {
+  const targets = moveTargets(iso);
+  const src = new Date(iso + 'T12:00:00');
+  const srcLabel = src.toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
+
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg open';
+  bg.innerHTML =
+    '<div class="modal" style="max-width:420px">' +
+      '<div class="modal-hd"><div class="modal-title">Move This Day</div>' +
+        '<button class="modal-close" data-x="1">\u2715</button></div>' +
+      '<div class="modal-body">' +
+        '<p style="font-size:13.5px;line-height:1.6;color:var(--ink-2);margin-bottom:14px">' +
+          'Move <strong>' + escH(srcLabel) + '</strong> to an open day.</p>' +
+        (targets.length
+          ? '<div class="mv-list">' + targets.map(t => {
+              const d = new Date(t.iso + 'T12:00:00');
+              const rel = t.offset === 1 ? 'Tomorrow' : t.offset === -1 ? 'Yesterday'
+                        : (t.offset > 0 ? 'In ' + t.offset + ' days' : Math.abs(t.offset) + ' days ago');
+              return '<button type="button" class="mv-day" data-to="' + t.iso + '">' +
+                '<span class="mv-day-date">' +
+                  escH(d.toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' })) +
+                '</span><span class="mv-day-rel">' + rel + '</span></button>';
+            }).join('') + '</div>'
+          : '<div class="mv-none">No open days within a week of this one.<br>' +
+            'A day can only move onto a date your coach left empty.</div>') +
+      '</div>' +
+      '<div class="modal-foot"><button class="btn-cancel" data-x="1">Cancel</button></div>' +
+    '</div>';
+  document.body.appendChild(bg);
+
+  bg.addEventListener('click', async ev => {
+    if (ev.target === bg || ev.target.dataset.x) { bg.remove(); return; }
+    const btn = ev.target.closest('[data-to]');
+    if (!btn) return;
+    const to = btn.dataset.to;
+    btn.disabled = true; btn.style.opacity = '.5';
+    await moveDay(iso, to);
+    bg.remove();
+  });
+}
+
+async function moveDay(from, to) {
+  const src = S.dayMap[from], dst = S.dayMap[to];
+  if (!src || !dst) { showToast('Could not find that day', 'err'); return; }
+
+  const r = await sheetCall('moveDay', {
+    fromSheet:          src.tabName,
+    fromResultsRowIdx:  src.resultsRowIdx,
+    fromColIndex:       src.colIndex,
+    expectFromDate:     src.dateStr,
+    toSheet:            dst.tabName,
+    toResultsRowIdx:    dst.resultsRowIdx,
+    toColIndex:         dst.colIndex,
+    expectToDate:       dst.dateStr,
+  });
+
+  if (!r.ok) { showToast(r.error || 'Could not move it', 'err'); return; }
+
+  // The sheet is the record, so read it back rather than guessing.
+  await loadAllSheets({ quiet: true });
+  navTo('day', { date: to });
+  showToast('Moved', 'ok');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2813,14 +2949,9 @@ function startClientChangePoll() {
       if (!data.ok || !data.lastChanged) return;
       if (!window._clientLastLoaded) return;
       if (data.lastChanged > window._clientLastLoaded) {
-        console.log('Sheet updated by coach - refreshing client view');
+        console.log('Sheet changed — refreshing quietly');
         window._clientLastLoaded = Date.now();
-        // Re-fetch sheets silently and re-render current view
-        const savedDate = S.selDate;
-        await loadAllSheets();
-        if (savedDate && S.dayMap[savedDate]) {
-          _openDay(savedDate);
-        }
+        await loadAllSheets({ quiet: true });
       }
     } catch(err) { /* silent */ }
   }, POLL_INTERVAL_MS);
@@ -2867,8 +2998,11 @@ async function adminViewUser(userId) {
   if (!u) return;
   ADM.detailUserId = userId;
 
-  // Show detail panel, hide tabs
+  // Show detail panel, hide tabs. Reset the day view first so this
+  // athlete opens on their calendar, not the last athlete's day.
   document.querySelectorAll('.adm-tab, .adm-panel').forEach(el => el.classList.remove('active'));
+  document.getElementById('adm-day-view').classList.remove('active');
+  document.getElementById('detail-body').style.display = '';
   document.getElementById('adm-detail').style.display = 'block';
 
   document.getElementById('detail-name').textContent = u.name;
@@ -2899,8 +3033,7 @@ async function adminViewUser(userId) {
 }
 
 function adminCloseDetail() {
-  document.getElementById('adm-detail').style.display = 'none';
-  ADM.detailUserId = null;
+  closeAthleteDetail();
   // Re-show users tab
   document.querySelector('.adm-tab').classList.add('active');
   document.getElementById('adm-users').classList.add('active');
@@ -2955,8 +3088,6 @@ function renderDetailBody() {
     const data = dm[iso];
     const isToday = iso === today;
     const hasResults = data && data.results && data.results.some(r=>r.content);
-    const comments = data ? loadComments(ADM.detailUserId, iso) : {};
-    const hasComment = Object.values(comments).some(c=>c&&c.trim());
 
     let cls = 'cc';
     let dot = '';
@@ -2970,8 +3101,6 @@ function renderDetailBody() {
         // Result dot — gold if logged, accent if not
         dot = '<div class="cdot" style="background:' + (hasResults ? 'var(--gold)' : 'var(--accent)') + '"></div>';
         click = 'onclick="adminOpenDay(\'' + iso + '\')"';
-        // Comment indicator
-        if (hasComment) dot += '<div class="cdot" style="background:var(--gold);width:3px;height:3px;margin-top:1px"></div>';
       }
     }
     if (data && data.status === 'wip') cls += ' is-wip';
@@ -3152,387 +3281,28 @@ function adminBuildSecCard(text, idx, blockLabel, secIdx, day) {
   }
   body.appendChild(resBox);
 
-  // Coach comment box
-  const comments = loadComments(ADM.detailUserId, day.isoDate);
-  const commentKey = day.isoDate + '-' + idx;
-  const existingComment = comments[idx] || '';
-  const commentWrap = document.createElement('div');
-  commentWrap.className = 'coach-comment-wrap';
-  commentWrap.innerHTML =
-    '<div class="coach-comment-label">💬 Coach Note</div>' +
-    '<textarea class="coach-comment-ta" id="cc-' + ADM.detailUserId + '-' + commentKey + '" ' +
-    'placeholder="Leave feedback for this section…">' + escH(existingComment) + '</textarea>' +
-    '<div class="comment-save-row">' +
-    '<button class="btn-comment-save" onclick="saveComment(\'' + ADM.detailUserId + '\',\'' + day.isoDate + '\',' + idx + ')">Save Note</button>' +
-    '<span class="comment-save-st" id="cst-' + ADM.detailUserId + '-' + commentKey + '"></span>' +
-    '</div>';
-  body.appendChild(commentWrap);
-
   card.appendChild(hd);
+  card.appendChild(body);  card.appendChild(hd);
   card.appendChild(body);
 
-  // Auto-open first section or sections with results/comments
-  if (idx === 0 || (result && result.content) || existingComment) card.classList.add('open');
+  // Auto-open the first section and anything already logged
+  if (idx === 0 || (result && result.content)) card.classList.add('open');
   return card;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// COACH COMMENTS — stored in localStorage per user+date+section
-// ═══════════════════════════════════════════════════════════════
-function commentKey(userId, isoDate) {
-  return 'bloc_comments_' + userId + '_' + isoDate;
-}
-
-function loadComments(userId, isoDate) {
-  try { return JSON.parse(localStorage.getItem(commentKey(userId, isoDate)) || '{}'); } catch { return {}; }
-}
-
-function saveComment(userId, isoDate, sectionIdx) {
-  const taId = 'cc-' + userId + '-' + isoDate + '-' + sectionIdx;
-  const stId = 'cst-' + userId + '-' + isoDate + '-' + sectionIdx;
-  const ta = document.getElementById(taId);
-  const st = document.getElementById(stId);
-  if (!ta || !st) return;
-
-  const text = ta.value.trim();
-  const comments = loadComments(userId, isoDate);
-  if (text) { comments[sectionIdx] = text; } else { delete comments[sectionIdx]; }
-  localStorage.setItem(commentKey(userId, isoDate), JSON.stringify(comments));
-
-  st.textContent = 'Saved \u2713'; st.className = 'comment-save-st ok';
-  setTimeout(() => { st.textContent = ''; st.className = 'comment-save-st'; }, 2500);
-  showToast('Coach note saved', 'ok');
-  // Mark as unread for the athlete so they get notified
-  if (text) { markCommentUnread(userId, isoDate, sectionIdx); }
-  else       { markCommentRead(userId, isoDate, sectionIdx); }
-  updateNotifUI();
-
-  // Also sync to sheet if the user has Apps Script configured
-  const u = PROFILES.find(u => u.id === userId);
-  if (u && u.scriptUrl) {
-    const dm = ADM.cache[userId]?.dayMap;
-    const day = dm && dm[isoDate];
-    if (day) syncCommentToSheet(u, day, sectionIdx, text);
-  }
-}
-
-// Push coach comment to sheet via Apps Script.
-// The script appends it to the same Results cell as the athlete's
-// results, formatted as red italic "COACH FEEDBACK: ..." text.
-// We pass the full combined comment for all sections of this day.
-async function syncCommentToSheet(u, day, sectionIdx, comment) {
-  // Build the full coach note for this day by reading all saved
-  // section comments and combining them into one string.
-  const allComments = loadComments(u.id, day.isoDate);
-  // Update the in-memory map with the latest value before building
-  if (comment) { allComments[sectionIdx] = comment; }
-  else          { delete allComments[sectionIdx]; }
-
-  // Combine all section comments into one block:
-  // "Section 1: ... / Section 2: ..." etc.
-  const totalSecs = day.blocks.reduce((n,b) => n + b.sections.length, 0);
-  const parts = [];
-  for (let i = 0; i < totalSecs; i++) {
-    if (allComments[i] && allComments[i].trim()) {
-      parts.push('Section ' + (i + 1) + ': ' + allComments[i].trim());
-    }
-  }
-  const combinedComment = parts.join('\n');
-
-  const payload = {
-    sheetName:     day.tabName,
-    resultsRowIdx: day.resultsRowIdx,
-    colIndex:      day.colIndex,
-    note:          combinedComment,
-    dateLabel:     day.isoDate || day.tabName,
-  };
-
-  const res = await sheetCall('comment', payload, u.id);
-  if (!res.ok) {
-    console.warn('Coach note did not reach the sheet:', res.error);
-    showToast('Note saved here, but not written to the sheet', 'err');
-  }
-}
-
-// Show coach notes on the CLIENT side (injected into day view)
-// Notes appear inside the section body, clearly labelled.
-function injectCoachNotes(day, container, totalSections) {
-  if (!S.user) return;
-  const comments = loadComments(S.user.id, day.isoDate);
-  if (!Object.keys(comments).length) return;
-
-  const secCards = container.querySelectorAll('.sec-card');
-  secCards.forEach((card, idx) => {
-    const comment = comments[idx];
-    if (!comment || !comment.trim()) return;
-    // Open the card so the note is visible
-    card.classList.add('open');
-    const noteDiv = document.createElement('div');
-    noteDiv.className = 'coach-note';
-    noteDiv.innerHTML =
-      '<div class="coach-note-label">&#x1F4AC; Coach Feedback</div>' +
-      '<div class="coach-note-text">' + richText(escH(comment.trim())) + '</div>';
-    const secBody = card.querySelector('.sec-body');
-    if (secBody) secBody.appendChild(noteDiv);
-
-    // Mark as read when this section's header is clicked
-    const hd = card.querySelector('.sec-hd');
-    if (hd) {
-      hd.addEventListener('click', () => {
-        markSectionRead(day.isoDate, idx);
-      }, { once: true });
-    }
-    // Also mark read immediately if card is already open
-    if (card.classList.contains('open')) {
-      markSectionRead(day.isoDate, idx);
-    }
-  });
-}
-
-
-// ═══════════════════════════════════════════════════════════════
-// NOTIFICATION SYSTEM
-// Tracks unread coach comments per athlete.
-// Storage keys:
-//   bloc_notif_{userId}_{isoDate}_{sectionIdx} → 'unread' | 'read'
-// ═══════════════════════════════════════════════════════════════
-
-function notifKey(userId, isoDate, sectionIdx) {
-  return 'bloc_notif_' + userId + '_' + isoDate + '_' + sectionIdx;
-}
-
-// Mark a coach comment as unread (called when admin saves a note)
-function markCommentUnread(userId, isoDate, sectionIdx) {
-  localStorage.setItem(notifKey(userId, isoDate, sectionIdx), 'unread');
-}
-
-// Mark one notification as read
-function markCommentRead(userId, isoDate, sectionIdx) {
-  localStorage.setItem(notifKey(userId, isoDate, sectionIdx), 'read');
-}
-
-// Mark ALL unread comments for a user as read
-function markAllNotificationsRead() {
-  if (!S.user) return;
-  const prefix = 'bloc_notif_' + S.user.id + '_';
-  const keys = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k && k.startsWith(prefix)) keys.push(k);
-  }
-  keys.forEach(k => localStorage.setItem(k, 'read'));
-  updateNotifUI();
-  closeNotifDrop();
-  showToast('All feedback marked as read', 'ok');
-}
-
-// Check if a specific note is unread
-function isCommentUnread(userId, isoDate, sectionIdx) {
-  return localStorage.getItem(notifKey(userId, isoDate, sectionIdx)) === 'unread';
-}
-
-// Get all unread notifications for the current user, sorted newest first
-function getUnreadNotifications() {
-  if (!S.user) return [];
-  const prefix = 'bloc_notif_' + S.user.id + '_';
-  const unread = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (!k || !k.startsWith(prefix)) continue;
-    // Key format: bloc_notif_{userId}_{isoDate}_{sectionIdx}
-    const parts = k.slice(prefix.length).split('_');
-    if (parts.length < 2) continue;
-    const isoDate    = parts[0];
-    const sectionIdx = parseInt(parts[1]);
-    const state      = localStorage.getItem(k);
-    const comment    = loadComments(S.user.id, isoDate)[sectionIdx] || '';
-    if (comment) unread.push({ isoDate, sectionIdx, state, comment });
-  }
-  // Sort newest date first
-  return unread.sort((a,b) => b.isoDate.localeCompare(a.isoDate));
-}
-
-// Rebuild the bell badge + dropdown list
-function updateNotifUI() {
-  if (!S.user) return;
-  const all    = getUnreadNotifications();
-  const unread = all.filter(n => n.state === 'unread');
-
-  // Bell visibility
-  const btn   = document.getElementById('notif-btn');
-  const badge = document.getElementById('notif-badge');
-  if (!btn) return;
-
-  if (all.length === 0) {
-    btn.style.display = 'none';
-    closeNotifDrop();
-    return;
-  }
-  btn.style.display = 'flex';
-
-  // Badge count
-  if (unread.length > 0) {
-    badge.textContent = unread.length > 9 ? '9+' : String(unread.length);
-    badge.style.display = 'flex';
-  } else {
-    badge.style.display = 'none';
-  }
-
-  // Rebuild dropdown list
-  const list = document.getElementById('notif-list');
-  if (!list) return;
-  list.innerHTML = '';
-
-  if (all.length === 0) {
-    list.innerHTML = '<div class="notif-empty">No coach feedback yet</div>';
-    return;
-  }
-
-  all.forEach(n => {
-    const dateObj  = new Date(n.isoDate + 'T12:00:00');
-    const dateLabel = dateObj.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
-    const preview   = n.comment.length > 60 ? n.comment.slice(0,60) + '…' : n.comment;
-    const isRead    = n.state === 'read';
-
-    const item = document.createElement('div');
-    item.className = 'notif-item' + (isRead ? ' read' : '');
-    item.innerHTML =
-      '<div class="notif-dot"></div>' +
-      '<div class="notif-item-body">' +
-        '<div class="notif-item-date">' + escH(dateLabel) + '</div>' +
-        '<div class="notif-item-text">Section ' + (n.sectionIdx + 1) + ': ' + escH(preview) + '</div>' +
-      '</div>';
-
-    item.addEventListener('click', () => {
-      markCommentRead(S.user.id, n.isoDate, n.sectionIdx);
-      updateNotifUI();
-      closeNotifDrop();
-      // Navigate to that day
-      navTo('day', { date: n.isoDate });
-    });
-    list.appendChild(item);
-  });
-}
-
-// Toggle dropdown open/close
-function toggleNotifDrop(e) {
-  e.stopPropagation();
-  const drop = document.getElementById('notif-drop');
-  if (!drop) return;
-  const isOpen = drop.style.display !== 'none';
-  if (isOpen) { closeNotifDrop(); }
-  else {
-    updateNotifUI(); // refresh list
-    drop.style.display = 'block';
-  }
-}
-
-function closeNotifDrop() {
-  const drop = document.getElementById('notif-drop');
-  if (drop) drop.style.display = 'none';
-}
-
-// Close dropdown when clicking outside
-document.addEventListener('click', e => {
-  const drop = document.getElementById('notif-drop');
-  const btn  = document.getElementById('notif-btn');
-  if (drop && btn && !btn.contains(e.target) && !drop.contains(e.target)) {
-    closeNotifDrop();
-  }
-});
-
-// Scan dayMap and mark any days with coach notes as having notifications
-// (called after sheets load — creates unread entries if not already tracked)
-function initNotificationsFromDayMap() {
-  if (!S.user) return;
-  const userId = S.user.id;
-  Object.values(S.dayMap).forEach(day => {
-    if (!day || day.isRestDay) return;
-    const comments = loadComments(userId, day.isoDate);
-    Object.entries(comments).forEach(([idx, comment]) => {
-      if (!comment || !comment.trim()) return;
-      const key = notifKey(userId, day.isoDate, parseInt(idx));
-      // Only set to unread if never tracked before
-      if (!localStorage.getItem(key)) {
-        localStorage.setItem(key, 'unread');
-      }
-    });
-  });
-  updateNotifUI();
-}
-
-// Show unread banner at top of day view if this day has unread notes
-function renderUnreadBanner(day, container) {
-  if (!S.user || !day) return;
-  const comments = loadComments(S.user.id, day.isoDate);
-  const unreadSections = Object.keys(comments).filter(idx =>
-    comments[idx] && isCommentUnread(S.user.id, day.isoDate, parseInt(idx))
-  );
-  if (!unreadSections.length) return;
-
-  const count  = unreadSections.length;
-  const banner = document.createElement('div');
-  banner.className = 'unread-banner';
-  banner.id = 'unread-banner-' + day.isoDate;
-  banner.innerHTML =
-    '<div class="unread-banner-icon">💬</div>' +
-    '<div class="unread-banner-text">Your coach left ' +
-      (count === 1 ? 'a new note' : count + ' new notes') +
-      ' — scroll down to review.</div>' +
-    '<button class="unread-banner-dismiss" onclick="dismissUnreadBanner(\'' + day.isoDate + '\')" title="Dismiss">✕</button>';
-
-  // Insert at the top of day content
-  container.insertBefore(banner, container.firstChild);
-}
-
-function dismissUnreadBanner(isoDate) {
-  if (!S.user) return;
-  // Mark all sections for this day as read
-  const comments = loadComments(S.user.id, isoDate);
-  Object.keys(comments).forEach(idx => {
-    markCommentRead(S.user.id, isoDate, parseInt(idx));
-  });
-  const banner = document.getElementById('unread-banner-' + isoDate);
-  if (banner) banner.remove();
-  updateNotifUI();
-}
-
-// Mark a single section's note as read when its card is opened
-function markSectionRead(isoDate, sectionIdx) {
-  if (!S.user) return;
-  if (!isCommentUnread(S.user.id, isoDate, sectionIdx)) return;
-  markCommentRead(S.user.id, isoDate, sectionIdx);
-  // If all sections for this day are now read, remove the banner
-  const comments = loadComments(S.user.id, isoDate);
-  const anyUnread = Object.keys(comments).some(idx =>
-    isCommentUnread(S.user.id, isoDate, parseInt(idx))
-  );
-  if (!anyUnread) {
-    const banner = document.getElementById('unread-banner-' + isoDate);
-    if (banner) {
-      banner.style.opacity = '0';
-      banner.style.transition = 'opacity .3s';
-      setTimeout(() => banner.remove(), 300);
-    }
-  }
-  updateNotifUI();
-}
-
-// Refresh the current day view — re-fetches all sheets then re-opens the same day
+// Refresh the current day view// Refresh the current day view — re-fetches all sheets then re-opens the same day
 async function refreshDayView() {
   const btn = document.getElementById('day-refresh-btn');
-  const savedDate = S.selDate;
-  if (!savedDate) return;
   if (btn) { btn.disabled = true; btn.textContent = '\u21BA Loading\u2026'; }
   try {
-    await loadAllSheets();
-    // loadAllSheets navigates automatically — if today has training it goes there,
-    // otherwise we force back to the saved date if it still exists
-    if (S.selDate !== savedDate && S.dayMap[savedDate]) {
-      navTo('day', { date: savedDate });
-    }
-  } catch(e) { console.error('Refresh failed:', e); }
-  if (btn) { btn.disabled = false; btn.textContent = '\u21BA Refresh'; }
+    await loadAllSheets({ quiet: true });
+    if (btn) { btn.disabled = false; btn.textContent = '\u21BA Refresh'; }
+    showToast('Up to date', 'ok');
+  } catch (e) {
+    console.error('Refresh failed:', e);
+    if (btn) { btn.disabled = false; btn.textContent = '\u21BA Refresh'; }
+    showToast('Could not refresh', 'err');
+  }
 }
 
 // ── Init ────────────────────────────────────────────────────────────────
@@ -3552,8 +3322,6 @@ async function refreshDayView() {
 // route. An invite or reset link lands here too, and opens the
 // set-a-password box once the rest of the app is up.
 
-window._initComplete = false;
-
 (async () => {
   // Show the loading screen immediately — no flash of the login box.
   document.getElementById('s-login').classList.remove('active');
@@ -3565,8 +3333,6 @@ window._initComplete = false;
   SB.auth.onAuthStateChange((evt) => {
     if (evt === 'PASSWORD_RECOVERY') openSetPassword();
   });
-
-  window._initComplete = true;
 
   try {
     await parseHashAndRoute();
@@ -3611,7 +3377,6 @@ if ('serviceWorker' in navigator) {
 
   <!-- Coach programming editor — must load AFTER the main script above,
        since it wraps adminOpenDay() and renderDetailBody(). -->
-  <script src="coach-editor.js"></script>
 
 </body>
 </html>
