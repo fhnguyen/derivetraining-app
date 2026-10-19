@@ -1,28 +1,21 @@
 /* ============================================================================
    TRAINDERIVE — Service Worker
 
-   IMPORTANT: I have not seen your existing sw.js, so this is a complete,
-   working replacement rather than a merge. If your current sw.js has custom
-   logic you want to keep, do NOT use this file — instead make two small edits
-   to your own:
-       1. add 'coach-editor.js' to the pre-cache list
-       2. bump the CACHE version string
-   That is all the coach editor needs from the service worker.
-
-   Strategy used here:
+   Strategy:
      • App shell (html/js/json/icons) — network-first, cache as fallback.
        Keeps athletes on the newest build while still working offline.
      • Google Fonts — cache-first (they never change).
-     • Everything cross-origin (Apps Script, the Cloudflare worker, Google
-       Sheets, codetabs) — never touched. Live data must not be cached.
+     • Everything cross-origin — never touched. In particular Supabase:
+       sign-in, profiles and every call to an athlete's sheet go through
+       it, and that is live data that must never be served from a cache.
    ============================================================================ */
 
-const CACHE = 'trainderive-v9';          // ← bump this on every deploy
+const CACHE = 'trainderive-v10';         // ← bump this on every deploy
 
 const SHELL = [
   './',
   './index.html',
-  './coach-editor.js',
+  './supabase.js',          // the Supabase client, served from this repo
   './manifest.json',
   './icon-192.png'
 ];
@@ -78,8 +71,9 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Anything else cross-origin (Apps Script, worker proxy, Sheets, codetabs)
-  // goes straight to the network — this is live data, never cache it.
+  // Anything else cross-origin — Supabase auth, the profiles table, and the
+  // edge functions that read and write each athlete's sheet — goes straight
+  // to the network. This is live data and must never be cached.
   if (url.origin !== self.location.origin) return;
 
   // App shell — network-first, fall back to cache when offline
