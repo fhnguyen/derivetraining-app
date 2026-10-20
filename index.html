@@ -497,14 +497,24 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
 .lt-txt { display:block; font-size:13px; line-height:1.55; color:var(--ink-2); white-space:pre-wrap; }
 
 /* Search */
-.cal-search { margin-bottom:14px; }
-.cal-search input {
+.hd-icon {
+  background:none; border:1px solid var(--line); border-radius:4px; cursor:pointer;
+  width:34px; height:34px; font-size:17px; line-height:1; color:var(--ink-2);
+  display:flex; align-items:center; justify-content:center; transition:border-color .15s, color .15s;
+}
+.hd-icon:hover { border-color:var(--blue); color:var(--blue); }
+
+#m-search .modal { max-width:520px; }
+#m-search .modal-body { padding-top:14px; }
+.srch-input {
   width:100%; background:var(--paper); border:1px solid var(--line); border-radius:4px;
-  padding:11px 13px; font-family:inherit; font-size:16px; color:var(--ink); outline:none;
+  padding:12px 14px; font-family:inherit; font-size:16px; color:var(--ink); outline:none;
   transition:border-color .15s;
 }
-.cal-search input:focus { border-color:var(--blue); }
-.cal-search input::placeholder { color:var(--ink-3); }
+.srch-input:focus { border-color:var(--blue); }
+.srch-input::placeholder { color:var(--ink-3); }
+.srch-hint { margin-top:9px; font-size:11.5px; line-height:1.5; color:var(--ink-3); }
+.srch-results { margin-top:14px; max-height:50vh; overflow-y:auto; }
 .sr-count { font-size:11px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:var(--ink-3); margin-bottom:10px; }
 .sr-item {
   display:block; width:100%; text-align:left; cursor:pointer; font:inherit;
@@ -791,7 +801,8 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
   <header class="app-hd">
     <div class="hd-logo"><span style="color:var(--accent)">TRAIN</span><span style="color:var(--gold)">DERIVE</span></div>
     <div class="hd-right">
-      <button class="acct-btn" onclick="openAccountSettings()" title="Account settings">      <button class="acct-btn" onclick="openAccountSettings()" title="Account settings">
+      <button class="hd-icon" onclick="openSearch()" title="Search your training" aria-label="Search your training">⌕</button>
+      <button class="acct-btn" onclick="openAccountSettings()" title="Account settings">
         <div class="acct-avatar" id="h-avatar">A</div>
         <span class="hd-name" id="h-name"></span>
       </button>
@@ -816,10 +827,6 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
               <button class="cal-arr" onclick="shiftMonth(1)">&#8594;</button>
             </div>
           </div>
-          <div class="cal-search">
-            <input type="search" id="cal-search" placeholder="Search your workouts…" oninput="runSearch(this.value)" autocomplete="off">
-          </div>
-          <div id="search-body" style="display:none"></div>
           <div id="cal-body"><div class="sbox"><div class="spinner"></div><p>Loading program…</p></div></div>
         </div>
       </section>
@@ -994,6 +1001,19 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
       <div class="fld"><label>Confirm New Password</label><div class="pw-wrap"><input type="password" id="m-ap-conf"><button class="pw-eye" type="button" onclick="togglePw(this)" tabindex="-1">👁</button></div></div>
     </div>
     <div class="modal-foot"><button class="btn-cancel" onclick="closeModal('m-adminpass')">Cancel</button><button class="btn-confirm" onclick="saveAdminPass()">Update</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="m-search">
+  <div class="modal">
+    <div class="modal-hd"><div class="modal-title">Search</div>
+      <button class="modal-close" onclick="closeModal('m-search')">✕</button></div>
+    <div class="modal-body">
+      <input type="search" class="srch-input" id="srch-input" placeholder="Back squat, intervals, 5k…"
+             oninput="runSearch(this.value)" autocomplete="off">
+      <div class="srch-hint">Searches everything programmed and everything you’ve logged.</div>
+      <div class="srch-results" id="srch-results"></div>
+    </div>
   </div>
 </div>
 
@@ -2143,7 +2163,6 @@ function shiftWeek(fromISO, dir) {
 // DAY VIEW
 // ═══════════════════════════════════════════════════════════════
 function _openDay(iso) {
-  clearSearch();
   const day = S.dayMap[iso];
   S.selDate = iso;
   S.feel = day?.feel ? parseFloat(day.feel) : null;
@@ -2390,15 +2409,57 @@ async function moveDay(from, to) {
 // needs the network.
 // ═══════════════════════════════════════════════════════════════
 
-// "A. Back Squat (tempo)" → "back squat". Two words is enough to match
-// the same lift across days without matching every other exercise.
-function sectionKey(title) {
-  const words = String(title || '')
-    .replace(/^[A-Za-z]{1,3}[.):\-]\s*/, '')
-    .replace(/\([^)]*\)/g, ' ')
+// ── Which sections count as lifts ────────────────────────────────
+// History is deliberately limited to named lifts. Everything else —
+// bike intervals, mobility, accessory circuits — produced a "last time"
+// line on nearly every section, which buried the useful ones.
+//
+// EDIT THIS LIST to match how you name things. Longer names win, so
+// "Back Squat" is kept apart from "Front Squat" rather than both
+// collapsing into "squat".
+const LIFTS = [
+  // Olympic lifts and their variations
+  'snatch', 'power snatch', 'hang snatch', 'hang power snatch', 'muscle snatch',
+  'snatch balance', 'snatch pull', 'snatch deadlift', 'snatch grip deadlift',
+  'clean', 'power clean', 'hang clean', 'hang power clean', 'squat clean',
+  'clean pull', 'clean deadlift', 'clean and jerk',
+  'jerk', 'push jerk', 'split jerk', 'power jerk', 'jerk dip', 'jerk balance',
+  // Squats
+  'squat', 'back squat', 'front squat', 'overhead squat', 'box squat', 'pause squat',
+  'tempo squat', 'split squat', 'bulgarian split squat', 'goblet squat', 'zercher squat',
+  // Hinges
+  'deadlift', 'sumo deadlift', 'romanian deadlift', 'rdl', 'stiff leg deadlift',
+  'trap bar deadlift', 'good morning', 'hip thrust',
+  // Presses
+  'bench press', 'incline bench', 'close grip bench', 'floor press',
+  'strict press', 'overhead press', 'push press', 'z press', 'landmine press',
+  'dumbbell press', 'db press', 'leg press',
+  // Pulls
+  'weighted pull up', 'weighted pullup', 'weighted chin up',
+  'barbell row', 'bent over row', 'pendlay row', 'dumbbell row', 'db row',
+  // Other loaded lifts
+  'thruster', 'wall ball', 'front rack lunge', 'back rack lunge', 'walking lunge',
+  'step up', 'farmers carry',
+];
+
+// Longest first, so "hang power clean" is preferred over "clean".
+const LIFTS_SORTED = LIFTS.slice().sort((a, b) => b.length - a.length);
+const LIFT_RE = LIFTS_SORTED.map(name => ({
+  name,
+  // a trailing "s" is allowed, so "thrusters" and "wall balls" still match
+  re: new RegExp('\\b' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+') + 's?\\b', 'i'),
+}));
+
+// The lift a section title names, or null if it isn't a lift.
+function liftKey(title) {
+  const t = String(title || '')
+    .replace(/^[A-Za-z]{1,3}[.):\-]\s*/, '')   // drop the "A." label
     .replace(/[^A-Za-z0-9 ]/g, ' ')
-    .toLowerCase().split(/\s+/).filter(Boolean);
-  return words.slice(0, 2).join(' ');
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!t) return null;
+  for (const lift of LIFT_RE) if (lift.re.test(t)) return lift.name;
+  return null;
 }
 
 function shortDate(iso) {
@@ -2407,8 +2468,8 @@ function shortDate(iso) {
 
 // The most recent earlier day where this section was logged.
 function findLastTime(title, beforeISO) {
-  const key = sectionKey(title);
-  if (!key) return null;
+  const key = liftKey(title);
+  if (!key) return null;                 // not a lift — no history line
   const dates = Object.keys(S.dayMap).filter(d => d < beforeISO).sort().reverse();
   for (const iso of dates) {
     const day = S.dayMap[iso];
@@ -2416,7 +2477,7 @@ function findLastTime(title, beforeISO) {
     let gi = 0, hit = null;
     for (const b of day.blocks) {
       for (const sec of b.sections) {
-        if (!hit && sectionKey(sec.trim().split('\n')[0]) === key) {
+        if (!hit && liftKey(sec.trim().split('\n')[0]) === key) {
           const r = day.results.find(r => r.label === toAlpha(gi));
           if (r && r.content && r.content.trim()) hit = { iso, content: r.content.trim() };
         }
@@ -2436,19 +2497,23 @@ function highlight(text, term) {
   return esc.replace(new RegExp(safe, 'gi'), m => '<mark>' + m + '</mark>');
 }
 
+function openSearch() {
+  const box = document.getElementById('srch-input');
+  box.value = '';
+  document.getElementById('srch-results').innerHTML = '';
+  openModal('m-search');
+  setTimeout(() => box.focus(), 50);
+}
+
+// Search covers everything programmed — section titles, the body of the
+// section, and whatever was logged. The lifts-only rule applies to the
+// "last time" lines, not here.
 function runSearch(q) {
   const term = (q || '').trim().toLowerCase();
-  const cal  = document.getElementById('cal-body');
-  const out  = document.getElementById('search-body');
-  if (!cal || !out) return;
+  const out  = document.getElementById('srch-results');
+  if (!out) return;
 
-  if (term.length < 2) {
-    out.style.display = 'none'; out.innerHTML = '';
-    cal.style.display = '';
-    return;
-  }
-  cal.style.display = 'none';
-  out.style.display = '';
+  if (term.length < 2) { out.innerHTML = ''; return; }
 
   const hits = [];
   Object.keys(S.dayMap).sort().reverse().forEach(iso => {
@@ -2466,31 +2531,33 @@ function runSearch(q) {
   });
 
   if (!hits.length) {
-    out.innerHTML = '<div class="sr-empty">Nothing found for “' + escH(q.trim()) + '”.</div>';
+    out.innerHTML = '<div class="sr-empty">Nothing found for \u201C' + escH(q.trim()) + '\u201D.</div>';
     return;
   }
 
   const shown = hits.slice(0, 40);
   let h = '<div class="sr-count">' + hits.length + ' result' + (hits.length === 1 ? '' : 's') +
-          (hits.length > shown.length ? ' · showing the ' + shown.length + ' most recent' : '') + '</div>';
+          (hits.length > shown.length ? ' \u00B7 showing the ' + shown.length + ' most recent' : '') + '</div>';
   shown.forEach(hit => {
-    h += '<button type="button" class="sr-item" onclick="navTo(\'day\',{date:\'' + hit.iso + '\'})">' +
+    h += '<button type="button" class="sr-item" data-go="' + hit.iso + '">' +
          '<div class="sr-date">' + escH(new Date(hit.iso + 'T12:00:00')
              .toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' })) + '</div>' +
          '<div class="sr-title">' + highlight(hit.title, term) + '</div>' +
          (hit.result
            ? '<div class="sr-res"><span class="sr-tag">You logged</span>' + highlight(hit.result, term) + '</div>'
-           : '') +
+           : '<div class="sr-res"><span class="sr-tag">Not logged</span></div>') +
          '</button>';
   });
   out.innerHTML = h;
 }
 
-function clearSearch() {
-  const box = document.getElementById('cal-search');
-  if (box) box.value = '';
-  runSearch('');
-}
+// Tapping a result opens that day.
+document.addEventListener('click', e => {
+  const hit = e.target.closest('#srch-results [data-go]');
+  if (!hit) return;
+  closeModal('m-search');
+  navTo('day', { date: hit.dataset.go });
+});
 
 // ── Progress + collapsed summaries ──────────────────────────────
 function refreshProgress() {
