@@ -402,7 +402,7 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
 .daily-note-label, .adm-result-label {
   font-size:9px; font-weight:800; letter-spacing:2px; text-transform:uppercase; color:var(--gold-ink); margin-bottom:6px;
 }
-.daily-note-text { font-size:13.5px; line-height:1.65; color:var(--ink-2); white-space:pre-wrap; }
+.daily-note-text { font-size:calc(14px * var(--read-scale, 1)); line-height:1.65; color:var(--ink-2); white-space:pre-wrap; }
 
 @keyframes fade-in { from { opacity:0; } to { opacity:1; } }
 
@@ -442,7 +442,7 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
 .sec-body { display:none; padding:0 16px 16px; }
 .sec-card.open .sec-body { display:block; }
 
-.t-text { font-size:14px; line-height:1.65; color:var(--ink-2); white-space:pre-wrap; word-break:break-word; overflow-wrap:break-word; max-width:100%; }
+.t-text { font-size:calc(15px * var(--read-scale, 1)); line-height:1.65; color:var(--ink-2); white-space:pre-wrap; word-break:break-word; overflow-wrap:break-word; max-width:100%; }
 .t-text a { color:var(--blue); font-weight:600; text-decoration:none; }
 .video-link {
   display:inline-flex; align-items:center; gap:6px; vertical-align:baseline;
@@ -458,7 +458,19 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
   font-size:9px; font-weight:800; letter-spacing:2px; text-transform:uppercase; color:var(--ink-3);
   margin:16px -16px 8px; padding:14px 16px 0; border-top:1px solid var(--line);
 }
-.res-ta { resize:vertical; min-height:68px; }
+/* Form fields — the results box and every modal field. Without a width
+   rule these fall back to the browser default of ~20 characters, which
+   is why the results box was half the width of its card. The 16px size
+   also stops iOS zooming the page when one is tapped. */
+.fld input, .fld select, .fld textarea, .res-ta {
+  width:100%; background:var(--paper); border:1px solid var(--line); border-radius:4px;
+  padding:11px 13px; font-family:inherit; font-size:16px; line-height:1.55;
+  color:var(--ink); outline:none; transition:border-color .15s;
+}
+.fld input:focus, .fld select:focus, .fld textarea:focus, .res-ta:focus { border-color:var(--blue); }
+.fld input::placeholder, .fld textarea::placeholder, .res-ta::placeholder { color:var(--ink-3); }
+.fld textarea, .res-ta { resize:vertical; }
+.res-ta { min-height:92px; overflow:hidden; font-size:max(16px, calc(16px * var(--read-scale, 1))); }
 .sec-save-st { font-size:11px; font-weight:600; color:var(--ink-3); margin-top:6px; min-height:15px; transition:color .2s; }
 
 /* Pick a day to move to */
@@ -494,7 +506,7 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
   display:block; font-size:9px; font-weight:800; letter-spacing:1.6px;
   text-transform:uppercase; color:var(--ink-3); margin-bottom:4px;
 }
-.lt-txt { display:block; font-size:13px; line-height:1.55; color:var(--ink-2); white-space:pre-wrap; }
+.lt-txt { display:block; font-size:calc(13px * var(--read-scale, 1)); line-height:1.55; color:var(--ink-2); white-space:pre-wrap; }
 
 /* Search */
 .hd-icon {
@@ -503,6 +515,29 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
   display:flex; align-items:center; justify-content:center; transition:border-color .15s, color .15s;
 }
 .hd-icon:hover { border-color:var(--blue); color:var(--blue); }
+
+/* Text size — the small-T big-T control */
+.tt-wrap { position:relative; }
+.tt-btn { gap:1px; font-weight:700; }
+.tt-btn .tt-s { font-size:11px; line-height:1; }
+.tt-btn .tt-l { font-size:16px; line-height:1; }
+.tt-pop {
+  display:none; position:absolute; top:calc(100% + 8px); right:0; z-index:300;
+  align-items:center; gap:4px; padding:6px;
+  background:var(--paper); border:1px solid var(--line); border-radius:6px;
+  box-shadow:0 8px 24px rgba(20,22,28,0.16);
+}
+.tt-pop.open { display:flex; }
+.tt-step {
+  width:40px; height:36px; display:flex; align-items:center; justify-content:center;
+  background:none; border:1px solid var(--line); border-radius:4px; cursor:pointer;
+  color:var(--ink); font-weight:700; transition:border-color .15s, color .15s;
+}
+.tt-step:hover { border-color:var(--blue); color:var(--blue); }
+.tt-step:disabled { opacity:.35; cursor:default; border-color:var(--line); color:var(--ink-3); }
+.tt-level { display:flex; gap:3px; padding:0 3px; }
+.tt-dot { width:5px; height:5px; border-radius:50%; background:var(--line); }
+.tt-dot.on { background:var(--blue); }
 
 #m-search .modal { max-width:520px; }
 #m-search .modal-body { padding-top:14px; }
@@ -761,11 +796,21 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
   .first-login-banner { flex-wrap:wrap; }
   .first-login-banner p { flex-basis:calc(100% - 40px); }
 }
+@media (max-width:400px) {
+  /* The header carries two more buttons than it used to, so on small
+     phones everything tightens up rather than Sign Out being pushed
+     off the edge. */
+  .hd-right { gap:5px; }
+  .hd-icon { width:30px; height:30px; font-size:15px; }
+  .tt-btn .tt-s { font-size:10px; }
+  .tt-btn .tt-l { font-size:14px; }
+}
 @media (max-width:360px) {
   .wn-d { display:none; }
   .wn-arr { flex-basis:24px; }
-  .hd-logo, .adm-logo { font-size:21px; }
-  .btn-ghost { padding:0 8px; letter-spacing:1px; }
+  .hd-logo, .adm-logo { font-size:18px; letter-spacing:0.5px; }
+  .btn-ghost { padding:0 7px; letter-spacing:0.5px; font-size:8.5px; }
+  .hd-right { gap:4px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition:none !important; animation:none !important; }
@@ -801,6 +846,16 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
   <header class="app-hd">
     <div class="hd-logo"><span style="color:var(--accent)">TRAIN</span><span style="color:var(--gold)">DERIVE</span></div>
     <div class="hd-right">
+      <div class="tt-wrap">
+        <button class="hd-icon tt-btn" onclick="toggleTextPop(event)" title="Text size" aria-label="Text size">
+          <span class="tt-s">T</span><span class="tt-l">T</span>
+        </button>
+        <div class="tt-pop" id="tt-pop">
+          <button class="tt-step" onclick="stepTextSize(-1)" aria-label="Smaller text"><span style="font-size:13px">T</span></button>
+          <div class="tt-level" id="tt-level"></div>
+          <button class="tt-step" onclick="stepTextSize(1)" aria-label="Larger text"><span style="font-size:22px">T</span></button>
+        </div>
+      </div>
       <button class="hd-icon" onclick="openSearch()" title="Search your training" aria-label="Search your training">⌕</button>
       <button class="acct-btn" onclick="openAccountSettings()" title="Account settings">
         <div class="acct-avatar" id="h-avatar">A</div>
@@ -2263,14 +2318,17 @@ function buildSecCard(text, idx, blockLabel, secIdx) {
   card.dataset.block = blockLabel || 'Training';
   card.dataset.si    = String((secIdx !== undefined ? secIdx : idx) % 8);
   const lines=text.trim().split('\n'), title=lines[0].trim();
+  // The first line is the card's title, so it isn't repeated in the body.
+  const bodyText=lines.slice(1).join('\n').replace(/^\n+/, '').trimEnd();
   const hd=document.createElement('div'); hd.className='sec-hd';
   const sumText=(S.secResults[idx]||'').trim().split('\n')[0];
-  hd.innerHTML='<span class="sec-n">'+toAlpha(idx)+'</span><span class="sec-t">'+escH(title)+'</span>'+
+  hd.innerHTML='<span class="sec-n">'+toAlpha(idx)+'</span><span class="sec-t">'+escH(stripInline(title))+'</span>'+
     '<span class="sec-sum">'+escH(sumText.length>26?sumText.slice(0,26)+'…':sumText)+'</span>'+
     '<span class="sec-ch">▼</span>';
   hd.addEventListener('click',()=>card.classList.toggle('open'));
   const body=document.createElement('div'); body.className='sec-body';
-  const pre=document.createElement('div'); pre.className='t-text'; pre.innerHTML=richText(escH(text));
+  const pre=document.createElement('div'); pre.className='t-text'; pre.innerHTML=richText(escH(bodyText));
+  if (!bodyText) pre.style.display='none';   // title-only section
   const rl=document.createElement('div'); rl.className='res-lbl'; rl.textContent='Your Results';
   const ta=document.createElement('textarea'); ta.className='res-ta';
   ta.placeholder='Log weights, reps, times, notes…'; ta.value=S.secResults[idx]||'';
@@ -2278,14 +2336,24 @@ function buildSecCard(text, idx, blockLabel, secIdx) {
   // Per-section save status indicator
   const secSt=document.createElement('div'); secSt.className='sec-save-st';
 
+  // Grow to fit what's been typed, so a long entry isn't read through
+  // a three-line window.
+  const growTa = () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.max(ta.scrollHeight, 92) + 'px';
+  };
+
   // Auto-save: debounce 1.5s after user stops typing
   let _autoTimer=null;
   ta.addEventListener('input', e => {
     S.secResults[idx] = e.target.value;
+    growTa();
     clearTimeout(_autoTimer);
     secSt.textContent='Unsaved…'; secSt.className='sec-save-st saving';
     _autoTimer = setTimeout(() => autoSaveSection(idx, secSt), 1500);
   });
+  // and once on open, for results already logged
+  requestAnimationFrame(growTa);
 
   body.appendChild(pre);
 
@@ -2497,6 +2565,64 @@ function highlight(text, term) {
   return esc.replace(new RegExp(safe, 'gi'), m => '<mark>' + m + '</mark>');
 }
 
+// ── Text size ───────────────────────────────────────────────────
+// A reading-size control, the way Safari and Kindle do it. It scales
+// the programming text, the daily note, the "last time" line and the
+// results box — not the chrome, so nothing reflows awkwardly. The
+// choice is remembered on this device.
+const TEXT_SCALES = [0.87, 1, 1.15, 1.32];
+const TEXT_SIZE_KEY = 'td_text_scale';
+let textScaleIdx = 1;
+
+function applyTextScale() {
+  document.documentElement.style.setProperty('--read-scale', TEXT_SCALES[textScaleIdx]);
+  const level = document.getElementById('tt-level');
+  if (level) {
+    level.innerHTML = TEXT_SCALES.map((_, i) =>
+      '<span class="tt-dot' + (i <= textScaleIdx ? ' on' : '') + '"></span>').join('');
+  }
+  const steps = document.querySelectorAll('.tt-step');
+  if (steps.length === 2) {
+    steps[0].disabled = textScaleIdx === 0;
+    steps[1].disabled = textScaleIdx === TEXT_SCALES.length - 1;
+  }
+  // the results boxes were sized for the old font
+  document.querySelectorAll('#d-content .res-ta').forEach(ta => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.max(ta.scrollHeight, 92) + 'px';
+  });
+}
+
+function stepTextSize(dir) {
+  const next = textScaleIdx + dir;
+  if (next < 0 || next >= TEXT_SCALES.length) return;
+  textScaleIdx = next;
+  try { localStorage.setItem(TEXT_SIZE_KEY, String(textScaleIdx)); } catch (e) {}
+  applyTextScale();
+}
+
+function toggleTextPop(e) {
+  e.stopPropagation();
+  const pop = document.getElementById('tt-pop');
+  if (pop) { pop.classList.toggle('open'); applyTextScale(); }
+}
+
+function initTextSize() {
+  try {
+    const saved = parseInt(localStorage.getItem(TEXT_SIZE_KEY), 10);
+    if (!isNaN(saved) && saved >= 0 && saved < TEXT_SCALES.length) textScaleIdx = saved;
+  } catch (e) {}
+  applyTextScale();
+}
+
+// Tapping anywhere else closes it.
+document.addEventListener('click', e => {
+  const pop = document.getElementById('tt-pop');
+  if (pop && pop.classList.contains('open') && !e.target.closest('.tt-wrap')) {
+    pop.classList.remove('open');
+  }
+});
+
 function openSearch() {
   const box = document.getElementById('srch-input');
   box.value = '';
@@ -2524,7 +2650,7 @@ function runSearch(q) {
       const r = (day.results || []).find(r => r.label === toAlpha(gi));
       const result = r && r.content ? r.content.trim() : '';
       if ((sec + ' ' + result).toLowerCase().includes(term)) {
-        hits.push({ iso, title: sec.trim().split('\n')[0], result });
+        hits.push({ iso, title: stripInline(sec.trim().split('\n')[0]), result });
       }
       gi++;
     }));
@@ -2784,6 +2910,15 @@ function formatInline(html) {
   return html
     .replace(/\*\*(?=\S)([^\n]*?\S)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[\s(\[>;])_(?=[^\s_])([^_\n]*?[^\s_]|[^\s_])_(?=$|[\s.,;:!?)\]<&])/gm, '$1<em>$2</em>');
+}
+
+// The same two markers, stripped rather than rendered — for section
+// titles and search results, where the markup can't be shown and the
+// raw ** and _ would otherwise leak through.
+function stripInline(text) {
+  return String(text)
+    .replace(/\*\*(?=\S)([^\n]*?\S)\*\*/g, '$1')
+    .replace(/(^|[\s(\[>;])_(?=[^\s_])([^_\n]*?[^\s_]|[^\s_])_(?=$|[\s.,;:!?)\]<&])/gm, '$1$2');
 }
 
 // Links are handled separately so a URL never gets mangled by the above.
@@ -3323,17 +3458,19 @@ function adminBuildSecCard(text, idx, blockLabel, secIdx, day) {
 
   const lines = text.trim().split('\n');
   const title = lines[0].trim();
+  const bodyText = lines.slice(1).join('\n').replace(/^\n+/, '').trimEnd();
 
   const hd = document.createElement('div'); hd.className = 'sec-hd';
   hd.innerHTML = '<span class="sec-n">' + toAlpha(idx) + '</span>' +
-    '<span class="sec-t">' + escH(title) + '</span><span class="sec-ch">▼</span>';
+    '<span class="sec-t">' + escH(stripInline(title)) + '</span><span class="sec-ch">▼</span>';
   hd.addEventListener('click', () => card.classList.toggle('open'));
 
   const body = document.createElement('div'); body.className = 'sec-body';
 
-  // Training text
+  // Training text, minus the first line, which is the card's title
   const pre = document.createElement('div'); pre.className = 't-text';
-  pre.innerHTML = richText(escH(text));
+  pre.innerHTML = richText(escH(bodyText));
+  if (!bodyText) pre.style.display = 'none';
   body.appendChild(pre);
 
   // Client result (read-only) — match by label only, never fall back to position
@@ -3393,6 +3530,8 @@ async function refreshDayView() {
   // Show the loading screen immediately — no flash of the login box.
   document.getElementById('s-login').classList.remove('active');
   document.getElementById('s-loading').classList.add('active');
+
+  initTextSize();
 
   await window._sbReady;
   SB = window.SB;
