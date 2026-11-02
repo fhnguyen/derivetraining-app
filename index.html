@@ -852,7 +852,7 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
         </button>
         <div class="tt-pop" id="tt-pop">
           <button class="tt-step" onclick="stepTextSize(-1)" aria-label="Smaller text"><span style="font-size:13px">T</span></button>
-          <div class="tt-level" id="tt-level"></div>
+          <div class="tt-level"></div>
           <button class="tt-step" onclick="stepTextSize(1)" aria-label="Larger text"><span style="font-size:22px">T</span></button>
         </div>
       </div>
@@ -918,7 +918,16 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
     <div class="adm-logo"><span style="color:var(--accent)">TRAIN</span><span style="color:var(--gold)">DERIVE</span> <span>ADMIN</span></div>
     <div class="hd-right">
       <span class="hd-name" id="adm-hd-name"></span>
-      
+      <div class="tt-wrap">
+        <button class="hd-icon tt-btn" onclick="toggleTextPop(event, 'tt-pop-adm')" title="Text size" aria-label="Text size">
+          <span class="tt-s">T</span><span class="tt-l">T</span>
+        </button>
+        <div class="tt-pop" id="tt-pop-adm">
+          <button class="tt-step" onclick="stepTextSize(-1)" aria-label="Smaller text"><span style="font-size:13px">T</span></button>
+          <div class="tt-level"></div>
+          <button class="tt-step" onclick="stepTextSize(1)" aria-label="Larger text"><span style="font-size:22px">T</span></button>
+        </div>
+      </div>
       <button class="btn-ghost" onclick="doAdminLogout()">Sign Out</button>
     </div>
   </header>
@@ -2576,18 +2585,19 @@ let textScaleIdx = 1;
 
 function applyTextScale() {
   document.documentElement.style.setProperty('--read-scale', TEXT_SCALES[textScaleIdx]);
-  const level = document.getElementById('tt-level');
-  if (level) {
-    level.innerHTML = TEXT_SCALES.map((_, i) =>
-      '<span class="tt-dot' + (i <= textScaleIdx ? ' on' : '') + '"></span>').join('');
-  }
-  const steps = document.querySelectorAll('.tt-step');
-  if (steps.length === 2) {
-    steps[0].disabled = textScaleIdx === 0;
-    steps[1].disabled = textScaleIdx === TEXT_SCALES.length - 1;
-  }
+  // There's a copy of the control in each header; both show the same state.
+  const dots = TEXT_SCALES.map((_, i) =>
+    '<span class="tt-dot' + (i <= textScaleIdx ? ' on' : '') + '"></span>').join('');
+  document.querySelectorAll('.tt-level').forEach(el => { el.innerHTML = dots; });
+  document.querySelectorAll('.tt-pop').forEach(pop => {
+    const steps = pop.querySelectorAll('.tt-step');
+    if (steps.length === 2) {
+      steps[0].disabled = textScaleIdx === 0;
+      steps[1].disabled = textScaleIdx === TEXT_SCALES.length - 1;
+    }
+  });
   // the results boxes were sized for the old font
-  document.querySelectorAll('#d-content .res-ta').forEach(ta => {
+  document.querySelectorAll('.res-ta').forEach(ta => {
     ta.style.height = 'auto';
     ta.style.height = Math.max(ta.scrollHeight, 92) + 'px';
   });
@@ -2601,10 +2611,13 @@ function stepTextSize(dir) {
   applyTextScale();
 }
 
-function toggleTextPop(e) {
+function toggleTextPop(e, id) {
   e.stopPropagation();
-  const pop = document.getElementById('tt-pop');
-  if (pop) { pop.classList.toggle('open'); applyTextScale(); }
+  const pop = document.getElementById(id || 'tt-pop');
+  if (!pop) return;
+  document.querySelectorAll('.tt-pop').forEach(p => { if (p !== pop) p.classList.remove('open'); });
+  pop.classList.toggle('open');
+  applyTextScale();
 }
 
 function initTextSize() {
@@ -2617,10 +2630,8 @@ function initTextSize() {
 
 // Tapping anywhere else closes it.
 document.addEventListener('click', e => {
-  const pop = document.getElementById('tt-pop');
-  if (pop && pop.classList.contains('open') && !e.target.closest('.tt-wrap')) {
-    pop.classList.remove('open');
-  }
+  if (e.target.closest('.tt-wrap')) return;
+  document.querySelectorAll('.tt-pop.open').forEach(p => p.classList.remove('open'));
 });
 
 function openSearch() {
