@@ -226,6 +226,25 @@ button.acc-row:hover { background:var(--wash); }
 .acc-out:hover { background:var(--magenta); border-color:var(--magenta); color:#fff; }
 .acc-foot { text-align:center; font-size:9px; font-weight:700; letter-spacing:2.5px; text-transform:uppercase; color:var(--ink-3); padding:22px 0 6px; }
 
+/* ── Coach panel: bottom bar on phones and tablets ─ */
+#adm-tabbar { display:none; }
+.adm-mobile-only { display:none !important; }
+@media (max-width:899px) {
+  #adm-tabbar { display:flex; }
+  #s-admin .adm-tabs { display:none; }
+  #s-admin .adm-hd .tt-wrap, #s-admin .adm-hd .btn-ghost, #adm-hd-name { display:none !important; }
+  #s-admin .adm-main { padding-bottom:calc(var(--tb-h) + var(--tb-pad) + 24px); }
+  /* Chat fills the screen between the header and the bar */
+  #s-admin .ch-wrap.coach {
+    height:calc(100dvh - var(--hd-h) - 3px - env(safe-area-inset-top, 0px) - 40px - var(--tb-h) - var(--tb-pad));
+    min-height:360px;
+  }
+  body:has(#s-admin.active) .toast { bottom:calc(var(--tb-h) + var(--tb-pad) + 14px); }
+  .adm-mobile-only { display:revert !important; }
+  .setting-row.adm-mobile-only { display:flex !important; }
+  .acc-out.adm-mobile-only { display:block !important; margin-top:22px; }
+}
+
 /* ── Chat (placeholder until messaging is built) ── */
 .chat-empty { text-align:center; padding:48px 20px; background:var(--paper); border:1px solid var(--line); border-radius:4px; }
 .chat-empty h2 { font-family:var(--display); font-weight:400; font-size:30px; line-height:1; color:var(--ink); margin-bottom:8px; }
@@ -362,7 +381,7 @@ function showView(id) {
 }
 
 function setActiveTab(id) {
-  document.querySelectorAll('.tabbar .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === id));
+  document.querySelectorAll('#s-app .tabbar .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === id));
   tmTabLabel();
 }
 
@@ -1058,6 +1077,100 @@ patchMainScript();
 wireTimer();
 tmRender();
 if (typeof applyTextScale === 'function') applyTextScale();
+
+/* ───────────────────────────────────────────────────────────────
+   COACH PANEL BOTTOM BAR
+   Mirrors the panel's own tab buttons (Users, Teams, Chat, Settings —
+   whatever is there), so tapping a bottom tab is the same as tapping
+   the top one, and the Chat badge follows along.
+   ─────────────────────────────────────────────────────────────── */
+const ADM_ICON = {
+  users:    svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.9-3.6 3.5-5.6 6.5-5.6s5.6 2 6.5 5.6"/><path d="M16.5 8h5M16.5 12h5M18.5 16h3"/>'),
+  teams:    svg('<circle cx="9" cy="8.5" r="3.2"/><path d="M3 19c.8-3 3.2-4.6 6-4.6s5.2 1.6 6 4.6"/><circle cx="17" cy="9.5" r="2.5"/><path d="M16 14.6c2.4.1 4.2 1.5 5 4"/>'),
+  chat:     ICON.chat,
+  settings: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
+};
+const ADM_LABEL = { users: 'Athletes' };
+
+function admTop() { const a = document.getElementById('s-admin'); return a && a.querySelector('.adm-tabs'); }
+function admName(btn) { return (/switchAdmTab\(\s*'(\w+)'/.exec(btn.getAttribute('onclick') || '') || [])[1] || ''; }
+
+function buildAdminBar() {
+  const admin = document.getElementById('s-admin'), top = admTop();
+  if (!admin || !top) return;
+  let bar = document.getElementById('adm-tabbar');
+  if (!bar) {
+    bar = document.createElement('nav');
+    bar.id = 'adm-tabbar';
+    bar.className = 'tabbar';
+    bar.setAttribute('aria-label', 'Coach');
+    bar.innerHTML = '<div class="tabbar-in"></div>';
+    admin.appendChild(bar);
+    bar.addEventListener('click', e => {
+      const b = e.target.closest('[data-adm]');
+      if (!b) return;
+      const src = top.querySelectorAll('.adm-tab')[+b.dataset.adm];
+      if (src) { src.click(); window.scrollTo(0, 0); }
+    });
+  }
+  const inner = bar.firstElementChild;
+  inner.innerHTML = '';
+  [...top.querySelectorAll('.adm-tab')].forEach((src, i) => {
+    const name = admName(src);
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'tab'; b.dataset.adm = i; b.dataset.name = name;
+    b.innerHTML = (ADM_ICON[name] || ADM_ICON.settings) + '<span class="tab-lbl"></span><span class="tab-badge" hidden></span>';
+    b.querySelector('.tab-lbl').textContent = ADM_LABEL[name] || (src.firstChild ? src.firstChild.textContent.trim() : name);
+    inner.appendChild(b);
+  });
+  syncAdminBar();
+}
+
+function syncAdminBar() {
+  const top = admTop(), bar = document.getElementById('adm-tabbar');
+  if (!top || !bar) return;
+  const srcs = [...top.querySelectorAll('.adm-tab')], tabs = [...bar.querySelectorAll('.tab')];
+  if (srcs.length !== tabs.length) { buildAdminBar(); return; }
+  // An open athlete counts as being on Athletes.
+  const anyActive = srcs.some(s => s.classList.contains('active'));
+  tabs.forEach((t, i) => {
+    const src = srcs[i];
+    t.classList.toggle('active', src.classList.contains('active') || (!anyActive && t.dataset.name === 'users'));
+    const from = src.querySelector('.ch-tab-badge'), to = t.querySelector('.tab-badge');
+    to.hidden = !from || from.hidden || !from.textContent;
+    to.textContent = from ? from.textContent : '';
+  });
+}
+
+// Text size and Sign Out leave the header on phones, so they live in Settings.
+function addAdminSettingsExtras() {
+  const panel = document.getElementById('adm-settings');
+  if (!panel || panel.querySelector('.adm-mobile-only')) return;
+  panel.insertAdjacentHTML('beforeend',
+    '<div class="setting-row adm-mobile-only"><div><div class="setting-label">Text size</div>' +
+      '<div class="setting-desc">For programming and results</div></div>' +
+      '<div class="tt-pop acc-tt">' +
+        '<button class="tt-step" onclick="stepTextSize(-1)" aria-label="Smaller text"><span style="font-size:13px">T</span></button>' +
+        '<div class="tt-level"></div>' +
+        '<button class="tt-step" onclick="stepTextSize(1)" aria-label="Larger text"><span style="font-size:22px">T</span></button>' +
+      '</div></div>' +
+    '<button class="acc-out adm-mobile-only" type="button" onclick="doAdminLogout()">Sign Out</button>');
+  if (typeof applyTextScale === 'function') applyTextScale();
+}
+
+function setupAdminBar() {
+  const top = admTop();
+  if (!top) return;
+  addAdminSettingsExtras();
+  buildAdminBar();
+  // Follow every change to the top tabs: which is active, new tabs, badge counts.
+  let queued = false;
+  const later = () => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; syncAdminBar(); }); };
+  new MutationObserver(later).observe(top, { subtree: true, childList: true, attributes: true, characterData: true });
+}
+// After every add-on (e.g. td-chat.js adding Teams and Chat) has run.
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setupAdminBar);
+else setTimeout(setupAdminBar, 0);
 
 // For td-chat.js
 window.TD_TABS = {
