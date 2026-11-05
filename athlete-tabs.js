@@ -124,6 +124,12 @@ body:has(#s-app.active) .toast { bottom:calc(var(--tb-h) + var(--tb-pad) + 14px)
 .tm-time .d { display:inline-block; width:.5em; text-align:center; }
 .tm-time .c { display:inline-block; width:.24em; text-align:center; }
 .tm-face.paused .tm-time { opacity:.4; }
+@keyframes tm-fl-count { 0% { box-shadow:inset 0 0 0 3px var(--ph); } 100% { box-shadow:inset 0 0 0 0 transparent; } }
+@keyframes tm-fl-big   { 0% { background:var(--ph); } 100% { background:var(--paper); } }
+@keyframes tm-fl-ink   { 0% { color:#fff; } 100% { color:inherit; } }
+.tm-face.fl-count { animation:tm-fl-count .45s ease-out; }
+.tm-face.fl-big   { animation:tm-fl-big .6s ease-out; }
+.tm-face.fl-big .tm-time, .tm-face.fl-big .tm-phase, .tm-face.fl-big .tm-sub { animation:tm-fl-ink .6s ease-out; }
 .tm-sub { font-size:13.5px; font-weight:600; color:var(--ink-2); min-height:19px; }
 .tm-bar { height:4px; background:var(--line); border-radius:2px; margin:18px 4px 0; overflow:hidden; }
 .tm-bar i { display:block; height:100%; width:0; background:var(--ph); border-radius:2px; }
@@ -582,9 +588,19 @@ function fmtShort(sec) {
 const roundsTxt = n => n + (n === 1 ? ' round' : ' rounds');
 
 /* ── Sound ─────────────────────────────────────────── */
+// Beeps play OVER the athlete's music, never instead of it. "ambient"
+// tells the phone this sound mixes with other audio (and, like other
+// ambient sounds, follows the Silent switch). Must be set before any
+// sound starts. Safari 16.4+; older phones ignore it.
+function setAmbientAudio() {
+  try { if (navigator.audioSession && navigator.audioSession.type !== 'ambient') navigator.audioSession.type = 'ambient'; } catch (e) {}
+}
+setAmbientAudio();
+
 let audio = null;
 function unlockAudio() {
   try {
+    setAmbientAudio();
     if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
     if (audio.state === 'suspended') audio.resume();
     // iOS only lets sound play after it has played something inside a tap.
@@ -592,8 +608,22 @@ function unlockAudio() {
     src.buffer = b; src.connect(audio.destination); src.start(0);
   } catch (e) { audio = null; }
 }
+// iPhone can stop a web app's sound after the screen locks or another
+// app plays audio. Wake it back up before every beep.
+// Only while a workout is on the clock, so the app isn't holding the
+// phone's audio while someone is just reading their programming.
+function wakeAudio(force) {
+  if (!force && TM.state !== 'running' && TM.state !== 'paused') return;
+  try { if (audio && audio.state !== 'running') audio.resume(); } catch (e) {}
+}
+// Let go of the phone's audio once the clock stops.
+function sleepAudio() {
+  if (TM.state === 'running' || TM.state === 'paused') return;
+  try { if (audio && audio.state === 'running') audio.suspend(); } catch (e) {}
+}
 function tone(freq, dur, at) {
   if (!audio || !TM.cfg.sound) return;
+  wakeAudio(true);
   try {
     const t = audio.currentTime + (at || 0);
     const o = audio.createOscillator(), g = audio.createGain();
@@ -607,11 +637,19 @@ function tone(freq, dur, at) {
   } catch (e) {}
 }
 const buzz = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} };
+// A visual cue alongside every beep, for a phone on silent or a loud gym.
+function flash(kind) {
+  const f = document.getElementById('tm-face');
+  if (!f) return;
+  f.classList.remove('fl-count', 'fl-big');
+  void f.offsetWidth;             // restart the animation if it's mid-flash
+  f.classList.add(kind === 'count' ? 'fl-count' : 'fl-big');
+}
 const cue = {
-  count: () => tone(660, 0.12),
-  go:    () => { tone(990, 0.55); buzz(250); },
-  rest:  () => { tone(520, 0.55); buzz(250); },
-  end:   () => { tone(990, 0.22); tone(990, 0.22, 0.3); tone(1320, 0.7, 0.6); buzz([200, 100, 200, 100, 400]); },
+  count: () => { tone(660, 0.12); flash('count'); },
+  go:    () => { tone(990, 0.55); buzz(250); flash('big'); },
+  rest:  () => { tone(520, 0.55); buzz(250); flash('big'); },
+  end:   () => { tone(990, 0.22); tone(990, 0.22, 0.3); tone(1320, 0.7, 0.6); buzz([200, 100, 200, 100, 400]); flash('big'); },
 };
 
 /* ── Keep the screen on while the clock runs ───────── */
@@ -661,6 +699,7 @@ function tmReset() {
   stopTicker();
   keepAwake(false);
   TM.state = 'idle'; TM.phases = null; TM.laps = []; TM.capHit = false;
+  sleepAudio();
   tmRender();
 }
 function tmFinish(el, capHit) {
@@ -670,6 +709,7 @@ function tmFinish(el, capHit) {
   stopTicker();
   keepAwake(false);
   cue.end();
+  setTimeout(sleepAudio, 2500);   // after the finish beeps have played
   tmRender();
 }
 function tmRound() {
@@ -953,7 +993,11 @@ function wireTimer() {
     }
     if (t.closest('#tm-reset')) { tmReset(); return; }
     if (t.closest('#tm-round')) { tmRound(); return; }
-    if (t.closest('#tm-snd'))   { TM.cfg.sound = !TM.cfg.sound; saveCfg(); if (TM.cfg.sound) { unlockAudio(); tone(880, 0.08); } tmRender(); }
+    if (t.closest('#tm-snd'))   {
+      TM.cfg.sound = !TM.cfg.sound; saveCfg();
+      if (TM.cfg.sound) { unlockAudio(); tone(880, 0.08); setTimeout(sleepAudio, 600); }
+      tmRender();
+    }
   });
 
   view.addEventListener('change', e => {
@@ -973,10 +1017,16 @@ function wireTimer() {
     document.getElementById('tm-go').click();
   });
 
+  // iPhone sometimes only lets sound restart during a tap, so any tap
+  // in the app (switching tabs, typing a result) wakes it up too.
+  document.addEventListener('touchend', () => wakeAudio(), { passive: true });
+  document.addEventListener('click', () => wakeAudio());
+
   // Back from the lock screen or another app: catch the clock up at
   // once and ask for the screen to stay on again.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
+    wakeAudio();
     if (TM.state === 'running') { keepAwake(true); tmTick(); }
     else if (TM.state === 'paused') keepAwake(true);
   });
