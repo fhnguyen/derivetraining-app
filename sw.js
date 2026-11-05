@@ -10,7 +10,7 @@
        it, and that is live data that must never be served from a cache.
    ============================================================================ */
 
-const CACHE = 'trainderive-v11';         // ← bump this on every deploy
+const CACHE = 'trainderive-v12';         // ← bump this on every deploy
 
 const SHELL = [
   './',
