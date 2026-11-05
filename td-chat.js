@@ -1231,5 +1231,5 @@ if (window.TD_TABS) window.TD_TABS.enableChat();
 else console.warn('td-chat.js: load athlete-tabs.js before this file to get the Chat tab');
 if (me()) start();
 
-window.TD_CHAT = { state: () => C, refresh: refreshInbox };
+window.TD_CHAT = { state: () => C, refresh: refreshInbox, open: openCoachThread };
 })();
