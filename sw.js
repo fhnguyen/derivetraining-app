@@ -9,8 +9,8 @@
        sign-in, profiles and every call to an athlete's sheet go through
        it, and that is live data that must never be served from a cache.
    ============================================================================ */
-
-const CACHE = 'trainderive-v12';         // ← bump this on every deploy
+importScripts('push-sw.js');
+const CACHE = 'trainderive-v13';         // ← bump this on every deploy
 
 const SHELL = [
   './',
