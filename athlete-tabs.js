@@ -8,7 +8,7 @@
 
    What it does
    • Adds a bottom bar to the athlete app: Train · Chat · Timer · Account
-     (Chat stays hidden until CHAT_ENABLED below is set to true).
+     (Chat appears by itself once td-chat.js is loaded after this file).
    • Train is the calendar + day view exactly as before.
    • Timer: For Time (optional cap), AMRAP, EMOM and Intervals.
      It keeps running while the athlete flips back to their workout,
@@ -21,7 +21,7 @@
 (function () {
 'use strict';
 
-const CHAT_ENABLED = false;   // flip on once messaging is built
+let chatOn = false;   // td-chat.js switches this on via TD_TABS.enableChat()
 
 // The main script rewrites the address on startup, so note now
 // whether the app was opened straight onto one of the new tabs.
@@ -75,6 +75,13 @@ const CSS = `
   box-shadow:0 0 0 2px var(--paper); animation:pulse 2s ease-in-out infinite;
 }
 .tab.live .tab-dot { display:block; }
+.tab[hidden] { display:none !important; }
+.tab-badge {
+  position:absolute; top:4px; left:calc(50% + 6px); min-width:17px; height:17px; padding:0 5px;
+  border-radius:9px; background:var(--magenta); color:#fff; box-shadow:0 0 0 2px var(--paper);
+  font-size:10px; font-weight:800; letter-spacing:0; line-height:17px; text-align:center;
+}
+.tab-badge[hidden] { display:none; }
 .tab.live:not(.active) .tab-lbl { color:var(--gold-ink); letter-spacing:1px; font-size:10.5px; }
 
 /* Toast and the install banner sit above the bar */
@@ -241,7 +248,7 @@ const ICON = {
 
 const TABS = [
   { id:'train',   label:'Train'   },
-  { id:'chat',    label:'Chat', hidden: !CHAT_ENABLED },
+  { id:'chat',    label:'Chat' },
   { id:'timer',   label:'Timer'   },
   { id:'account', label:'Account' },
 ];
@@ -326,9 +333,11 @@ function injectMarkup() {
   const bar = document.createElement('nav');
   bar.className = 'tabbar';
   bar.setAttribute('aria-label', 'Main');
-  bar.innerHTML = '<div class="tabbar-in">' + TABS.filter(t => !t.hidden).map(t =>
-    '<button class="tab' + (t.id === 'train' ? ' active' : '') + '" id="tab-' + t.id + '" data-tab="' + t.id + '" type="button">' +
+  bar.innerHTML = '<div class="tabbar-in">' + TABS.map(t =>
+    '<button class="tab' + (t.id === 'train' ? ' active' : '') + '" id="tab-' + t.id + '" data-tab="' + t.id + '" type="button"' +
+      (t.id === 'chat' && !chatOn ? ' hidden' : '') + '>' +
       ICON[t.id] + '<span class="tab-lbl" id="tab-' + t.id + '-lbl">' + t.label + '</span><span class="tab-dot"></span>' +
+      (t.id === 'chat' ? '<span class="tab-badge" id="tab-chat-badge" hidden></span>' : '') +
     '</button>').join('') + '</div>';
   app.appendChild(bar);
   bar.addEventListener('click', e => {
@@ -378,7 +387,11 @@ function tabGo(tab) {
     return;
   }
 
-  if (viewActive('v-' + tab)) { window.scrollTo(0, 0); return; }
+  if (viewActive('v-' + tab)) {
+    window.scrollTo(0, 0);
+    document.dispatchEvent(new CustomEvent('td:tabreselect', { detail: tab }));   // e.g. Chat → back to the inbox
+    return;
+  }
   if (trainActive()) {
     S.trainScroll = window.scrollY;
     if (viewActive('v-day') && S.selDate) saveDraft(S.selDate);   // nothing typed is lost
@@ -394,7 +407,7 @@ function patchMainScript() {
     if (TAB_ROUTES.indexOf(route) !== -1) {
       if (!S.user) { history.replaceState({ route:'login' }, '', '#login'); showScreen('s-login'); return; }
       if (S.user.role === 'coach') { _applyRoute('admin'); return; }
-      if (route === 'chat' && !CHAT_ENABLED) route = 'timer';
+      if (route === 'chat' && !chatOn) route = 'timer';
       showScreen('s-app');
       showView('v-' + route);
       setActiveTab(route);
@@ -418,7 +431,8 @@ function patchMainScript() {
   const _openBestDay = window.openBestDay;
   window.openBestDay = function (target) {
     if (S.pendingTab) {
-      const tab = S.pendingTab;
+      let tab = S.pendingTab;
+      if (tab === 'chat' && !chatOn) tab = 'timer';
       S.pendingTab = null;
       S.lastTrain  = null;    // Train picks the best day when first opened
       navTo(tab);
@@ -451,7 +465,7 @@ function patchMainScript() {
   };
 
   const m = /^#(chat|timer|account)$/.exec(BOOT_HASH);
-  if (m) S.pendingTab = (m[1] === 'chat' && !CHAT_ENABLED) ? 'timer' : m[1];
+  if (m) S.pendingTab = m[1];
 }
 
 /* ───────────────────────────────────────────────────────────────
@@ -1044,6 +1058,22 @@ patchMainScript();
 wireTimer();
 tmRender();
 if (typeof applyTextScale === 'function') applyTextScale();
+
+// For td-chat.js
+window.TD_TABS = {
+  enableChat() {
+    chatOn = true;
+    const b = document.getElementById('tab-chat');
+    if (b) b.hidden = false;
+  },
+  setChatBadge(n) {
+    const el = document.getElementById('tab-chat-badge');
+    if (!el) return;
+    el.hidden = !(n > 0);
+    el.textContent = n > 99 ? '99+' : String(n || '');
+  },
+  go: tabGo,
+};
 
 // For testing in the console.
 window.TD_TIMER = { buildPhases, locate, fmt, state: () => TM };
