@@ -397,6 +397,7 @@ function start() {
       });
   } catch (e) { console.warn('Chat: live updates unavailable —', e.message); }
 
+  if (isCoach()) { C.pendingOpen = BOOT_OPEN; pushSync(); }
   refreshInbox();
 }
 
@@ -445,6 +446,13 @@ async function refreshInbox() {
   C.loadedInbox = true;
   renderInbox();
   updateBadges();
+  // Opened by tapping a notification: go straight to that conversation.
+  if (C.pendingOpen && isCoach() && !C.inboxErr) {
+    const t = C.pendingOpen;
+    C.pendingOpen = null;
+    if (BOOT_OPEN) { BOOT_OPEN = null; history.replaceState(history.state, '', location.pathname + location.hash); }
+    openCoachThread(t);
+  }
 }
 function scheduleInbox(ms) {
   clearTimeout(C.inboxTimer);
@@ -455,6 +463,10 @@ function totalUnread() { return C.inbox.reduce((n, r) => n + (r.unread || 0), 0)
 function updateBadges() { setBadges(totalUnread()); }
 function setBadges(n) {
   if (window.TD_TABS) window.TD_TABS.setChatBadge(isCoach() ? 0 : n);
+  // Coach's home-screen icon shows the unread count (needs notifications on).
+  if (isCoach() && 'setAppBadge' in navigator && window.Notification && Notification.permission === 'granted') {
+    try { (n > 0 ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {}); } catch (e) {}
+  }
   const b = document.getElementById('adm-chat-badge');
   if (b) { b.hidden = !(isCoach() && n > 0); b.textContent = n > 99 ? '99+' : String(n || ''); }
 }
@@ -699,6 +711,7 @@ function onDelete(old) {
 }
 
 function markRead(thread) {
+  if (isCoach()) clearPushFor(thread);              // read here → clear it from the lock screen too
   clearTimeout(C.readTimer);
   C.readTimer = setTimeout(async () => {
     const client = sb();
@@ -737,6 +750,7 @@ async function send(retryOf) {
     renderMsgs();
     return;
   }
+  if (!isCoach()) notifyCoach(data.id);             // push to the coach's phone, if they've turned it on
   if (msg.resolvedId != null) return;               // the live update already swapped it in
   const dup = o.msgs.find(m => !m.tmp && String(m.id) === String(data.id));
   if (dup) o.msgs = o.msgs.filter(m => m !== msg);
@@ -1028,6 +1042,179 @@ function hook() {
 }
 
 /* ───────────────────────────────────────────────────────────────
+   COACH PUSH NOTIFICATIONS
+   Only the coach's devices are ever registered. Athletes' apps just
+   ask the notify-coach function to send one after they post.
+   ─────────────────────────────────────────────────────────────── */
+const VAPID_PUBLIC = 'BKxbyOaAb8zfi8oNeYytduwEyjTQ77_KuK2m4wRNYY36viv6AlhuK-Ugh147kboKRkLO9X7peoC7t03bQLdSuhI';
+let BOOT_OPEN = new URLSearchParams(location.search).get('open');
+
+const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+function b64ToBytes(b64) {
+  const s = atob((b64 + '='.repeat((4 - b64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(s, c => c.charCodeAt(0));
+}
+
+// The app's service worker (sw.js), waiting up to a few seconds for it.
+async function swReg() {
+  if (!('serviceWorker' in navigator)) return null;
+  const now = await navigator.serviceWorker.getRegistration();
+  if (now && now.active) return now;
+  return Promise.race([navigator.serviceWorker.ready, new Promise(r => setTimeout(() => r(now || null), 5000))]);
+}
+
+// Is push-sw.js loaded into sw.js? It answers this ping if so.
+function swHasPush(reg) {
+  return new Promise(res => {
+    if (!reg || !reg.active) return res(false);
+    const ch = new MessageChannel();
+    const t = setTimeout(() => res(false), 1500);
+    ch.port1.onmessage = e => { clearTimeout(t); res(!!(e.data && e.data.tdPush)); };
+    try { reg.active.postMessage({ type: 'td-push-ping' }, [ch.port2]); } catch (e) { clearTimeout(t); res(false); }
+  });
+}
+
+function notifyCoach(messageId) {
+  if (typeof fnCall !== 'function') return;
+  fnCall('notify-coach', { message_id: messageId })
+    .then(r => { if (r && r.ok === false) console.warn('Coach notification not sent:', r.error); })
+    .catch(() => {});
+}
+
+function clearPushFor(thread) {
+  swReg().then(reg => reg && reg.getNotifications({ tag: thread }))
+    .then(ns => (ns || []).forEach(n => n.close())).catch(() => {});
+}
+
+async function openCoachThread(thread) {
+  if (!isCoach() || !thread) return;
+  const btn = [...document.querySelectorAll('#s-admin .adm-tab')].find(b => /chat/i.test(b.textContent));
+  if (btn && !btn.classList.contains('active')) btn.click();
+  if (!C.inbox.some(r => r.thread === thread)) await refreshInbox();
+  openThread(thread);
+}
+
+function injectPushSettings() {
+  const panel = document.getElementById('adm-settings');
+  const title = panel && panel.querySelector('.section-title');
+  if (!panel || document.getElementById('td-push-row')) return;
+  const html =
+    '<div class="setting-row" id="td-push-row"><div><div class="setting-label">Message notifications</div>' +
+      '<div class="setting-desc" id="td-push-desc">Checking…</div></div>' +
+      '<button class="btn-sm" type="button" id="td-push-btn" hidden>Turn on</button></div>' +
+    '<div class="setting-row" id="td-push-teams-row" hidden><div><div class="setting-label">Team chat messages</div>' +
+      '<div class="setting-desc">Also notify when athletes post in team chats</div></div>' +
+      '<div class="toggle-wrap"><label class="toggle"><input type="checkbox" id="td-push-teams"><span class="toggle-slider"></span></label></div></div>';
+  if (title) title.insertAdjacentHTML('afterend', html); else panel.insertAdjacentHTML('afterbegin', html);
+  const st = document.createElement('style');
+  st.textContent = '#td-push-row[hidden], #td-push-teams-row[hidden], #td-push-btn[hidden] { display:none !important; }';
+  document.head.appendChild(st);
+  document.getElementById('td-push-btn').addEventListener('click', togglePush);
+  document.getElementById('td-push-teams').addEventListener('change', setTeamsPref);
+}
+
+const P = { sub: null, includeTeams: true, busy: false };
+
+function renderPush(note) {
+  const desc = document.getElementById('td-push-desc'), btn = document.getElementById('td-push-btn');
+  const teams = document.getElementById('td-push-teams-row');
+  if (!desc) return;
+  btn.hidden = true; teams.hidden = true; btn.disabled = P.busy;
+  if (!pushSupported()) {
+    desc.textContent = /iPhone|iPad|iPod/.test(navigator.userAgent)
+      ? 'Add TRAINDERIVE to your home screen and open it from there to turn these on.'
+      : 'This browser can’t show notifications.';
+    return;
+  }
+  if (Notification.permission === 'denied') {
+    desc.textContent = 'Blocked for this app. Allow notifications for TRAINDERIVE in your phone’s Settings, then come back here.';
+    return;
+  }
+  btn.hidden = false;
+  if (P.sub) {
+    desc.textContent = note || 'On for this device. You’ll get a notification when an athlete messages you.';
+    btn.textContent = 'Turn off';
+    teams.hidden = false;
+    document.getElementById('td-push-teams').checked = P.includeTeams;
+  } else {
+    desc.textContent = note || 'Get a notification on this device when an athlete messages you.';
+    btn.textContent = 'Turn on';
+  }
+}
+
+async function saveSub(sub) {
+  const j = sub.toJSON();
+  const { error } = await sb().from('td_push_subs')
+    .upsert({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth }, { onConflict: 'endpoint' });
+  if (error) throw error;
+  const { data } = await sb().from('td_push_subs').select('include_teams').eq('endpoint', j.endpoint).maybeSingle();
+  if (data) P.includeTeams = data.include_teams;
+}
+
+// On sign-in: if this device already has notifications on, keep its
+// registration current (phones occasionally rotate it).
+async function pushSync() {
+  injectPushSettings();
+  P.sub = null;
+  if (pushSupported() && Notification.permission === 'granted') {
+    try {
+      const reg = await swReg();
+      P.sub = reg ? await reg.pushManager.getSubscription() : null;
+      if (P.sub) await saveSub(P.sub);
+    } catch (e) { console.warn('Notifications:', e.message || e); }
+  }
+  renderPush();
+}
+
+async function togglePush() {
+  if (P.busy) return;
+  P.busy = true; renderPush();
+  try {
+    if (P.sub) {
+      const endpoint = P.sub.endpoint;
+      try { await P.sub.unsubscribe(); } catch (e) {}
+      await sb().from('td_push_subs').delete().eq('endpoint', endpoint);
+      P.sub = null;
+      showToast('Notifications off for this device', 'ok');
+    } else {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { P.busy = false; renderPush(); return; }
+      const reg = await swReg();
+      if (!reg) throw new Error('The app’s service worker isn’t running. Reopen the app and try again.');
+      P.sub = await reg.pushManager.getSubscription() ||
+              await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(VAPID_PUBLIC) });
+      await saveSub(P.sub);
+      if (!(await swHasPush(reg))) {
+        P.busy = false;
+        renderPush('Almost there: sw.js needs the push-sw.js line added at the top before notifications can show.');
+        return;
+      }
+      showToast('Notifications on', 'ok');
+    }
+  } catch (e) {
+    console.warn('Notifications:', e);
+    showToast('Couldn’t change notifications: ' + (e.message || e), 'err');
+  }
+  P.busy = false;
+  renderPush();
+}
+
+async function setTeamsPref(e) {
+  if (!P.sub) return;
+  P.includeTeams = e.target.checked;
+  const { error } = await sb().from('td_push_subs').update({ include_teams: P.includeTeams }).eq('endpoint', P.sub.endpoint);
+  if (error) { showToast('Couldn’t save that setting', 'err'); P.includeTeams = !P.includeTeams; renderPush(); }
+}
+
+// A notification tapped while the app is already open.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', e => {
+    if (e.data && e.data.type === 'td-open-thread') openCoachThread(e.data.thread);
+  });
+}
+
+/* ───────────────────────────────────────────────────────────────
    GO
    ─────────────────────────────────────────────────────────────── */
 if (typeof S === 'undefined' || typeof applyRoute !== 'function') {
@@ -1035,6 +1222,7 @@ if (typeof S === 'undefined' || typeof applyRoute !== 'function') {
   return;
 }
 inject();
+injectPushSettings();
 wire('athlete');
 wire('coach');
 wireTeams();
