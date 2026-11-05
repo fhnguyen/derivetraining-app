@@ -210,6 +210,14 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
 }
 .url-preview.valid   { border-color:var(--accent-bdr); color:var(--blue); }
 .url-preview.invalid { border-color:rgba(204,18,102,.4); color:var(--magenta); }
+.adv-sheet { border-top:1px solid var(--line); margin:4px 0 10px; padding-top:12px; }
+.adv-sheet > summary {
+  cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px; padding:4px 0 12px;
+  font-size:9.5px; font-weight:800; letter-spacing:1.8px; text-transform:uppercase; color:var(--blue);
+}
+.adv-sheet > summary::-webkit-details-marker { display:none; }
+.adv-sheet > summary::before { content:'\25B8'; font-size:12px; transition:transform .15s; }
+.adv-sheet[open] > summary::before { transform:rotate(90deg); }
 
 /* ── Install banner ──────────────────────────────── */
 .install-banner {
@@ -952,10 +960,6 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
       <div class="section-title" style="margin-bottom:1.2rem">Settings</div>
 
       <div class="setting-row">
-        <div><div class="setting-label">Refresh Athletes</div><div class="setting-desc">Reload the athlete list from the database</div></div>
-        <button class="btn-sm" id="btn-sync-master" onclick="adminSyncMaster()">Refresh</button>
-      </div>
-      <div class="setting-row">
         <div><div class="setting-label">Your Password</div><div class="setting-desc">Change the password for your coach account</div></div>
         <button class="btn-sm" onclick="openChangeAdminPass()">Change</button>
       </div>
@@ -1022,6 +1026,8 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
         <div class="url-preview" id="m-sheet-preview" style="display:none"></div>
         <div class="form-hint">Paste the full share link or just the spreadsheet ID. Must be shared as "Anyone with the link can view". Tabs are auto-discovered.</div>
       </div>
+      <details class="adv-sheet" id="m-adv">
+      <summary>Advanced sheet settings</summary>
       <div class="fld">
         <label>Tab Names <span style="font-weight:400;opacity:.6">(comma-separated programming tab names)</span></label>
         <input type="text" id="m-sheet-gid" placeholder="e.g. 2026 Training, 2027 Training">
@@ -1030,7 +1036,7 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
       <div class="fld">
         <label>Data From <span style="font-weight:400;opacity:.6">(load workouts from this date)</span></label>
         <input type="date" id="m-created-at" value="2024-01-01">
-        <div class="form-hint">Only dates on or after this will be loaded for the client. Defaults to Jan 1 2026. Set to account creation date for new athletes.</div>
+        <div class="form-hint">Only workouts on or after this date are shown to the athlete. New athletes start from today.</div>
       </div>
       <div class="fld">
         <label>Apps Script URL <span style="font-weight:400;opacity:.6">(optional — enables result syncing)</span></label>
@@ -1042,6 +1048,7 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
         <input type="text" id="m-script-secret" placeholder="Leave blank to keep the stored one" autocomplete="off">
         <div class="form-hint">Stored on the server, never sent to a browser — which is why it can be set here but not read back.</div>
       </div>
+      </details>
     </div>
     <div class="modal-foot"><button class="btn-cancel" onclick="closeModal('m-user')">Cancel</button><button class="btn-confirm" onclick="saveUser()">Save User</button></div>
   </div>
@@ -1140,7 +1147,7 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
 
 <div class="toast" id="toast"></div>
 
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+<script>
 // ═══════════════════════════════════════════════════════════════
 // DATA STORE
 // ═══════════════════════════════════════════════════════════════
@@ -1460,6 +1467,7 @@ async function doAdminLogin() {
 document.getElementById('m-al-pass').addEventListener('keydown', e => { if(e.key==='Enter') doAdminLogin(); });
 
 async function doAdminLogout() {
+  closeAthleteDetail();   // also stops checking that athlete's sheet
   await SB.auth.signOut();
   S.user = null;
   history.pushState({ route:'login' }, '', '#login');
@@ -1520,6 +1528,7 @@ function openAddUser() {
   document.getElementById('m-user-err').textContent = '';
   document.getElementById('m-sheet-preview').style.display = 'none';
   document.getElementById('m-email').disabled = false;
+  document.getElementById('m-adv').open = false;
   openModal('m-user');
 }
 
@@ -1540,6 +1549,7 @@ function openEditUser(id) {
   const tabNamesArr = u.sheetTabNames || [];
   document.getElementById('m-sheet-gid').value = tabNamesArr.join(', ');
   document.getElementById('m-user-err').textContent = '';
+  document.getElementById('m-adv').open = false;
   previewSheetId();
   openModal('m-user');
 }
@@ -1653,6 +1663,7 @@ function closeAthleteDetail(){
   if (dayView) dayView.classList.remove('active');
   const body = document.getElementById('detail-body');
   if (body) body.style.display = '';
+  if (ADM.detailUserId) stopAutoRefresh(ADM.detailUserId);   // stop checking their sheet in the background
   ADM.detailUserId = null;
 }
 function openChangeAdminPass(){ ['m-ap-cur','m-ap-new','m-ap-conf'].forEach(id=>document.getElementById(id).value=''); document.getElementById('m-ap-err').textContent=''; openModal('m-adminpass'); }
@@ -2240,8 +2251,17 @@ function _openDay(iso) {
   // Restore any unsaved draft from localStorage (survives refresh)
   const draft = loadDraft(iso);
   if (draft) {
-    if (draft.secResults) Object.assign(S.secResults, draft.secResults);
-    if (draft.feel && !S.feel) S.feel = draft.feel;
+    // New-style drafts are genuinely unsaved, so they win. Older drafts
+    // (from before this fix) only fill sections the sheet has nothing for.
+    const unsynced = draft.v === 2;
+    let used = false;
+    if (draft.secResults) Object.keys(draft.secResults).forEach(k => {
+      const v = draft.secResults[k];
+      if (!v || !String(v).trim()) return;
+      if (unsynced || !(S.secResults[k] || '').trim()) { S.secResults[k] = v; used = true; }
+    });
+    if (draft.feel && !S.feel) { S.feel = draft.feel; used = true; }
+    if (!unsynced) { if (used) saveDraft(iso); else clearDraft(iso); }
   }
 
   const dateObj = new Date(iso + 'T12:00:00');
@@ -2729,9 +2749,12 @@ function pickFeel(n){
 // Draft persistence keys
 function draftKey(userId, isoDate) { return 'bloc_draft_' + userId + '_' + isoDate; }
 
+// A draft is what's been typed on this device but not yet saved to the
+// sheet. It's cleared as soon as a save to the sheet succeeds, so an old
+// draft can never overwrite a newer result from the sheet.
 function saveDraft(isoDate) {
   if (!S.user) return;
-  const draft = { secResults: S.secResults, feel: S.feel };
+  const draft = { v: 2, secResults: S.secResults, feel: S.feel, savedAt: Date.now() };
   localStorage.setItem(draftKey(S.user.id, isoDate), JSON.stringify(draft));
 }
 
@@ -2810,6 +2833,7 @@ async function autoSaveAll(silent=false) {
   });
 
   if (r.ok) {
+    clearDraft(S.selDate);   // it's in the sheet now
     if (!silent) {
       const stEl=document.getElementById('save-st');
       if (stEl) { stEl.textContent='Synced ✓'; stEl.className='save-st ok'; }
@@ -3231,13 +3255,15 @@ async function adminViewUser(userId) {
     try {
       const dayMap = await loadUserSheets(u);
       ADM.cache[userId] = { dayMap, loadedAt: Date.now() };
-      // Start auto-refresh
-      if (u.spreadsheetId) startAutoRefresh(userId);
     } catch(err) {
       document.getElementById('detail-body').innerHTML = '<div class="sbox"><p class="e">Failed to load: ' + escH(err.message) + '</p></div>';
       return;
     }
   }
+
+  // Check their sheet for changes while they're open (also catches up
+  // straight away if it changed since you last looked).
+  if (u.spreadsheetId) startAutoRefresh(userId);
 
   // Always open at current month
   ADM.detailMonth = new Date();
@@ -3592,10 +3618,9 @@ if ('serviceWorker' in navigator) {
     <button class="install-banner-close" onclick="dismissInstallBanner()" title="Dismiss">✕</button>
   </div>
 
-  <!-- Coach programming editor — must load AFTER the main script above,
-       since it wraps adminOpenDay() and renderDetailBody(). -->
-  
-<script src="athlete-tabs.js?v=7"></script>
-   <script src="td-chat.js?v=2"></script>
+  <!-- Add-ons: bottom bars, timer, athlete list (athlete-tabs.js), then teams + chat (td-chat.js).
+       Bump the ?v= number whenever a file changes so phones fetch the new copy. -->
+  <script src="athlete-tabs.js?v=8"></script>
+  <script src="td-chat.js?v=3"></script>
 </body>
 </html>
