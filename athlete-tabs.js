@@ -35,7 +35,12 @@ const CSS = `
    live on the Account tab now. */
 .app-hd .tt-wrap, .app-hd .acct-btn, .app-hd .btn-ghost { display:none !important; }
 
-.app-main { padding-bottom:calc(92px + env(safe-area-inset-bottom, 0px)); }
+/* Space under the buttons. On iPhones with a home bar the safe area is
+   about 34pt; the bar only needs to clear the indicator line itself,
+   so it sits about 18pt lower than the full safe area. */
+:root { --tb-h:50px; --tb-pad:max(4px, calc(env(safe-area-inset-bottom, 0px) - 18px)); }
+
+.app-main { padding-bottom:calc(var(--tb-h) + var(--tb-pad) + 20px); }
 
 /* ── Bottom bar ─────────────────────────────────── */
 .tabbar {
@@ -45,17 +50,17 @@ const CSS = `
   backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
   border-top:1px solid var(--line);
   box-shadow:0 -6px 20px rgba(20,22,28,0.05);
-  padding:0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  padding:0 env(safe-area-inset-right, 0px) var(--tb-pad) env(safe-area-inset-left, 0px);
 }
 .tabbar-in { display:flex; width:100%; max-width:560px; }
 .tab {
-  flex:1; position:relative; min-width:0; height:62px;
-  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
+  flex:1; position:relative; min-width:0; height:var(--tb-h);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
   background:none; border:0; cursor:pointer; color:var(--ink-3);
   font-family:var(--sans); font-size:9px; font-weight:800; letter-spacing:1.6px; text-transform:uppercase;
   transition:color .15s;
 }
-.tab svg { width:24px; height:24px; flex-shrink:0; }
+.tab svg { width:21px; height:21px; flex-shrink:0; }
 .tab::before {
   content:''; position:absolute; top:-1px; left:26%; right:26%; height:3px; border-radius:0 0 2px 2px;
   background:var(--grad); transform:scaleX(0); transition:transform .25s;
@@ -65,7 +70,7 @@ const CSS = `
 .tab:hover:not(.active) { color:var(--ink); }
 .tab-lbl { font-variant-numeric:tabular-nums; white-space:nowrap; }
 .tab-dot {
-  display:none; position:absolute; top:10px; left:calc(50% + 10px);
+  display:none; position:absolute; top:6px; left:calc(50% + 9px);
   width:8px; height:8px; border-radius:50%; background:var(--gold);
   box-shadow:0 0 0 2px var(--paper); animation:pulse 2s ease-in-out infinite;
 }
@@ -73,8 +78,8 @@ const CSS = `
 .tab.live:not(.active) .tab-lbl { color:var(--gold-ink); letter-spacing:1px; font-size:10.5px; }
 
 /* Toast and the install banner sit above the bar */
-body:has(#s-app.active) .toast { bottom:calc(84px + env(safe-area-inset-bottom, 0px)); }
-#s-app.active ~ .install-banner { bottom:calc(62px + env(safe-area-inset-bottom, 0px)); padding-bottom:16px; }
+body:has(#s-app.active) .toast { bottom:calc(var(--tb-h) + var(--tb-pad) + 14px); }
+#s-app.active ~ .install-banner { bottom:calc(var(--tb-h) + var(--tb-pad)); padding-bottom:16px; }
 
 /* Shared page column for the new tabs */
 .tb-col { width:min(calc(100% - 2 * var(--gut)), 560px); margin:0 auto; padding-top:18px; }
