@@ -281,6 +281,39 @@ button.acc-row:hover { background:var(--wash); }
 #d-content > .logged-badge + .blk-wrap > .blk-lbl,
 #d-content > .daily-note + .blk-wrap > .blk-lbl { margin-top:12px; }
 
+/* ── Compact month calendar (athlete) ───────────── */
+/* One line: November 2026 ............ [↻][←][→], then the month. */
+#v-cal .hero { padding:12px 0 16px; }
+#v-cal .cal-nav { align-items:center; margin-bottom:12px; }
+#v-cal .cal-month-wrap { gap:0; }
+#v-cal .cal-badge { display:none !important; }
+#v-cal .cal-month { font-size:clamp(28px, 8.4vw, 38px); line-height:1; padding-top:3px; white-space:nowrap; }
+#v-cal .cal-arrows .btn-sm {
+  position:relative; width:38px; height:38px; padding:0; margin-right:6px !important;
+  font-size:0 !important; letter-spacing:0;
+}
+#v-cal .cal-arrows .btn-sm::before {
+  content:''; width:19px; height:19px; background:currentColor;
+  -webkit-mask:var(--ico) center / contain no-repeat; mask:var(--ico) center / contain no-repeat;
+  --ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 12a8 8 0 1 1-2.6-5.9'/%3E%3Cpath d='M20 4v5h-5'/%3E%3C/svg%3E");
+}
+#v-cal .cal-arr { width:38px; }
+#v-cal .cal-dow-row { margin-bottom:4px; }
+#v-cal .cal-legend { margin-top:12px; padding-top:10px; gap:6px 14px; }
+
+/* ── Workout: drop the lone "Training" heading ──── */
+/* AM / PM headings stay; a single block doesn't need a label. */
+#d-content .blk-lbl[data-block="Training"], #adm-day-content .blk-lbl[data-block="Training"] { display:none; }
+#d-content .blk-lbl[data-block="Training"] + .blk-sections,
+#adm-day-content .blk-lbl[data-block="Training"] + .blk-sections { margin-top:10px; }
+
+/* Results autosave as you type, so Save is a quieter backup button */
+#d-content .sub-row .btn-save {
+  background:var(--paper); color:var(--blue); border:1px solid var(--line); box-shadow:none;
+  padding:13px 24px;
+}
+#d-content .sub-row .btn-save:hover { border-color:var(--blue); background:var(--paper); color:var(--blue); transform:none; }
+
 /* ── Coach: an athlete's program, without the clutter ── */
 #adm-detail[style*="block"] {
   display:grid !important; grid-template-columns:auto minmax(0, 1fr); align-items:center; column-gap:10px;
@@ -315,6 +348,53 @@ button.acc-row:hover { background:var(--wash); }
 }
 #adm-day-view > .week-nav { grid-row:2; margin:0 !important; }
 #adm-day-view > #adm-day-content { grid-row:3; }
+
+/* ── Coach: athlete list ────────────────────────── */
+#adm-users .table-wrap { display:none; }
+.ros-search {
+  width:100%; background:var(--paper); border:1px solid var(--line); border-radius:4px;
+  padding:11px 13px; font-family:inherit; font-size:16px; color:var(--ink); outline:none; margin-bottom:10px;
+}
+.ros-search:focus { border-color:var(--blue); }
+.ros-sec { font-size:9px; font-weight:800; letter-spacing:2px; text-transform:uppercase; color:var(--ink-3); margin:16px 2px 6px; }
+.ros-sec:first-child { margin-top:2px; }
+.ros-list { background:var(--paper); border:1px solid var(--line); border-radius:4px; overflow:hidden; }
+.ros-row { display:flex; align-items:center; }
+.ros-row + .ros-row { border-top:1px solid var(--line); }
+.ros-main {
+  flex:1; min-width:0; display:flex; align-items:center; gap:12px; padding:11px 4px 11px 12px;
+  background:none; border:0; font:inherit; color:inherit; text-align:left; cursor:pointer;
+}
+.ros-main:hover { background:var(--wash); }
+.ros-av {
+  width:38px; height:38px; flex-shrink:0; border-radius:3px; display:grid; place-items:center;
+  background:var(--blue); color:#fff; font-family:var(--display); font-size:21px; padding-top:2px;
+}
+.ros-row.coach .ros-av { background:var(--gold); color:var(--ink); }
+.ros-mid { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.ros-name { font-weight:700; font-size:15px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ros-sub { font-size:12.5px; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ros-tag {
+  flex-shrink:0; font-size:8.5px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase;
+  padding:4px 6px; border-radius:2px; color:var(--magenta); background:rgba(204,18,102,.07); border:1px solid rgba(204,18,102,.25);
+}
+.ros-tag.coach { color:var(--gold-ink); background:var(--gold-bg); border-color:var(--gold-bdr); }
+.ros-chev { color:var(--ink-3); font-size:18px; flex-shrink:0; margin-left:2px; }
+.ros-more {
+  width:46px; align-self:stretch; flex-shrink:0; background:none; border:0; border-left:1px solid var(--line);
+  color:var(--ink-3); font-size:20px; line-height:1; cursor:pointer; letter-spacing:1px;
+}
+.ros-more:hover { background:var(--wash); color:var(--blue); }
+.ros-none { padding:28px 16px; text-align:center; font-size:13.5px; color:var(--ink-3); }
+.ros-acts { display:flex; flex-direction:column; gap:8px; padding-bottom:12px; }
+.ros-act {
+  width:100%; height:50px; border-radius:3px; cursor:pointer; text-align:left; padding:0 16px;
+  background:var(--paper); border:1px solid var(--line); color:var(--ink);
+  font-family:var(--sans); font-size:14.5px; font-weight:600;
+}
+.ros-act:hover { border-color:var(--blue); color:var(--blue); }
+.ros-act.danger { color:var(--magenta); }
+.ros-act.danger:hover { border-color:var(--magenta); }
 
 /* ── Coach panel: bottom bar on phones and tablets ─ */
 #adm-tabbar { display:none; }
@@ -1205,6 +1285,126 @@ function fitTitles() { ['d-title', 'adm-day-title'].forEach(id => fitDayTitle(do
 let fitTimer = null;
 window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitTitles, 120); });
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitTitles);   // once Bebas Neue has loaded
+
+/* ───────────────────────────────────────────────────────────────
+   COACH: ATHLETE LIST
+   Replaces the wide table with a list that works on a phone. The
+   table is still drawn (hidden), so everything that updates it keeps
+   working; Edit still has every detail, spreadsheet included.
+   ─────────────────────────────────────────────────────────────── */
+let rosterQuery = '';
+let rosterActId = null;
+
+function rosterRow(u) {
+  const isCoachRow = u.role === 'coach';
+  const row = document.createElement('div');
+  row.className = 'ros-row' + (isCoachRow ? ' coach' : '');
+  row.innerHTML =
+    '<button type="button" class="ros-main"><span class="ros-av"></span>' +
+      '<span class="ros-mid"><span class="ros-name"></span><span class="ros-sub"></span></span>' +
+      (isCoachRow ? '<span class="ros-tag coach">Coach</span>'
+                  : (u.spreadsheetId ? '' : '<span class="ros-tag">No sheet</span>') + '<span class="ros-chev">&#8250;</span>') +
+    '</button>' +
+    '<button type="button" class="ros-more" aria-label="More options">&#8943;</button>';
+  row.querySelector('.ros-av').textContent = (u.name || '?').trim().charAt(0).toUpperCase() || '?';
+  row.querySelector('.ros-name').textContent = u.name || 'Unnamed';
+  row.querySelector('.ros-sub').textContent = u.email || '';
+  row.querySelector('.ros-main').addEventListener('click', () => {
+    if (isCoachRow) openEditUser(u.id);        // coaches have no program to view
+    else adminViewUser(u.id);
+  });
+  row.querySelector('.ros-more').addEventListener('click', () => openRosterActions(u.id));
+  return row;
+}
+
+function renderRoster() {
+  const box = document.getElementById('td-roster');
+  if (!box) return;
+  const all = (window.PROFILES || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const q = rosterQuery.trim().toLowerCase();
+  const match = u => !q || ((u.name || '') + ' ' + (u.email || '')).toLowerCase().includes(q);
+  const athletes = all.filter(u => u.role !== 'coach' && match(u));
+  const coaches = all.filter(u => u.role === 'coach' && match(u));
+  box.innerHTML = '';
+  if (!all.length) { box.innerHTML = '<div class="ros-list"><div class="ros-none">No athletes yet — tap + Add User.</div></div>'; return; }
+  if (!athletes.length && !coaches.length) {
+    const none = document.createElement('div');
+    none.className = 'ros-list';
+    none.innerHTML = '<div class="ros-none"></div>';
+    none.firstChild.textContent = 'No one matches “' + rosterQuery.trim() + '”.';
+    box.appendChild(none);
+    return;
+  }
+  const section = (label, people) => {
+    if (!people.length) return;
+    const h = document.createElement('div');
+    h.className = 'ros-sec';
+    h.textContent = label + ' · ' + people.length;
+    const list = document.createElement('div');
+    list.className = 'ros-list';
+    people.forEach(u => list.appendChild(rosterRow(u)));
+    box.appendChild(h); box.appendChild(list);
+  };
+  section('Athletes', athletes);
+  section(coaches.length === 1 ? 'Coach' : 'Coaches', coaches);
+}
+
+function openRosterActions(id) {
+  const u = (window.PROFILES || []).find(p => p.id === id);
+  if (!u) return;
+  rosterActId = id;
+  const isCoachRow = u.role === 'coach';
+  const self = typeof S !== 'undefined' && S.user && S.user.id === id;
+  document.getElementById('m-ros-title').textContent = u.name || 'Unnamed';
+  const show = (sel, on) => { document.querySelector(sel).hidden = !on; };
+  show('[data-ros="view"]', !isCoachRow);
+  show('[data-ros="msg"]', !isCoachRow && !!(window.TD_CHAT && window.TD_CHAT.open));
+  show('[data-ros="del"]', !self);
+  openModal('m-ros');
+}
+
+function setupRoster() {
+  const panel = document.getElementById('adm-users');
+  if (!panel || typeof window.renderUserTable !== 'function' || document.getElementById('td-roster')) return;
+  const hd = panel.querySelector('.users-hd');
+  const holder = document.createElement('div');
+  holder.innerHTML = '<input type="search" class="ros-search" placeholder="Search athletes" autocomplete="off" aria-label="Search athletes">' +
+                     '<div id="td-roster"></div>';
+  if (hd) hd.after(...holder.childNodes); else panel.prepend(...holder.childNodes);
+  panel.querySelector('.ros-search').addEventListener('input', e => { rosterQuery = e.target.value; renderRoster(); });
+
+  document.body.insertAdjacentHTML('beforeend',
+    '<div class="modal-bg" id="m-ros"><div class="modal" style="max-width:420px">' +
+      '<div class="modal-hd"><div class="modal-title" id="m-ros-title"></div>' +
+        '<button class="modal-close" type="button" onclick="closeModal(\'m-ros\')">&#10005;</button></div>' +
+      '<div class="modal-body"><div class="ros-acts">' +
+        '<button type="button" class="ros-act" data-ros="view">View program</button>' +
+        '<button type="button" class="ros-act" data-ros="msg">Message</button>' +
+        '<button type="button" class="ros-act" data-ros="edit">Edit details &amp; spreadsheet</button>' +
+        '<button type="button" class="ros-act danger" data-ros="del">Delete</button>' +
+      '</div></div></div></div>');
+  const sheet = document.getElementById('m-ros');
+  sheet.addEventListener('click', e => {
+    if (e.target === sheet) { closeModal('m-ros'); return; }
+    const b = e.target.closest('[data-ros]');
+    if (!b || !rosterActId) return;
+    const id = rosterActId;
+    closeModal('m-ros');
+    if (b.dataset.ros === 'view') adminViewUser(id);
+    else if (b.dataset.ros === 'msg') window.TD_CHAT.open('d:' + id);
+    else if (b.dataset.ros === 'edit') openEditUser(id);
+    else if (b.dataset.ros === 'del') openDeleteUser(id);
+  });
+
+  const orig = window.renderUserTable;
+  window.renderUserTable = function () {
+    try { orig.apply(this, arguments); } catch (e) { console.warn(e); }
+    renderRoster();
+  };
+  renderRoster();
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setupRoster);
+else setTimeout(setupRoster, 0);
 
 /* ───────────────────────────────────────────────────────────────
    COACH PANEL BOTTOM BAR
