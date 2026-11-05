@@ -226,6 +226,96 @@ button.acc-row:hover { background:var(--wash); }
 .acc-out:hover { background:var(--magenta); border-color:var(--magenta); color:#fff; }
 .acc-foot { text-align:center; font-size:9px; font-weight:700; letter-spacing:2.5px; text-transform:uppercase; color:var(--ink-3); padding:22px 0 6px; }
 
+/* ── Compact day header (athlete) ───────────────── */
+/* One line: [calendar] Thursday, November 5 [refresh], then the week. */
+#v-day .hero { padding:10px 0 12px; }
+#v-day .hero-in {
+  display:grid; grid-template-columns:auto minmax(0, 1fr) auto; align-items:center; column-gap:10px; row-gap:10px;
+}
+#v-day .hero-bar { display:contents; }
+#v-day .day-hd { grid-column:2; grid-row:1; margin:0; display:block; min-width:0; }
+#v-day .day-sub { display:none; }
+#v-day .day-title {
+  font-size:clamp(28px, 8.4vw, 38px); line-height:1; padding-top:3px;
+  white-space:nowrap; overflow:hidden;
+}
+#v-day #week-nav { grid-column:1 / -1; grid-row:2; }
+#v-day .back-btn { grid-column:1; grid-row:1; }
+#v-day #day-refresh-btn { grid-column:3; grid-row:1; }
+
+/* Icon-only buttons, same size, words kept for screen readers */
+#v-day .back-btn, #v-day #day-refresh-btn, #adm-detail .detail-back, #detail-refresh-btn, #adm-day-view .adm-day-back {
+  position:relative; width:38px; height:38px; padding:0; margin:0; flex-shrink:0;
+  font-size:0 !important; letter-spacing:0; color:var(--blue);
+  background:var(--paper); border:1px solid var(--line); border-radius:3px; box-shadow:none;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+#v-day .back-btn:hover, #v-day #day-refresh-btn:hover, #adm-detail .detail-back:hover, #detail-refresh-btn:hover, #adm-day-view .adm-day-back:hover {
+  border-color:var(--blue); background:var(--paper); color:var(--blue);
+}
+#v-day .back-btn::before, #adm-day-view .adm-day-back::before, #v-day #day-refresh-btn::before, #detail-refresh-btn::before, #adm-detail .detail-back::before {
+  content:''; width:19px; height:19px; background:currentColor;
+  -webkit-mask:var(--ico) center / contain no-repeat; mask:var(--ico) center / contain no-repeat;
+}
+#v-day .back-btn, #adm-day-view .adm-day-back {
+  --ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='5' width='17' height='15.5' rx='2'/%3E%3Cpath d='M3.5 10h17M8 3v4M16 3v4'/%3E%3C/svg%3E");
+}
+#v-day #day-refresh-btn, #detail-refresh-btn {
+  --ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 12a8 8 0 1 1-2.6-5.9'/%3E%3Cpath d='M20 4v5h-5'/%3E%3C/svg%3E");
+}
+#adm-detail .detail-back {
+  --ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 5l-7 7 7 7'/%3E%3C/svg%3E");
+}
+#v-day #day-refresh-btn:disabled, #detail-refresh-btn:disabled { opacity:.5; }
+#v-day #day-refresh-btn:disabled::before, #detail-refresh-btn:disabled::before { animation:spin .8s linear infinite; }
+
+/* Shorter week strip (athlete and coach) */
+.week-nav .wn-day { padding:6px 0 5px; gap:2px; border-top-width:3px; }
+.week-nav .wn-n { font-size:clamp(19px, 5.4vw, 25px); }
+.week-nav .wn-d { font-size:8px; }
+.week-nav .wn-arr { flex-basis:28px; }
+
+/* Less space before the first block */
+#d-content { padding-top:12px; }
+#d-content .logged-badge { margin-bottom:4px; }
+#d-content > .logged-badge + .blk-wrap > .blk-lbl,
+#d-content > .daily-note + .blk-wrap > .blk-lbl { margin-top:12px; }
+
+/* ── Coach: an athlete's program, without the clutter ── */
+#adm-detail[style*="block"] {
+  display:grid !important; grid-template-columns:auto minmax(0, 1fr); align-items:center; column-gap:10px;
+}
+#adm-detail > * { grid-column:1 / -1; }
+#adm-detail > .detail-back { grid-column:1; grid-row:1; }
+#adm-detail > .detail-hd {
+  grid-column:2; grid-row:1; margin:0; flex-wrap:nowrap; align-items:center; gap:10px; min-width:0;
+}
+#adm-detail .detail-hd > div:first-child { min-width:0; flex:1; }
+#adm-detail .detail-name {
+  font-size:clamp(24px, 7vw, 34px); line-height:1; padding-top:3px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+#adm-detail .detail-meta, #adm-detail .refresh-indicator { display:none !important; }
+#adm-detail .adm-cal-nav { margin:14px 0 12px; align-items:center; }
+#adm-detail .adm-cal-month { font-size:clamp(22px, 6vw, 30px); }
+/* Inside a day, the month controls aren't needed */
+#adm-detail:has(#adm-day-view.active) .adm-cal-nav { display:none; }
+#adm-detail #adm-day-view.active {
+  display:grid; grid-template-columns:auto minmax(0, 1fr); align-items:center; column-gap:10px; row-gap:10px; margin-top:12px;
+}
+#adm-day-view > * { grid-column:1 / -1; order:0 !important; }
+#adm-day-view > .adm-day-back { grid-column:1; grid-row:1; align-self:center; }
+#adm-day-view > .day-hd {
+  grid-column:2; grid-row:1; margin:0; padding:0; border:0; background:none; display:block; min-width:0;
+}
+#adm-day-view .day-sub { display:none; }
+#adm-day-view .day-title {
+  font-size:clamp(26px, 7.6vw, 34px) !important; line-height:1; padding-top:3px;
+  white-space:nowrap; overflow:hidden;
+}
+#adm-day-view > .week-nav { grid-row:2; margin:0 !important; }
+#adm-day-view > #adm-day-content { grid-row:3; }
+
 /* ── Coach panel: bottom bar on phones and tablets ─ */
 #adm-tabbar { display:none; }
 .adm-mobile-only { display:none !important; }
@@ -1077,6 +1167,44 @@ patchMainScript();
 wireTimer();
 tmRender();
 if (typeof applyTextScale === 'function') applyTextScale();
+
+/* ───────────────────────────────────────────────────────────────
+   DAY TITLE THAT ALWAYS FITS
+   The date stays big. If the full date doesn't fit on one line, it
+   steps down to a shorter form instead of being cut off:
+     Wednesday, September 30 → Wednesday, Sep 30 → Wed, Sep 30
+   ─────────────────────────────────────────────────────────────── */
+function fitDayTitle(el, iso) {
+  if (!el) return;
+  iso = iso || el.dataset.iso;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return;
+  el.dataset.iso = iso;
+  const d = new Date(iso + 'T12:00:00');
+  const forms = [
+    { weekday:'long',  month:'long',  day:'numeric' },
+    { weekday:'long',  month:'short', day:'numeric' },
+    { weekday:'short', month:'short', day:'numeric' },
+  ].map(f => d.toLocaleDateString('en-US', f));
+  el.title = forms[0];
+  if (!el.clientWidth) { el.textContent = forms[0]; return; }   // not on screen yet; fitted when it is
+  for (const text of forms) {
+    el.textContent = text;
+    if (el.scrollWidth <= el.clientWidth + 1) return;
+  }
+}
+function fitTitles() { ['d-title', 'adm-day-title'].forEach(id => fitDayTitle(document.getElementById(id))); }
+['_openDay', 'adminOpenDay'].forEach(fn => {
+  const orig = window[fn];
+  if (typeof orig !== 'function') return;
+  window[fn] = function (iso) {
+    const r = orig.apply(this, arguments);
+    fitDayTitle(document.getElementById(fn === '_openDay' ? 'd-title' : 'adm-day-title'), iso);
+    return r;
+  };
+});
+let fitTimer = null;
+window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitTitles, 120); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitTitles);   // once Bebas Neue has loaded
 
 /* ───────────────────────────────────────────────────────────────
    COACH PANEL BOTTOM BAR
