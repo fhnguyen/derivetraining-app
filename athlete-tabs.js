@@ -349,6 +349,56 @@ button.acc-row:hover { background:var(--wash); }
 #adm-day-view > .week-nav { grid-row:2; margin:0 !important; }
 #adm-day-view > #adm-day-content { grid-row:3; }
 
+/* ── % Calculator ───────────────────────────────── */
+.app-hd .pc-hd-btn { font-family:var(--display); font-size:20px; padding-top:2px; }
+.pc-open {
+  display:flex; align-items:center; gap:10px; width:100%; margin:12px 0 2px; cursor:pointer; text-align:left;
+  background:var(--blue-soft); border:1px solid rgba(0,68,223,.22); border-radius:4px; padding:10px 12px;
+  font:inherit; color:var(--blue); transition:background .15s, border-color .15s;
+}
+.pc-open:hover { border-color:var(--blue); }
+.pc-open-ico { font-family:var(--display); font-size:22px; line-height:1; width:30px; height:30px; flex-shrink:0;
+  display:grid; place-items:center; background:var(--blue); color:#fff; border-radius:3px; padding-top:2px; }
+.pc-open-txt { flex:1; min-width:0; }
+.pc-open-lbl { display:block; font-size:9.5px; font-weight:800; letter-spacing:1.8px; text-transform:uppercase; }
+.pc-open-sub { display:block; font-size:13px; font-weight:600; color:var(--ink-2); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pc-open-chev { font-size:18px; flex-shrink:0; }
+
+#m-pct .modal { max-width:460px; }
+.pc-row2 { display:flex; gap:8px; align-items:flex-end; }
+.pc-row2 .fld { flex:1; min-width:0; margin-bottom:12px; }
+.pc-max {
+  font-family:var(--display) !important; font-size:34px !important; line-height:1 !important; padding:8px 12px 6px !important;
+  letter-spacing:.5px;
+}
+.pc-seg { display:flex; border:1px solid var(--line); border-radius:4px; overflow:hidden; flex-shrink:0; margin-bottom:12px; height:56px; }
+.pc-seg button {
+  width:52px; background:var(--paper); border:0; cursor:pointer; color:var(--ink-3);
+  font-size:11px; font-weight:800; letter-spacing:1.6px; text-transform:uppercase;
+}
+.pc-seg button + button { border-left:1px solid var(--line); }
+.pc-seg button.on { background:var(--blue); color:#fff; }
+.pc-today {
+  position:relative; overflow:hidden; background:#FCF5E8; border-left:4px solid var(--gold); border-radius:0 4px 4px 0;
+  padding:12px 14px; margin-bottom:12px;
+}
+.pc-today-lbl { font-size:9px; font-weight:800; letter-spacing:2px; text-transform:uppercase; color:var(--gold-ink); }
+.pc-today-val { font-family:var(--display); font-size:30px; line-height:1; color:var(--ink); margin-top:6px; }
+.pc-today-pct { font-size:12.5px; font-weight:600; color:var(--ink-2); margin-top:3px; }
+.pc-empty { text-align:center; padding:22px 12px; font-size:13.5px; color:var(--ink-3); background:var(--wash); border-radius:4px; }
+.pc-table { border:1px solid var(--line); border-radius:4px; overflow:hidden; margin-bottom:8px; }
+.pc-tr { display:flex; align-items:center; justify-content:space-between; padding:9px 14px; border-top:1px solid var(--line); }
+.pc-tr:first-child { border-top:0; }
+.pc-tr:nth-child(even) { background:#FAFBFE; }
+.pc-pct { font-family:var(--display); font-size:21px; line-height:1; color:var(--ink-3); padding-top:2px; width:62px; }
+.pc-w { font-family:var(--display); font-size:24px; line-height:1; color:var(--ink); padding-top:2px; }
+.pc-w small { font-family:var(--sans); font-size:11px; font-weight:700; letter-spacing:1px; color:var(--ink-3); margin-left:4px; }
+.pc-tag { flex:1; font-size:8.5px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase; color:var(--gold-ink); }
+.pc-tr.hit { background:#FCF5E8 !important; box-shadow:inset 4px 0 0 var(--gold); }
+.pc-tr.hit .pc-pct { color:var(--gold-ink); }
+.pc-tr.band { background:rgba(220,142,9,.05) !important; }
+.pc-note { font-size:11.5px; line-height:1.5; color:var(--ink-3); text-align:center; padding:4px 0 10px; }
+
 /* ── Coach: athlete list ────────────────────────── */
 #adm-users .table-wrap { display:none; }
 .ros-search {
@@ -487,7 +537,7 @@ function injectMarkup() {
         '<div class="tm-ctrls">' +
           '<button class="tm-btn" id="tm-reset" type="button">Reset</button>' +
           '<button class="tm-btn go" id="tm-go" type="button">Start</button>' +
-          '<button class="tm-btn round" id="tm-round" type="button">+ Round</button>' +
+          '<button class="tm-btn round" id="tm-round" type="button">Split</button>' +
         '</div>' +
         '<div class="tm-card" id="tm-setup"></div>' +
         '<div class="tm-card" id="tm-laps" hidden></div>' +
@@ -789,6 +839,7 @@ function fmtShort(sec) {
   return fmt(sec);
 }
 const roundsTxt = n => n + (n === 1 ? ' round' : ' rounds');
+const splitsTxt = n => n + (n === 1 ? ' split' : ' splits');
 
 /* ── Sound ─────────────────────────────────────────── */
 // Beeps play OVER the athlete's music, never instead of it. "ambient"
@@ -915,13 +966,27 @@ function tmFinish(el, capHit) {
   setTimeout(sleepAudio, 2500);   // after the finish beeps have played
   tmRender();
 }
+// Split: marks the time on the workout clock (after the get-ready
+// countdown). Works in every mode, during work or rest.
 function tmRound() {
   if (TM.state !== 'running') return;
-  const loc = locate(TM.phases, tmElapsed());
-  if (loc.done || loc.ph.kind !== 'work') return;
-  TM.laps.push(loc.inPh);
+  const el = tmElapsed(), loc = locate(TM.phases, el);
+  if (loc.done || loc.ph.kind === 'ready') return;
+  const tag = loc.ph.round ? 'Rd ' + loc.ph.round + (loc.ph.kind === 'rest' ? ' rest' : '') : '';
+  TM.laps.push({ t: el - leadOf(TM.phases), tag });
   tone(880, 0.08); buzz(40);
+  flash('count');
   tmRender();
+}
+// The Split button only shows while a clock is running (or paused),
+// and wakes up when the get-ready countdown ends.
+function syncSplitBtn() {
+  const b = document.getElementById('tm-round');
+  if (!b) return;
+  const live = TM.state === 'running' || TM.state === 'paused';
+  b.style.display = live ? '' : 'none';
+  const loc = live ? locate(TM.phases, tmElapsed()) : null;
+  b.disabled = TM.state !== 'running' || !loc || loc.done || loc.ph.kind === 'ready';
 }
 function startTicker() { stopTicker(); TM.ticker = setInterval(tmTick, 100); }
 function stopTicker()  { if (TM.ticker) { clearInterval(TM.ticker); TM.ticker = null; } }
@@ -938,6 +1003,7 @@ function tmTick() {
 
   // Phase changed: cue it, unless the phone was asleep through it.
   if (loc.i !== TM.lastPhase) {
+    syncSplitBtn();
     if (loc.inPh < 1.5) {
       if (loc.ph.kind === 'work') cue.go();
       else if (loc.ph.kind === 'rest') cue.rest();
@@ -977,7 +1043,7 @@ function faceState() {
   if (TM.state === 'done') {
     const workTime = TM.endEl - lead;
     if (mode === 'fortime') return { ph:'done', label: TM.capHit ? 'Time Cap' : 'Done', time: fmt(workTime),
-      sub: TM.laps.length ? roundsTxt(TM.laps.length) : 'Nice work', bar: null };
+      sub: TM.laps.length ? splitsTxt(TM.laps.length) : 'Nice work', bar: null };
     if (mode === 'amrap')   return { ph:'done', label:'Time', time: '0:00',
       sub: TM.laps.length ? roundsTxt(TM.laps.length) : 'AMRAP complete', bar: 1 };
     const n = mode === 'emom' ? c.emom.rounds : c.intervals.rounds;
@@ -995,13 +1061,13 @@ function faceState() {
   if (mode === 'fortime') {
     const capOn = ph.dur !== Infinity;
     const bits = [];
-    if (TM.laps.length) bits.push(roundsTxt(TM.laps.length));
+    if (TM.laps.length) bits.push(splitsTxt(TM.laps.length));
     if (capOn) bits.push('cap ' + fmt(ph.dur));
-    return { ph:'work', label:'For Time', time, sub: bits.join(' \u00B7 ') || 'Tap + Round as you go', bar: capOn ? loc.inPh / ph.dur : null };
+    return { ph:'work', label:'For Time', time, sub: bits.join(' \u00B7 ') || 'Tap Split as you go', bar: capOn ? loc.inPh / ph.dur : null };
   }
   if (mode === 'amrap') {
     return { ph:'work', label:'AMRAP', time,
-      sub: TM.laps.length ? roundsTxt(TM.laps.length) : 'Tap + Round as you go', bar: loc.inPh / ph.dur };
+      sub: TM.laps.length ? roundsTxt(TM.laps.length) : 'Tap Split after each round', bar: loc.inPh / ph.dur };
   }
   return { ph: ph.kind, label: mode === 'emom' ? 'EMOM' : (ph.kind === 'rest' ? 'Rest' : 'Work'), time,
     sub: 'Round ' + ph.round + ' of ' + ph.of + ' \u00B7 ' + left, bar: loc.inPh / ph.dur };
@@ -1094,10 +1160,10 @@ function summary() {
 function lapsHTML() {
   if (!TM.laps.length) return '';
   let prev = 0;
-  const rows = TM.laps.map((t, i) => { const split = t - prev; prev = t; return { n: i + 1, split, at: t }; }).reverse();
-  return '<div class="tm-laps-hd"><span class="tm-lbl">Rounds</span><span class="tm-lbl">' + TM.laps.length + '</span></div>' +
+  const rows = TM.laps.map((l, i) => { const split = l.t - prev; prev = l.t; return { n: i + 1, split, at: l.t, tag: l.tag }; }).reverse();
+  return '<div class="tm-laps-hd"><span class="tm-lbl">Splits</span><span class="tm-lbl">' + TM.laps.length + '</span></div>' +
     rows.map(r => '<div class="tm-lap"><span class="tm-lap-n">' + r.n + '</span>' +
-      '<span class="tm-lap-split">' + fmt(r.split) + '</span><span class="tm-lap-at">at ' + fmt(r.at) + '</span></div>').join('');
+      '<span class="tm-lap-split">' + fmt(r.split) + '</span><span class="tm-lap-at">at ' + fmt(r.at) + (r.tag ? ' \u00B7 ' + r.tag : '') + '</span></div>').join('');
 }
 
 function tmRender() {
@@ -1124,16 +1190,14 @@ function tmRender() {
   const reset = document.getElementById('tm-reset');
   reset.disabled = idle || TM.state === 'running';    // pause first, so a stray tap can't wipe a workout
 
-  const round = document.getElementById('tm-round');
-  round.style.display = (c.mode === 'fortime' || c.mode === 'amrap') ? '' : 'none';
-  round.disabled = TM.state !== 'running';
+  syncSplitBtn();
 
   const snd = document.getElementById('tm-snd');
   snd.innerHTML = c.sound ? ICON.sound : ICON.muted;
   snd.setAttribute('aria-label', c.sound ? 'Sound on' : 'Sound off');
 
   const laps = document.getElementById('tm-laps');
-  const lh = (c.mode === 'fortime' || c.mode === 'amrap') ? lapsHTML() : '';
+  const lh = lapsHTML();
   laps.hidden = !lh;
   laps.innerHTML = lh;
 
@@ -1247,6 +1311,202 @@ patchMainScript();
 wireTimer();
 tmRender();
 if (typeof applyTextScale === 'function') applyTextScale();
+
+/* ───────────────────────────────────────────────────────────────
+   % CALCULATOR
+   Opens from the % button in the top bar, or from a section whose
+   programming mentions percentages ("5x3 @ 60-65%", "4 @ 165 (72%)").
+   The athlete enters their max once per lift; it's remembered on this
+   device, and the chart shows every 5% plus the workout's own numbers.
+   ─────────────────────────────────────────────────────────────── */
+const PC_PREFS_KEY = 'td_calc_prefs';
+const PC = { key: '', pcts: [], ranges: [], unit: 'lb' };
+
+function pcMaxesKey() { return 'td_maxes_' + ((typeof S !== 'undefined' && S.user) ? S.user.id : 'anon'); }
+function pcLoad(k, fallback) { try { return JSON.parse(localStorage.getItem(k)) || fallback; } catch (e) { return fallback; } }
+function pcSave(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+
+// Percentages written in a section: "60-65%", "60 to 65%", "60%-65%", "72%".
+function pcFind(text) {
+  const out = { pcts: [], ranges: [] };
+  const s = String(text || '');
+  const re = /(\d{1,3}(?:\.\d+)?)\s*%?\s*(?:-|–|—|to)\s*(\d{1,3}(?:\.\d+)?)\s*%|(\d{1,3}(?:\.\d+)?)\s*%/gi;
+  let m;
+  while ((m = re.exec(s))) {
+    if (m[3] != null) {
+      const v = parseFloat(m[3]);
+      if (v >= 20 && v <= 120) out.pcts.push(v);
+    } else {
+      const a = parseFloat(m[1]), b = parseFloat(m[2]);
+      if (a >= 20 && b <= 120 && a < b) { out.ranges.push([a, b]); out.pcts.push(a, b); }
+    }
+  }
+  out.pcts = [...new Set(out.pcts)].sort((x, y) => x - y);
+  return out;
+}
+
+// Lift name for the title, and a key that groups "Back Squat" days together.
+function pcLiftOf(title) {
+  const clean = String(typeof stripInline === 'function' ? stripInline(title) : title)
+    .replace(/^[A-Za-z]{1,3}[.):\-]\s+/, '').trim();
+  const k = typeof liftKey === 'function' ? liftKey(clean) : null;
+  return { name: clean, key: (k || clean).toLowerCase() };
+}
+
+function pcFmt(n) { return (Math.round(n * 10) / 10).toString(); }
+// Exact, shown to the nearest tenth (pcFmt) — no rounding to plates.
+function pcWeight(max, pct) { return max * pct / 100; }
+
+function injectCalc() {
+  const right = document.querySelector('#s-app .app-hd .hd-right');
+  if (right && !document.getElementById('pc-hd-btn')) {
+    const b = document.createElement('button');
+    b.id = 'pc-hd-btn'; b.className = 'hd-icon pc-hd-btn'; b.type = 'button';
+    b.title = 'Percentage calculator'; b.setAttribute('aria-label', 'Percentage calculator');
+    b.textContent = '%';
+    b.addEventListener('click', () => openCalc(null));
+    right.insertBefore(b, right.firstChild);
+  }
+  if (document.getElementById('m-pct')) return;
+  document.body.insertAdjacentHTML('beforeend',
+    '<div class="modal-bg" id="m-pct"><div class="modal">' +
+      '<div class="modal-hd"><div class="modal-title">% Calculator</div>' +
+        '<button class="modal-close" type="button" onclick="closeModal(\'m-pct\')" aria-label="Close">&#10005;</button></div>' +
+      '<div class="modal-body">' +
+        '<div class="pc-row2"><div class="fld"><label for="pc-max">Your max (1RM)</label>' +
+          '<input type="text" id="pc-max" class="pc-max" inputmode="decimal" placeholder="0" autocomplete="off"></div>' +
+          '<div class="pc-seg" role="group" aria-label="Units"><button type="button" data-unit="lb">lb</button><button type="button" data-unit="kg">kg</button></div></div>' +
+        '<div id="pc-out"></div>' +
+      '</div>' +
+    '</div></div>');
+
+  const bg = document.getElementById('m-pct');
+  bg.addEventListener('click', e => { if (e.target === bg) closeModal('m-pct'); });
+  document.getElementById('pc-max').addEventListener('input', e => {
+    const v = parseFloat(String(e.target.value).replace(',', '.'));
+    // Remembered quietly: per section lift (so a squat day reopens with the
+    // squat number), and as the last number for the top-bar button.
+    if (v > 0) {
+      if (PC.key) { const maxes = pcLoad(pcMaxesKey(), {}); maxes[PC.key] = { max: v, unit: PC.unit }; pcSave(pcMaxesKey(), maxes); }
+      const p = pcLoad(PC_PREFS_KEY, {}); p.lastMax = v; p.unit = PC.unit; pcSave(PC_PREFS_KEY, p);
+    }
+    renderCalc(false);
+  });
+  bg.querySelector('.pc-seg').addEventListener('click', e => {
+    const b = e.target.closest('[data-unit]');
+    if (!b || b.dataset.unit === PC.unit) return;
+    setUnit(b.dataset.unit);
+    const maxes = pcLoad(pcMaxesKey(), {});
+    if (PC.key && maxes[PC.key]) { maxes[PC.key].unit = PC.unit; pcSave(pcMaxesKey(), maxes); }
+    renderCalc(true);
+  });
+}
+
+function setUnit(u) {
+  PC.unit = u === 'kg' ? 'kg' : 'lb';
+  const p = pcLoad(PC_PREFS_KEY, {}); p.unit = PC.unit; pcSave(PC_PREFS_KEY, p);
+}
+
+function openCalc(section) {
+  injectCalc();
+  const prefs = pcLoad(PC_PREFS_KEY, {});
+  PC.unit = prefs.unit === 'kg' ? 'kg' : 'lb';
+  let start = '';
+  if (section) {
+    PC.key = pcLiftOf(section.title).key;
+    const f = pcFind(section.text);
+    PC.pcts = f.pcts; PC.ranges = f.ranges;
+    const saved = pcLoad(pcMaxesKey(), {})[PC.key];
+    if (saved) { start = saved.max; if (saved.unit !== PC.unit) setUnit(saved.unit); }
+  } else {
+    PC.key = ''; PC.pcts = []; PC.ranges = [];
+    if (prefs.lastMax > 0) start = prefs.lastMax;
+  }
+  const box = document.getElementById('pc-max');
+  box.value = start ? pcFmt(start) : '';
+  renderCalc(true);
+  openModal('m-pct');
+  // Number selected, so typing replaces it.
+  setTimeout(() => { box.focus(); box.select(); }, 80);
+}
+
+function renderCalc(full) {
+  if (full) {
+    document.querySelectorAll('#m-pct [data-unit]').forEach(b => b.classList.toggle('on', b.dataset.unit === PC.unit));
+  }
+
+  const out = document.getElementById('pc-out');
+  const max = parseFloat(String(document.getElementById('pc-max').value).replace(',', '.'));
+  if (!(max > 0)) {
+    out.innerHTML = '<div class="pc-empty">Enter your max to see your weights' +
+      (PC.pcts.length ? ' for ' + PC.pcts.map(p => pcFmt(p) + '%').join(', ') : '') + '.</div>';
+    return;
+  }
+  const u = PC.unit;
+  let html = '';
+
+  // The workout's own numbers, up top
+  if (PC.pcts.length) {
+    const parts = [];
+    const inRange = new Set();
+    PC.ranges.forEach(([a, b]) => { inRange.add(a); inRange.add(b);
+      parts.push({ label: pcFmt(a) + '–' + pcFmt(b) + '%', val: pcFmt(pcWeight(max, a)) + '–' + pcFmt(pcWeight(max, b)) }); });
+    PC.pcts.filter(p => !inRange.has(p)).forEach(p => parts.push({ label: pcFmt(p) + '%', val: pcFmt(pcWeight(max, p)) }));
+    html += '<div class="pc-today"><div class="pc-today-lbl">In this workout</div>' +
+      parts.map(x => '<div class="pc-today-val">' + x.val + ' <small style="font-family:var(--sans);font-size:12px;font-weight:700;color:var(--ink-3)">' + u + '</small></div>' +
+        '<div class="pc-today-pct">' + x.label + ' of ' + pcFmt(max) + ' ' + u + '</div>').join('<div style="height:8px"></div>') + '</div>';
+  }
+
+  // Every 5% from 40 to 100, plus any of the workout's own numbers in between
+  const top = Math.max(100, ...PC.pcts.map(p => Math.ceil(p / 5) * 5));
+  const rows = new Set();
+  for (let p = 40; p <= top; p += 5) rows.add(p);
+  PC.pcts.forEach(p => rows.add(p));
+  const isBand = p => PC.ranges.some(([a, b]) => p > a && p < b);
+  html += '<div class="pc-table">' + [...rows].sort((a, b) => a - b).map(p => {
+    const hit = PC.pcts.includes(p);
+    return '<div class="pc-tr' + (hit ? ' hit' : isBand(p) ? ' band' : '') + '">' +
+      '<span class="pc-pct">' + pcFmt(p) + '%</span>' +
+      '<span class="pc-tag">' + (hit ? 'Today' : '') + '</span>' +
+      '<span class="pc-w">' + pcFmt(pcWeight(max, p)) + '<small>' + u + '</small></span></div>';
+  }).join('') + '</div>' +
+  '<div class="pc-note">Your max is saved on this phone.</div>';
+  out.innerHTML = html;
+}
+
+// A Calculator button on sections whose programming mentions percentages.
+(function hookSections() {
+  const orig = window.buildSecCard;
+  if (typeof orig !== 'function') return;
+  window.buildSecCard = function (text) {
+    const card = orig.apply(this, arguments);
+    try {
+      const f = pcFind(text);
+      if (!f.pcts.length) return card;
+      const title = String(text).trim().split('\n')[0];
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'pc-open';
+      const what = f.ranges.length ? f.ranges.map(([a, b]) => pcFmt(a) + '–' + pcFmt(b) + '%') : [];
+      const singles = f.pcts.filter(p => !f.ranges.some(([a, b]) => p === a || p === b)).map(p => pcFmt(p) + '%');
+      btn.innerHTML = '<span class="pc-open-ico">%</span><span class="pc-open-txt"><span class="pc-open-lbl">Calculator</span>' +
+        '<span class="pc-open-sub"></span></span><span class="pc-open-chev">&#8250;</span>';
+      // With a saved max, preview the weights right on the button: "60–65% · 185–195 lb"
+      const saved = pcLoad(pcMaxesKey(), {})[pcLiftOf(title).key];
+      let preview = ' · enter your max';
+      if (saved) {
+        const w = p => pcFmt(saved.max * p / 100);
+        const ws = f.ranges.map(([a, b]) => w(a) + '–' + w(b))
+          .concat(f.pcts.filter(p => !f.ranges.some(([a, b]) => p === a || p === b)).map(w));
+        preview = ' · ' + ws.join(', ') + ' ' + saved.unit;
+      }
+      btn.querySelector('.pc-open-sub').textContent = what.concat(singles).join(', ') + preview;
+      btn.addEventListener('click', e => { e.stopPropagation(); openCalc({ title, text }); });
+      const body = card.querySelector('.sec-body'), t = body && body.querySelector('.t-text');
+      if (t) t.after(btn); else if (body) body.prepend(btn);
+    } catch (e) { console.warn('Calculator button:', e); }
+    return card;
+  };
+})();
 
 /* ───────────────────────────────────────────────────────────────
    DAY TITLE THAT ALWAYS FITS
