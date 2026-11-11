@@ -872,6 +872,7 @@ function renderTeams() {
         : '<span class="tmc-none">No athletes yet</span>') + '</div>' +
       '<div class="tmc-act">' +
         '<button class="btn-sm" type="button" data-team-chat="' + t.id + '">Open Chat</button>' +
+        (names.length ? '<button class="btn-sm" type="button" data-team-mail="' + t.id + '">Copy emails</button>' : '') +
         '<button class="btn-sm" type="button" data-team-edit="' + t.id + '">Edit</button>' +
         '<button class="btn-sm danger" type="button" data-team-del="' + t.id + '">Delete</button>' +
       '</div></div>';
@@ -982,7 +983,13 @@ function wireTeams() {
   panel.addEventListener('click', e => {
     const ed = e.target.closest('[data-team-edit]'); if (ed) { openTeamEditor(ed.dataset.teamEdit); return; }
     const dl = e.target.closest('[data-team-del]');  if (dl) { openTeamDelete(dl.dataset.teamDel); return; }
-    const ch = e.target.closest('[data-team-chat]'); if (ch) { openTeamChat(ch.dataset.teamChat); }
+    const ch = e.target.closest('[data-team-chat]'); if (ch) { openTeamChat(ch.dataset.teamChat); return; }
+    const ml = e.target.closest('[data-team-mail]');
+    if (ml && window.TD_EMAILS) {
+      const t = C.teams.find(x => x.id === ml.dataset.teamMail);
+      const people = (window.PROFILES || []).filter(p => t && t.members.includes(p.id));
+      window.TD_EMAILS.copy(people, t ? t.name : '');
+    }
   });
   document.getElementById('m-team-filter').addEventListener('input', renderPicker);
   document.getElementById('m-team-pick').addEventListener('change', e => {
