@@ -10,7 +10,8 @@
    • Adds a bottom bar to the athlete app: Train · Chat · Timer · Account
      (Chat appears by itself once td-chat.js is loaded after this file).
    • Train is the calendar + day view exactly as before.
-   • Timer: For Time (optional cap), AMRAP, EMOM and Intervals.
+   • Timer: Time (optional cap, rest between rounds) and Intervals
+     (fixed or variable), with splits and an optional round counter.
      It keeps running while the athlete flips back to their workout,
      and the Timer tab shows the clock while they're away.
    • Account: profile, text size and sign out — moved out of the
@@ -111,6 +112,12 @@ body:has(#s-app.active) .toast { bottom:calc(var(--tb-h) + var(--tb-pad) + 14px)
 .tm-mode.active { background:var(--blue); color:#fff; }
 .tm-mode:disabled:not(.active) { opacity:.4; cursor:default; }
 
+.tm-face.tappable { cursor:pointer; -webkit-user-select:none; user-select:none; touch-action:manipulation; }
+.tm-live { display:flex; align-items:baseline; justify-content:center; gap:10px; margin:-2px 0 10px; }
+.tm-live[hidden] { display:none; }
+.tm-live-lbl { font-size:10px; font-weight:800; letter-spacing:2.4px; text-transform:uppercase; color:var(--ink-3); }
+.tm-live-t { font-family:var(--display); font-size:clamp(40px, 13vw, 58px); line-height:.9; color:var(--blue); font-variant-numeric:tabular-nums; }
+.tm-face[data-ph="rest"] .tm-live-t { color:var(--gold-ink); }
 .tm-face {
   --ph:var(--blue); --ph-ink:var(--blue);
   position:relative; overflow:hidden; text-align:center;
@@ -192,6 +199,46 @@ body:has(#s-app.active) .toast { bottom:calc(var(--tb-h) + var(--tb-pad) + 14px)
 .tm-sum { font-size:12.5px; line-height:1.5; color:var(--ink-3); text-align:center; padding:12px 0 10px; border-top:1px solid var(--line); }
 
 .tm-laps-hd { display:flex; justify-content:space-between; padding:12px 0 8px; }
+.tm-big {
+  position:fixed; inset:0; z-index:400; display:none; align-items:center; justify-content:center;
+  pointer-events:none; background:rgba(20,22,28,.55);
+}
+.tm-big.on { display:flex; }
+.tm-big span {
+  font-family:var(--display); line-height:.8; color:#fff; padding-top:.06em;
+  font-size:min(60vh, 92vw); text-shadow:0 8px 40px rgba(0,0,0,.35);
+  animation:tm-pop .32s cubic-bezier(.2,.9,.3,1.2);
+}
+.tm-big.word span { font-size:min(34vh, 38vw); letter-spacing:2px; }
+.tm-big.go span { color:var(--gold-lt); }
+.tm-big.rest span { color:#fff; }
+.tm-big.done span { background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+@keyframes tm-pop { 0% { transform:scale(1.4); opacity:0; } 100% { transform:scale(1); opacity:1; } }
+.tm-count { display:flex; align-items:center; justify-content:center; gap:10px; margin:2px 0 10px; }
+.tm-count[hidden] { display:none; }
+.tm-count-n { font-family:var(--display); font-size:clamp(48px, 15vw, 66px); line-height:.9; color:var(--ink); padding-top:3px; min-width:.6em; text-align:right; }
+.tm-count-lbl { font-size:10px; font-weight:800; letter-spacing:2.4px; text-transform:uppercase; color:var(--ink-3); }
+.tm-count-undo {
+  height:32px; padding:0 10px; border:1px solid var(--line); border-radius:3px; background:var(--paper); cursor:pointer;
+  font-size:11px; font-weight:800; color:var(--ink-3);
+}
+.tm-count-undo:hover:not(:disabled) { color:var(--magenta); border-color:var(--magenta); }
+.tm-count-undo:disabled { opacity:.35; cursor:default; }
+.tm-desc { display:block; font-size:12px; line-height:1.4; color:var(--ink-3); margin-top:3px; max-width:250px; }
+.tm-btn.round.rest { color:var(--gold-ink); border-color:var(--gold-bdr); }
+.tm-lap.rest .tm-lap-n, .tm-lap.rest .tm-lap-split { color:var(--gold-ink); }
+.tm-lap-n { min-width:44px; }
+.tm-var-hd, .tm-var { display:grid; grid-template-columns:18px 1fr 1fr 28px; gap:6px; align-items:center; }
+.tm-var-hd { margin-bottom:2px; }
+.tm-var { padding:4px 0; }
+.tm-var-n { font-family:var(--display); font-size:18px; color:var(--blue); text-align:center; padding-top:2px; }
+.tm-step.sm { width:100%; }
+.tm-step.sm button { width:30px; height:38px; font-size:17px; flex-shrink:0; }
+.tm-step.sm input { width:auto; flex:1; min-width:0; font-size:20px; }
+.tm-var-del { width:28px; height:38px; border:0; background:none; color:var(--ink-3); font-size:14px; cursor:pointer; }
+.tm-var-del:hover:not(:disabled) { color:var(--magenta); }
+.tm-var-del:disabled { opacity:.3; cursor:default; }
+.tm-var-add { align-self:flex-start; margin-top:6px; }
 .tm-lap { display:flex; align-items:baseline; gap:10px; padding:10px 0; border-top:1px solid var(--line); }
 .tm-lap-n { font-family:var(--display); font-size:19px; color:var(--blue); width:28px; }
 .tm-lap-split { font-family:var(--display); font-size:22px; color:var(--ink); flex:1; }
@@ -399,6 +446,30 @@ button.acc-row:hover { background:var(--wash); }
 .pc-tr.band { background:rgba(220,142,9,.05) !important; }
 .pc-note { font-size:11.5px; line-height:1.5; color:var(--ink-3); text-align:center; padding:4px 0 10px; }
 
+/* From a workout section: everything on one screen */
+#m-pct.pc-compact .modal-hd { padding:16px 10px 10px 16px; }
+#m-pct.pc-compact .modal-title { font-size:24px; }
+#m-pct.pc-compact .modal-body { padding:12px 14px 4px; }
+#m-pct.pc-compact .fld label { margin-bottom:4px; }
+#m-pct.pc-compact .pc-row2 .fld, #m-pct.pc-compact .pc-seg { margin-bottom:10px; }
+#m-pct.pc-compact .pc-max { font-size:28px !important; padding:6px 10px 4px !important; }
+#m-pct.pc-compact .pc-seg { height:48px; }
+#m-pct.pc-compact .pc-today { padding:8px 12px; margin-bottom:10px; display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 12px; }
+#m-pct.pc-compact .pc-today-lbl { width:100%; }
+#m-pct.pc-compact .pc-today-val { font-size:26px; margin-top:4px; }
+#m-pct.pc-compact .pc-today-pct { margin-top:0; }
+#m-pct.pc-compact .pc-today > div[style] { display:none; }
+#m-pct.pc-compact .pc-table { display:grid; grid-auto-flow:column; grid-template-columns:1fr 1fr; margin-bottom:12px; }
+#m-pct.pc-compact .pc-tr { padding:6px 10px; border-top:1px solid var(--line); background:var(--paper); }
+#m-pct.pc-compact .pc-tr.top { border-top:0; }
+#m-pct.pc-compact .pc-tr.l { border-right:1px solid var(--line); }
+#m-pct.pc-compact .pc-tr:nth-child(even) { background:var(--paper); }
+#m-pct.pc-compact .pc-tr.alt { background:#FAFBFE; }
+#m-pct.pc-compact .pc-pct { font-size:17px; width:auto; min-width:40px; }
+#m-pct.pc-compact .pc-tag { flex:1; }
+#m-pct.pc-compact .pc-w { font-size:20px; }
+#m-pct.pc-compact .pc-w small { font-size:9.5px; margin-left:2px; }
+
 /* ── Coach: athlete list ────────────────────────── */
 #adm-users .table-wrap { display:none; }
 .ros-search {
@@ -522,15 +593,16 @@ function injectMarkup() {
     '<div id="v-timer" class="view">' + pageHero('Timer', 'Workout clock', 'tm-kicker') +
       '<div class="tb-col">' +
         '<div class="tm-modes" id="tm-modes">' +
-          '<button class="tm-mode" data-mode="fortime">For Time</button>' +
-          '<button class="tm-mode" data-mode="amrap">AMRAP</button>' +
-          '<button class="tm-mode" data-mode="emom">EMOM</button>' +
+          '<button class="tm-mode" data-mode="fortime">Time</button>' +
           '<button class="tm-mode" data-mode="intervals">Intervals</button>' +
         '</div>' +
         '<div class="tm-face" id="tm-face" data-ph="idle">' +
           '<button class="tm-snd" id="tm-snd" type="button" aria-label="Sound on"></button>' +
           '<div class="tm-phase" id="tm-phase"></div>' +
           '<div class="tm-time" id="tm-time" aria-live="off"></div>' +
+          '<div class="tm-live" id="tm-live" hidden><span class="tm-live-lbl"></span><span class="tm-live-t"></span></div>' +
+          '<div class="tm-count" id="tm-count" hidden><span class="tm-count-n">0</span><span class="tm-count-lbl">Rounds</span>' +
+            '<button type="button" class="tm-count-undo" id="tm-count-undo" aria-label="Take one round off">\u22121</button></div>' +
           '<div class="tm-sub" id="tm-sub"></div>' +
           '<div class="tm-bar"><i id="tm-bar"></i></div>' +
         '</div>' +
@@ -730,20 +802,30 @@ const TM_DEFAULT = {
   mode: 'fortime',
   lead: 10,                                   // get-ready countdown, seconds
   sound: true,
-  fortime:   { capOn: false, cap: 20 * 60 },
-  amrap:     { dur: 12 * 60 },
-  emom:      { every: 60, rounds: 10 },
-  intervals: { work: 20, rest: 10, rounds: 8 },
+  counter: false,                             // tapping the clock counts rounds
+  fortime:   { capOn: false, cap: 20 * 60, rest: false, restFixed: false, restLen: 60 },
+  intervals: {
+    work: 20, rest: 10, rounds: 8,
+    variable: false,                          // build your own list instead
+    list: [ { work: 60, rest: 30 }, { work: 45, rest: 30 }, { work: 30, rest: 30 } ],
+    repeat: 1,                                // times through the list
+  },
 };
 const TM_FIELDS = {
-  'fortime.cap':      { kind:'time',  step:60, min:60, max:5999 },
-  'amrap.dur':        { kind:'time',  step:60, min:60, max:5999 },
-  'emom.every':       { kind:'time',  step:15, min:15, max:1200 },
-  'emom.rounds':      { kind:'count', step:1,  min:1,  max:99 },
-  'intervals.work':   { kind:'time',  step:5,  min:5,  max:3600 },
-  'intervals.rest':   { kind:'time',  step:5,  min:0,  max:3600 },
-  'intervals.rounds': { kind:'count', step:1,  min:1,  max:99 },
+  'fortime.cap':        { kind:'time',  step:60, min:60, max:5999 },
+  'fortime.restLen':    { kind:'time',  step:15, min:15, max:1800 },
+  'intervals.work':     { kind:'time',  step:5,  min:5,  max:3600 },
+  'intervals.rest':     { kind:'time',  step:5,  min:0,  max:3600 },
+  'intervals.rounds':   { kind:'count', step:1,  min:1,  max:99 },
+  'intervals.repeat':   { kind:'count', step:1,  min:1,  max:20 },
 };
+const TM_VAR_MAX = 20;
+function fieldSpec(path) {
+  if (TM_FIELDS[path]) return TM_FIELDS[path];
+  if (/^intervals\.list\.\d+\.work$/.test(path)) return { kind:'time', step:5, min:5, max:3600 };
+  if (/^intervals\.list\.\d+\.rest$/.test(path)) return { kind:'time', step:5, min:0, max:3600 };
+  return null;
+}
 const TM_PRESETS = [
   { label:'Tabata', work:20, rest:10, rounds:8 },
   { label:'30 / 30', work:30, rest:30, rounds:10 },
@@ -751,7 +833,7 @@ const TM_PRESETS = [
   { label:'45 / 15', work:45, rest:15, rounds:8 },
 ];
 const TM_LEADS = [0, 5, 10, 15];
-const MODE_NAME = { fortime:'For Time', amrap:'AMRAP', emom:'EMOM', intervals:'Intervals' };
+const MODE_NAME = { fortime:'Time', intervals:'Intervals' };
 
 const TM = {
   cfg: loadCfg(),
@@ -760,8 +842,16 @@ const TM = {
   startAt: 0,           // Date.now() at start, pushed forward by pauses
   pausedAt: 0,
   endEl: 0,
-  laps: [],             // seconds into the work, one per tapped round
+  laps: [],             // { t: seconds on the workout clock, tag, kind } per split
   capHit: false,
+  counterOn: false,     // "Round counter?" for this workout
+  count: 0,
+  restOn: false,        // Time mode with "Rest between rounds?"
+  restFixed: false,     // …with a set rest length: next round starts itself
+  restLen: 60,
+  restEndAt: null,      // workout-clock second the current set rest ends
+  inRest: false,
+  round: 1,
   lastPhase: -1,
   lastCount: '',
   ticker: null,
@@ -772,8 +862,12 @@ function loadCfg() {
   try {
     const saved = JSON.parse(localStorage.getItem(TM_KEY) || 'null');
     if (saved && typeof saved === 'object') {
-      ['mode', 'lead', 'sound'].forEach(k => { if (saved[k] !== undefined) c[k] = saved[k]; });
-      ['fortime', 'amrap', 'emom', 'intervals'].forEach(k => { if (saved[k]) Object.assign(c[k], saved[k]); });
+      ['mode', 'lead', 'sound', 'counter'].forEach(k => { if (saved[k] !== undefined) c[k] = saved[k]; });
+      ['fortime', 'intervals'].forEach(k => { if (saved[k]) Object.assign(c[k], saved[k]); });
+      const L = c.intervals.list;
+      c.intervals.list = Array.isArray(L) && L.length
+        ? L.slice(0, TM_VAR_MAX).map(x => ({ work: Math.max(5, +x.work || 30), rest: Math.max(0, +x.rest || 0) }))
+        : JSON.parse(JSON.stringify(TM_DEFAULT.intervals.list));
     }
   } catch (e) {}
   if (!MODE_NAME[c.mode]) c.mode = 'fortime';
@@ -793,10 +887,15 @@ function buildPhases(c) {
   if (c.lead > 0) p.push({ kind:'ready', dur:c.lead, dir:'down' });
   if (c.mode === 'fortime') {
     p.push({ kind:'work', dur: c.fortime.capOn ? c.fortime.cap : Infinity, dir:'up' });
-  } else if (c.mode === 'amrap') {
-    p.push({ kind:'work', dur:c.amrap.dur, dir:'down' });
-  } else if (c.mode === 'emom') {
-    for (let r = 1; r <= c.emom.rounds; r++) p.push({ kind:'work', dur:c.emom.every, dir:'down', round:r, of:c.emom.rounds });
+  } else if (c.intervals.variable) {
+    // Your own list, each with its own work and rest, repeated
+    const iv = c.intervals, n = iv.list.length * iv.repeat;
+    let r = 0;
+    for (let s = 0; s < iv.repeat; s++) iv.list.forEach(x => {
+      r++;
+      p.push({ kind:'work', dur:x.work, dir:'down', round:r, of:n });
+      if (x.rest > 0 && r < n) p.push({ kind:'rest', dur:x.rest, dir:'down', round:r, of:n });
+    });
   } else {
     const iv = c.intervals;
     for (let r = 1; r <= iv.rounds; r++) {
@@ -926,6 +1025,12 @@ function tmStart() {
   TM.startAt = Date.now();
   TM.laps = []; TM.capHit = false; TM.endEl = 0;
   TM.lastPhase = -1; TM.lastCount = '';
+  TM.restOn = TM.cfg.mode === 'fortime' && !!TM.cfg.fortime.rest;
+  TM.restFixed = TM.restOn && !!TM.cfg.fortime.restFixed;
+  TM.restLen = TM.cfg.fortime.restLen || 60;
+  TM.restEndAt = null;
+  TM.inRest = false; TM.round = 1;
+  TM.counterOn = !!TM.cfg.counter; TM.count = 0;
   TM.state = 'running';
   keepAwake(true);
   startTicker();
@@ -937,6 +1042,7 @@ function tmPause() {
   TM.pausedAt = Date.now();
   TM.state = 'paused';
   stopTicker();
+  bigHide();
   tmRender();
 }
 function tmResume() {
@@ -953,6 +1059,9 @@ function tmReset() {
   stopTicker();
   keepAwake(false);
   TM.state = 'idle'; TM.phases = null; TM.laps = []; TM.capHit = false;
+  TM.restOn = false; TM.inRest = false; TM.round = 1; TM.restEndAt = null;
+  TM.counterOn = false; TM.count = 0;
+  bigHide();
   sleepAudio();
   tmRender();
 }
@@ -963,21 +1072,70 @@ function tmFinish(el, capHit) {
   stopTicker();
   keepAwake(false);
   cue.end();
+  bigWord(TM.capHit ? 'TIME' : 'DONE', 'done', 1400);
   setTimeout(sleepAudio, 2500);   // after the finish beeps have played
   tmRender();
 }
 // Split: marks the time on the workout clock (after the get-ready
-// countdown). Works in every mode, during work or rest.
+// countdown). With "Rest between rounds?" on, splits alternate: end the
+// round (rest starts) → start the next round.
 function tmRound() {
   if (TM.state !== 'running') return;
   const el = tmElapsed(), loc = locate(TM.phases, el);
   if (loc.done || loc.ph.kind === 'ready') return;
-  const tag = loc.ph.round ? 'Rd ' + loc.ph.round + (loc.ph.kind === 'rest' ? ' rest' : '') : '';
-  TM.laps.push({ t: el - leadOf(TM.phases), tag });
-  tone(880, 0.08); buzz(40);
-  flash('count');
+  const t = el - leadOf(TM.phases);
+  if (TM.restOn) {
+    if (!TM.inRest) {
+      TM.laps.push({ t, kind:'work', round: TM.round });
+      TM.inRest = true;
+      TM.restEndAt = TM.restFixed ? t + TM.restLen : null;
+      cue.rest();
+    } else {
+      TM.laps.push({ t, kind:'rest', round: TM.round });   // started early, by hand
+      TM.inRest = false; TM.round++; TM.restEndAt = null;
+      cue.go();
+    }
+  } else {
+    const tag = loc.ph.round ? 'Rd ' + loc.ph.round + (loc.ph.kind === 'rest' ? ' rest' : '') : '';
+    TM.laps.push({ t, tag });
+    tone(880, 0.08); buzz(40);
+    flash('count');
+  }
   tmRender();
 }
+// A set rest has run out: the next round starts on its own, timed to
+// the exact second the rest ended.
+function autoStartRound() {
+  const at = TM.restEndAt;
+  TM.laps.push({ t: at, kind:'rest', round: TM.round });
+  TM.inRest = false; TM.round++; TM.restEndAt = null;
+  cue.go();
+  bigWord('GO', 'go');
+  tmRender();
+}
+
+// Round counter: the big clock counts rounds; −1 undoes a stray tap.
+function countRound(delta) {
+  if (TM.state !== 'running' && delta > 0) return;
+  const el = tmElapsed(), loc = locate(TM.phases, el);
+  if (delta > 0 && (loc.done || loc.ph.kind === 'ready')) return;
+  TM.count = Math.max(0, TM.count + delta);
+  if (delta > 0) { tone(990, 0.09); buzz(40); flash('count'); }
+  renderCount();
+  lastFace = ''; tmRenderFace();
+}
+function renderCount() {
+  const box = document.getElementById('tm-count');
+  if (!box) return;
+  const show = TM.counterOn && TM.state !== 'idle';
+  box.hidden = !show;
+  if (!show) return;
+  box.querySelector('.tm-count-n').textContent = TM.count;
+  box.querySelector('.tm-count-lbl').textContent = TM.count === 1 ? 'Round' : 'Rounds';
+  const undo = box.querySelector('.tm-count-undo');
+  undo.disabled = !TM.count || TM.state === 'idle';
+}
+
 // The Split button only shows while a clock is running (or paused),
 // and wakes up when the get-ready countdown ends.
 function syncSplitBtn() {
@@ -985,8 +1143,19 @@ function syncSplitBtn() {
   if (!b) return;
   const live = TM.state === 'running' || TM.state === 'paused';
   b.style.display = live ? '' : 'none';
+  b.textContent = TM.restOn ? (TM.inRest ? 'Start Rd ' + (TM.round + 1) : 'Rest') : 'Split';
+  b.classList.toggle('rest', TM.restOn && TM.inRest);
   const loc = live ? locate(TM.phases, tmElapsed()) : null;
   b.disabled = TM.state !== 'running' || !loc || loc.done || loc.ph.kind === 'ready';
+}
+// Work and rest so far, for Time with rest between rounds.
+function workRest() {
+  const lead = TM.phases ? leadOf(TM.phases) : 0;
+  const now = Math.max(0, tmElapsed() - lead);
+  let work = 0, rest = 0, prev = 0;
+  TM.laps.forEach(l => { const d = l.t - prev; prev = l.t; if (l.kind === 'rest') rest += d; else work += d; });
+  if (TM.inRest) rest += now - prev; else work += now - prev;
+  return { work, rest };
 }
 function startTicker() { stopTicker(); TM.ticker = setInterval(tmTick, 100); }
 function stopTicker()  { if (TM.ticker) { clearInterval(TM.ticker); TM.ticker = null; } }
@@ -1001,53 +1170,100 @@ function tmTick() {
     return;
   }
 
+  // A set rest ran out → next round starts itself
+  const wc = el - leadOf(TM.phases);
+  if (TM.restOn && TM.inRest && TM.restEndAt != null && wc >= TM.restEndAt) { autoStartRound(); return; }
+
   // Phase changed: cue it, unless the phone was asleep through it.
   if (loc.i !== TM.lastPhase) {
     syncSplitBtn();
     if (loc.inPh < 1.5) {
-      if (loc.ph.kind === 'work') cue.go();
-      else if (loc.ph.kind === 'rest') cue.rest();
+      if (loc.ph.kind === 'work') { cue.go(); bigWord('GO', 'go'); }
+      else if (loc.ph.kind === 'rest') { cue.rest(); bigWord('REST', 'rest'); }
     }
     TM.lastPhase = loc.i;
   }
 
-  // 3-2-1 before the end of every timed phase.
-  if (loc.ph.dur !== Infinity) {
-    const n = Math.ceil(loc.remain);
-    const key = loc.i + ':' + n;
-    if (n >= 1 && n <= 3 && key !== TM.lastCount && (n - loc.remain) < 0.6) cue.count();
+  // Countdown to the next change: 3-2-1 beeps, 5-4-3-2-1 on screen.
+  let rem = null, key0 = loc.i;
+  if (TM.restOn && TM.inRest && TM.restEndAt != null) { rem = TM.restEndAt - wc; key0 = 'r' + TM.round; }
+  else if (loc.ph.dur !== Infinity) rem = loc.remain;
+  if (rem != null) {
+    const n = Math.ceil(rem);
+    const key = key0 + ':' + n;
+    if (n >= 1 && n <= 3 && key !== TM.lastCount && (n - rem) < 0.6) cue.count();
     TM.lastCount = key;
-  }
+    if (n >= 1 && n <= 5) bigCount(n); else bigIdle();
+  } else bigIdle();
 
   tmRenderFace();
   tmTabLabel();
 }
 
+/* ── Big 5-4-3-2-1 / GO on screen ──────────────────── */
+// Shown on top of whatever tab the athlete is on; taps go straight
+// through to the app underneath.
+const BIG = { el: null, shown: '', wordUntil: 0, timer: null };
+function bigEl() {
+  if (BIG.el) return BIG.el;
+  const app = document.getElementById('s-app');
+  if (!app) return null;
+  BIG.el = document.createElement('div');
+  BIG.el.className = 'tm-big'; BIG.el.setAttribute('aria-hidden', 'true');
+  app.appendChild(BIG.el);
+  return BIG.el;
+}
+function bigSet(text, cls) {
+  const el = bigEl();
+  if (!el) return;
+  if (BIG.shown !== text + '|' + cls) {
+    BIG.shown = text + '|' + cls;
+    el.className = 'tm-big on ' + cls;
+    el.innerHTML = '<span></span>';           // fresh element restarts the pop
+    el.firstChild.textContent = text;
+  }
+}
+function bigCount(n) { if (Date.now() < BIG.wordUntil) return; bigSet(String(n), 'num'); }
+function bigWord(word, cls, ms) {
+  BIG.wordUntil = Date.now() + (ms || 900);
+  bigSet(word, 'word ' + cls);
+  clearTimeout(BIG.timer);
+  BIG.timer = setTimeout(() => { if (Date.now() >= BIG.wordUntil) bigHide(); }, (ms || 900) + 20);
+}
+function bigIdle() { if (Date.now() >= BIG.wordUntil && BIG.shown) bigHide(); }
+function bigHide() {
+  BIG.shown = ''; BIG.wordUntil = 0; clearTimeout(BIG.timer);
+  if (BIG.el) { BIG.el.className = 'tm-big'; BIG.el.innerHTML = ''; }
+}
+
 /* ── What the face shows ───────────────────────────── */
 function faceState() {
-  const c = TM.cfg, mode = c.mode;
+  const c = TM.cfg, mode = c.mode, iv = c.intervals;
+  const ivCount = iv.variable ? iv.list.length * iv.repeat : iv.rounds;
 
   if (TM.state === 'idle') {
-    const sub = {
-      fortime:   c.fortime.capOn ? 'Time cap ' + fmt(c.fortime.cap) : 'Counts up until you stop it',
-      amrap:     'As many rounds as possible',
-      emom:      roundsTxt(c.emom.rounds) + ' \u00B7 ' + fmt(c.emom.every * c.emom.rounds),
-      intervals: roundsTxt(c.intervals.rounds) + ' \u00B7 ' + fmt(totalOf(buildPhases(Object.assign({}, c, { lead: 0 })))),
-    }[mode];
-    const t = { fortime: 0, amrap: c.amrap.dur, emom: c.emom.every, intervals: c.intervals.work }[mode];
+    let sub, t;
+    if (mode === 'fortime') {
+      t = 0;
+      sub = (c.fortime.capOn ? 'Time cap ' + fmt(c.fortime.cap) : 'Counts up until you stop it') +
+            (c.fortime.rest ? ' \u00B7 rest between rounds' : '');
+    } else {
+      t = iv.variable ? iv.list[0].work : iv.work;
+      sub = ivCount + (iv.variable ? ' intervals' : (ivCount === 1 ? ' round' : ' rounds')) + ' \u00B7 ' +
+            fmt(totalOf(buildPhases(Object.assign({}, c, { lead: 0 }))));
+    }
     return { ph:'idle', label: MODE_NAME[mode], time: fmt(t), sub, bar: null };
   }
 
   const phases = TM.phases, lead = leadOf(phases);
+  const wr = () => { const x = workRest(); return 'Work ' + fmt(x.work) + ' \u00B7 Rest ' + fmt(x.rest); };
 
   if (TM.state === 'done') {
     const workTime = TM.endEl - lead;
     if (mode === 'fortime') return { ph:'done', label: TM.capHit ? 'Time Cap' : 'Done', time: fmt(workTime),
-      sub: TM.laps.length ? splitsTxt(TM.laps.length) : 'Nice work', bar: null };
-    if (mode === 'amrap')   return { ph:'done', label:'Time', time: '0:00',
-      sub: TM.laps.length ? roundsTxt(TM.laps.length) : 'AMRAP complete', bar: 1 };
-    const n = mode === 'emom' ? c.emom.rounds : c.intervals.rounds;
-    return { ph:'done', label:'Done', time: fmt(workTime), sub: roundsTxt(n) + ' complete', bar: 1 };
+      sub: TM.restOn ? wr() : (TM.counterOn ? roundsTxt(TM.count) : TM.laps.length ? splitsTxt(TM.laps.length) : 'Nice work'), bar: null };
+    return { ph:'done', label:'Done', time: fmt(workTime),
+      sub: ivCount + (iv.variable ? ' intervals' : ' rounds') + ' complete', bar: 1 };
   }
 
   const el = tmElapsed(), loc = locate(phases, el);
@@ -1057,20 +1273,20 @@ function faceState() {
 
   if (ph.kind === 'ready') return { ph:'ready', label:'Get Ready', time, sub: MODE_NAME[mode] + ' starts', bar: loc.inPh / ph.dur };
 
-  const left = fmt(Math.ceil(totalOf(phases) - el - 1e-6)) + ' left';
   if (mode === 'fortime') {
     const capOn = ph.dur !== Infinity;
+    if (TM.restOn) {
+      return { ph: TM.inRest ? 'rest' : 'work', label: TM.inRest ? 'Rest' : 'Round ' + TM.round, time,
+        sub: TM.laps.length ? wr() : (TM.counterOn ? 'Tap Rest to start your rest' : 'Tap the clock to start your rest'), bar: capOn ? loc.inPh / ph.dur : null };
+    }
     const bits = [];
     if (TM.laps.length) bits.push(splitsTxt(TM.laps.length));
     if (capOn) bits.push('cap ' + fmt(ph.dur));
-    return { ph:'work', label:'For Time', time, sub: bits.join(' \u00B7 ') || 'Tap Split as you go', bar: capOn ? loc.inPh / ph.dur : null };
+    return { ph:'work', label:'Time', time, sub: bits.join(' \u00B7 ') || (TM.counterOn ? 'Tap the clock after each round' : 'Tap the clock to split'), bar: capOn ? loc.inPh / ph.dur : null };
   }
-  if (mode === 'amrap') {
-    return { ph:'work', label:'AMRAP', time,
-      sub: TM.laps.length ? roundsTxt(TM.laps.length) : 'Tap Split after each round', bar: loc.inPh / ph.dur };
-  }
-  return { ph: ph.kind, label: mode === 'emom' ? 'EMOM' : (ph.kind === 'rest' ? 'Rest' : 'Work'), time,
-    sub: 'Round ' + ph.round + ' of ' + ph.of + ' \u00B7 ' + left, bar: loc.inPh / ph.dur };
+  const left = fmt(Math.ceil(totalOf(phases) - el - 1e-6)) + ' left';
+  return { ph: ph.kind, label: ph.kind === 'rest' ? 'Rest' : 'Work', time,
+    sub: (iv.variable ? 'Interval ' : 'Round ') + ph.round + ' of ' + ph.of + ' \u00B7 ' + left, bar: loc.inPh / ph.dur };
 }
 
 // Each digit gets a fixed-width box, so the clock doesn't wobble
@@ -1080,6 +1296,31 @@ function timeHTML(t) {
 }
 
 let lastFace = '';
+// The split running right now, like a watch: time since the last split
+// (or since the start). Shows the moment the clock starts, so a rest
+// after a split counts up in plain view.
+function renderLiveSplit() {
+  const box = document.getElementById('tm-live'), face = document.getElementById('tm-face');
+  if (!box || !face) return;
+  const live = TM.state === 'running' || TM.state === 'paused';
+  face.classList.toggle('tappable', TM.state === 'running');
+  if (!live || !TM.phases) { box.hidden = true; return; }
+  const el = tmElapsed(), loc = locate(TM.phases, el);
+  if (loc.done || loc.ph.kind === 'ready') { box.hidden = true; return; }
+  const wcNow = el - leadOf(TM.phases);
+  const since = wcNow - (TM.laps.length ? TM.laps[TM.laps.length - 1].t : 0);
+  box.hidden = false;
+  if (TM.restOn && TM.inRest && TM.restEndAt != null) {
+    box.querySelector('.tm-live-lbl').textContent = 'Next round in';
+    box.querySelector('.tm-live-t').textContent = fmt(Math.ceil(TM.restEndAt - wcNow - 1e-6));
+    return;
+  }
+  box.querySelector('.tm-live-lbl').textContent = TM.restOn
+    ? (TM.inRest ? 'Rest ' + TM.round : 'Round ' + TM.round)
+    : 'Split ' + (TM.laps.length + 1);
+  box.querySelector('.tm-live-t').textContent = fmt(since);
+}
+
 function tmRenderFace() {
   const f = faceState();
   const face = document.getElementById('tm-face');
@@ -1095,6 +1336,7 @@ function tmRenderFace() {
     document.getElementById('tm-sub').textContent = f.sub;
   }
   document.getElementById('tm-bar').style.width = (f.bar === null ? 0 : Math.min(1, Math.max(0, f.bar)) * 100) + '%';
+  renderLiveSplit();
 }
 
 // While the clock runs, the Timer tab shows it — handy when flipping
@@ -1109,38 +1351,58 @@ function tmTabLabel() {
 
 /* ── Controls + setup panel ────────────────────────── */
 function stepperHTML(path, label) {
-  const f = TM_FIELDS[path], v = cfgGet(path);
-  return '<div class="tm-row"><span class="tm-lbl">' + label + '</span>' +
-    '<div class="tm-step">' +
+  return '<div class="tm-row"><span class="tm-lbl">' + label + '</span>' + stepBox(path, label) + '</div>';
+}
+function stepBox(path, label, small) {
+  const f = fieldSpec(path), v = cfgGet(path);
+  return '<div class="tm-step' + (small ? ' sm' : '') + '">' +
       '<button type="button" data-step="' + path + '" data-dir="-1" aria-label="Less">\u2212</button>' +
       '<input type="text" inputmode="' + (f.kind === 'count' ? 'numeric' : 'text') + '" data-field="' + path + '" value="' +
         (f.kind === 'count' ? v : fmt(v)) + '" aria-label="' + label + '" autocomplete="off">' +
       '<button type="button" data-step="' + path + '" data-dir="1" aria-label="More">+</button>' +
-    '</div></div>';
+    '</div>';
+}
+function toggleRow(label, desc, attr, on) {
+  return '<div class="tm-row"><span><span class="tm-lbl">' + label + '</span>' +
+    (desc ? '<span class="tm-desc">' + desc + '</span>' : '') + '</span>' +
+    '<label class="toggle"><input type="checkbox" ' + attr + (on ? ' checked' : '') + '>' +
+    '<span class="toggle-slider"></span></label></div>';
 }
 
 function setupHTML() {
   const c = TM.cfg, rows = [];
   if (c.mode === 'fortime') {
-    rows.push('<div class="tm-row"><span class="tm-lbl">Time cap</span>' +
-      '<label class="toggle"><input type="checkbox" data-cap ' + (c.fortime.capOn ? 'checked' : '') + '>' +
-      '<span class="toggle-slider"></span></label></div>');
+    rows.push(toggleRow('Time cap', '', 'data-cap', c.fortime.capOn));
     if (c.fortime.capOn) rows.push(stepperHTML('fortime.cap', 'Cap'));
-  } else if (c.mode === 'amrap') {
-    rows.push(stepperHTML('amrap.dur', 'Duration'));
-  } else if (c.mode === 'emom') {
-    rows.push(stepperHTML('emom.every', 'Every'));
-    rows.push(stepperHTML('emom.rounds', 'Rounds'));
+    rows.push(toggleRow('Rest between rounds?', 'Split ends the round and starts your rest; split again to start the next round.', 'data-restopt', c.fortime.rest));
+    if (c.fortime.rest) {
+      rows.push(toggleRow('Set rest length?', 'Rest counts down and the next round starts automatically.', 'data-restfixed', c.fortime.restFixed));
+      if (c.fortime.restFixed) rows.push(stepperHTML('fortime.restLen', 'Rest length'));
+    }
   } else {
     const iv = c.intervals;
-    rows.push('<div class="tm-row stack"><span class="tm-lbl">Presets</span><div class="tm-chips">' +
-      TM_PRESETS.map((p, i) => '<button type="button" class="tm-chip' +
-        (p.work === iv.work && p.rest === iv.rest && p.rounds === iv.rounds ? ' on' : '') +
-        '" data-preset="' + i + '">' + p.label + '</button>').join('') + '</div></div>');
-    rows.push(stepperHTML('intervals.work', 'Work'));
-    rows.push(stepperHTML('intervals.rest', 'Rest'));
-    rows.push(stepperHTML('intervals.rounds', 'Rounds'));
+    rows.push(toggleRow('Variable intervals?', 'Set a different work and rest for each interval.', 'data-variable', iv.variable));
+    if (iv.variable) {
+      rows.push('<div class="tm-row stack"><div class="tm-var-hd"><span class="tm-lbl">#</span><span class="tm-lbl">Work</span><span class="tm-lbl">Rest</span><span></span></div>' +
+        iv.list.map((x, i) => '<div class="tm-var"><span class="tm-var-n">' + (i + 1) + '</span>' +
+          stepBox('intervals.list.' + i + '.work', 'Work ' + (i + 1), true) +
+          stepBox('intervals.list.' + i + '.rest', 'Rest ' + (i + 1), true) +
+          '<button type="button" class="tm-var-del" data-var-del="' + i + '" aria-label="Remove interval ' + (i + 1) + '"' +
+            (iv.list.length === 1 ? ' disabled' : '') + '>\u2715</button></div>').join('') +
+        (iv.list.length < TM_VAR_MAX ? '<button type="button" class="tm-chip tm-var-add" data-var-add>+ Add interval</button>' : '') +
+        '</div>');
+      rows.push(stepperHTML('intervals.repeat', 'Repeat list'));
+    } else {
+      rows.push('<div class="tm-row stack"><span class="tm-lbl">Presets</span><div class="tm-chips">' +
+        TM_PRESETS.map((p, i) => '<button type="button" class="tm-chip' +
+          (p.work === iv.work && p.rest === iv.rest && p.rounds === iv.rounds ? ' on' : '') +
+          '" data-preset="' + i + '">' + p.label + '</button>').join('') + '</div></div>');
+      rows.push(stepperHTML('intervals.work', 'Work'));
+      rows.push(stepperHTML('intervals.rest', 'Rest'));
+      rows.push(stepperHTML('intervals.rounds', 'Rounds'));
+    }
   }
+  rows.push(toggleRow('Round counter?', 'Tap the big clock to count a round.', 'data-counter', c.counter));
   rows.push('<div class="tm-row"><span class="tm-lbl">Countdown</span><div class="tm-chips">' +
     TM_LEADS.map(s => '<button type="button" class="tm-chip' + (c.lead === s ? ' on' : '') + '" data-lead="' + s + '">' +
       (s ? s + 's' : 'Off') + '</button>').join('') + '</div></div>');
@@ -1148,21 +1410,23 @@ function setupHTML() {
 }
 
 function summary() {
-  const c = TM.cfg;
-  if (c.mode === 'fortime') return c.fortime.capOn ? 'Counts up and stops at ' + fmt(c.fortime.cap) : 'Counts up until you pause it';
-  if (c.mode === 'amrap')   return fmt(c.amrap.dur) + ' on the clock, counting down';
-  if (c.mode === 'emom')    return 'A new round every ' + fmtShort(c.emom.every) + ', ' + c.emom.rounds + ' times \u00B7 ' + fmt(c.emom.every * c.emom.rounds) + ' total';
-  const iv = c.intervals;
-  return fmtShort(iv.work) + ' on' + (iv.rest ? ' / ' + fmtShort(iv.rest) + ' off' : '') + ' \u00D7 ' + iv.rounds +
-    ' \u00B7 ' + fmt(totalOf(buildPhases(Object.assign({}, c, { lead: 0 })))) + ' total';
+  const c = TM.cfg, iv = c.intervals;
+  if (c.mode === 'fortime') return (c.fortime.capOn ? 'Counts up and stops at ' + fmt(c.fortime.cap) : 'Counts up until you pause it') +
+    (c.fortime.rest ? (c.fortime.restFixed ? '. ' + fmtShort(c.fortime.restLen) + ' rest, then the next round starts by itself.' : '. Rest is timed separately.') : '');
+  const total = fmt(totalOf(buildPhases(Object.assign({}, c, { lead: 0 })))) + ' total';
+  if (iv.variable) return iv.list.length + (iv.list.length === 1 ? ' interval' : ' intervals') +
+    (iv.repeat > 1 ? ' \u00D7 ' + iv.repeat : '') + ' \u00B7 ' + total;
+  return fmtShort(iv.work) + ' on' + (iv.rest ? ' / ' + fmtShort(iv.rest) + ' off' : '') + ' \u00D7 ' + iv.rounds + ' \u00B7 ' + total;
 }
 
 function lapsHTML() {
   if (!TM.laps.length) return '';
   let prev = 0;
-  const rows = TM.laps.map((l, i) => { const split = l.t - prev; prev = l.t; return { n: i + 1, split, at: l.t, tag: l.tag }; }).reverse();
-  return '<div class="tm-laps-hd"><span class="tm-lbl">Splits</span><span class="tm-lbl">' + TM.laps.length + '</span></div>' +
-    rows.map(r => '<div class="tm-lap"><span class="tm-lap-n">' + r.n + '</span>' +
+  const rows = TM.laps.map((l, i) => { const split = l.t - prev; prev = l.t;
+    return { n: l.kind ? (l.kind === 'rest' ? 'Rest' : 'Rd ' + l.round) : i + 1, rest: l.kind === 'rest', split, at: l.t, tag: l.tag }; }).reverse();
+  return '<div class="tm-laps-hd"><span class="tm-lbl">' + (TM.restOn ? 'Rounds' : 'Splits') + '</span><span class="tm-lbl">' +
+    (TM.restOn ? TM.laps.filter(l => l.kind === 'work').length : TM.laps.length) + '</span></div>' +
+    rows.map(r => '<div class="tm-lap' + (r.rest ? ' rest' : '') + '"><span class="tm-lap-n">' + r.n + '</span>' +
       '<span class="tm-lap-split">' + fmt(r.split) + '</span><span class="tm-lap-at">at ' + fmt(r.at) + (r.tag ? ' \u00B7 ' + r.tag : '') + '</span></div>').join('');
 }
 
@@ -1191,6 +1455,7 @@ function tmRender() {
   reset.disabled = idle || TM.state === 'running';    // pause first, so a stray tap can't wipe a workout
 
   syncSplitBtn();
+  renderCount();
 
   const snd = document.getElementById('tm-snd');
   snd.innerHTML = c.sound ? ICON.sound : ICON.muted;
@@ -1210,7 +1475,7 @@ function tmRender() {
 }
 
 function commitField(input) {
-  const path = input.dataset.field, f = TM_FIELDS[path];
+  const path = input.dataset.field, f = fieldSpec(path);
   const txt = String(input.value).trim();
   let v = null;
   if (f.kind === 'count') {
@@ -1231,12 +1496,18 @@ function wireTimer() {
 
   view.addEventListener('click', e => {
     const t = e.target;
+    // Tapping the clock face records a split / round (not the sound button).
+    if (t.closest('#tm-count-undo')) { countRound(-1); return; }
+    if (t.closest('#tm-face') && !t.closest('#tm-snd')) {
+      if (TM.state === 'running') { if (TM.counterOn) countRound(1); else tmRound(); }
+      return;
+    }
     const mode = t.closest('[data-mode]');
     if (mode && TM.state === 'idle') { TM.cfg.mode = mode.dataset.mode; saveCfg(); tmRender(); return; }
 
     const step = t.closest('[data-step]');
     if (step) {
-      const path = step.dataset.step, f = TM_FIELDS[path], dir = +step.dataset.dir;
+      const path = step.dataset.step, f = fieldSpec(path), dir = +step.dataset.dir;
       const cur = cfgGet(path);
       // Snap to the step, so 0:47 then + goes to 0:50, not 0:52.
       const next = dir > 0 ? Math.floor(cur / f.step) * f.step + f.step : Math.ceil(cur / f.step) * f.step - f.step;
@@ -1247,6 +1518,18 @@ function wireTimer() {
 
     const pre = t.closest('[data-preset]');
     if (pre) { const p = TM_PRESETS[+pre.dataset.preset]; Object.assign(TM.cfg.intervals, { work:p.work, rest:p.rest, rounds:p.rounds }); saveCfg(); tmRender(); return; }
+
+    if (t.closest('[data-var-add]')) {
+      const L = TM.cfg.intervals.list, last = L[L.length - 1];
+      if (L.length < TM_VAR_MAX) L.push({ work: last.work, rest: last.rest });
+      saveCfg(); tmRender(); return;
+    }
+    const del = t.closest('[data-var-del]');
+    if (del) {
+      const L = TM.cfg.intervals.list;
+      if (L.length > 1) L.splice(+del.dataset.varDel, 1);
+      saveCfg(); tmRender(); return;
+    }
 
     const lead = t.closest('[data-lead]');
     if (lead) { TM.cfg.lead = +lead.dataset.lead; saveCfg(); tmRender(); return; }
@@ -1269,6 +1552,10 @@ function wireTimer() {
 
   view.addEventListener('change', e => {
     if (e.target.matches('[data-cap]')) { cfgSet('fortime.capOn', e.target.checked); tmRender(); return; }
+    if (e.target.matches('[data-restopt]')) { cfgSet('fortime.rest', e.target.checked); tmRender(); return; }
+    if (e.target.matches('[data-restfixed]')) { cfgSet('fortime.restFixed', e.target.checked); tmRender(); return; }
+    if (e.target.matches('[data-variable]')) { cfgSet('intervals.variable', e.target.checked); tmRender(); return; }
+    if (e.target.matches('[data-counter]')) { TM.cfg.counter = e.target.checked; saveCfg(); tmRender(); return; }
     if (e.target.matches('[data-field]')) commitField(e.target);
   });
   view.addEventListener('keydown', e => {
@@ -1425,6 +1712,9 @@ function openCalc(section) {
   const box = document.getElementById('pc-max');
   box.value = start ? pcFmt(start) : '';
   renderCalc(true);
+  PC.compact = !!section;
+  document.getElementById('m-pct').classList.toggle('pc-compact', PC.compact);
+  renderCalc(true);
   openModal('m-pct');
   // Number selected, so typing replaces it.
   setTimeout(() => { box.focus(); box.select(); }, 80);
@@ -1463,14 +1753,21 @@ function renderCalc(full) {
   for (let p = 40; p <= top; p += 5) rows.add(p);
   PC.pcts.forEach(p => rows.add(p));
   const isBand = p => PC.ranges.some(([a, b]) => p > a && p < b);
-  html += '<div class="pc-table">' + [...rows].sort((a, b) => a - b).map(p => {
-    const hit = PC.pcts.includes(p);
-    return '<div class="pc-tr' + (hit ? ' hit' : isBand(p) ? ' band' : '') + '">' +
-      '<span class="pc-pct">' + pcFmt(p) + '%</span>' +
-      '<span class="pc-tag">' + (hit ? 'Today' : '') + '</span>' +
-      '<span class="pc-w">' + pcFmt(pcWeight(max, p)) + '<small>' + u + '</small></span></div>';
-  }).join('') + '</div>' +
-  '<div class="pc-note">Your max is saved on this phone.</div>';
+  const sorted = [...rows].sort((a, b) => a - b);
+  // From a workout section: two columns, read down the left then the
+  // right, so the whole chart fits on one screen.
+  const perCol = PC.compact ? Math.ceil(sorted.length / 2) : sorted.length;
+  html += '<div class="pc-table"' + (PC.compact ? ' style="grid-template-rows:repeat(' + perCol + ', auto)"' : '') + '>' +
+    sorted.map((p, i) => {
+      const hit = PC.pcts.includes(p);
+      const cls = (hit ? ' hit' : isBand(p) ? ' band' : '') +
+        (PC.compact ? ((i % perCol) % 2 ? ' alt' : '') + (i < perCol ? ' l' : '') + (i % perCol === 0 ? ' top' : '') : '');
+      return '<div class="pc-tr' + cls + '">' +
+        '<span class="pc-pct">' + pcFmt(p) + '%</span>' +
+        '<span class="pc-tag">' + (hit && !PC.compact ? 'Today' : '') + '</span>' +
+        '<span class="pc-w">' + pcFmt(pcWeight(max, p)) + '<small>' + u + '</small></span></div>';
+    }).join('') + '</div>' +
+    (PC.compact ? '' : '<div class="pc-note">Your max is saved on this phone.</div>');
   out.innerHTML = html;
 }
 
