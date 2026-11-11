@@ -22,6 +22,10 @@
 (function () {
 'use strict';
 
+// Shown at the bottom of the Account tab, so it's easy to check which
+// version of this file a phone is running. Bump it with every change.
+const TD_BUILD = '18';
+
 let chatOn = false;   // td-chat.js switches this on via TD_TABS.enableChat()
 
 // The main script rewrites the address on startup, so note now
@@ -637,7 +641,7 @@ function injectMarkup() {
             '</div></div>' +
         '</div>' +
         '<button class="acc-out" type="button" onclick="doLogout()">Sign Out</button>' +
-        '<div class="acc-foot">Trainderive &middot; By Frank Nguyen</div>' +
+        '<div class="acc-foot">Trainderive &middot; By Frank Nguyen &middot; Build ' + TD_BUILD + '</div>' +
       '</div>' +
     '</div>');
 
@@ -1594,6 +1598,7 @@ if (typeof S === 'undefined' || typeof applyRoute !== 'function') {
   return;
 }
 if (!injectMarkup()) return;
+injectCalc();          // % button in the top bar, there from the start
 patchMainScript();
 wireTimer();
 tmRender();
