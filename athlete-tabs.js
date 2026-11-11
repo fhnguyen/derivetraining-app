@@ -24,7 +24,7 @@
 
 // Shown at the bottom of the Account tab, so it's easy to check which
 // version of this file a phone is running. Bump it with every change.
-const TD_BUILD = '18';
+const TD_BUILD = '16';
 
 let chatOn = false;   // td-chat.js switches this on via TD_TABS.enableChat()
 
@@ -510,6 +510,10 @@ button.acc-row:hover { background:var(--wash); }
   color:var(--ink-3); font-size:20px; line-height:1; cursor:pointer; letter-spacing:1px;
 }
 .ros-more:hover { background:var(--wash); color:var(--blue); }
+.ros-mail { display:flex; align-items:center; gap:6px; margin:-2px 0 10px; }
+.ros-mail[hidden] { display:none; }
+.ros-mail-note { flex:1; min-width:0; font-size:9px; font-weight:800; letter-spacing:1.6px; text-transform:uppercase; color:var(--ink-3);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ros-none { padding:28px 16px; text-align:center; font-size:13.5px; color:var(--ink-3); }
 .ros-acts { display:flex; flex-direction:column; gap:8px; padding-bottom:12px; }
 .ros-act {
@@ -1879,7 +1883,59 @@ function rosterRow(u) {
   return row;
 }
 
+// ── Emails for a batch message ──────────────────────────────────
+// "a@x.com, b@y.com" works pasted into the To or BCC line of Gmail,
+// Apple Mail and Outlook.
+function emailList(people) {
+  const seen = new Set();
+  return people.map(p => String(p.email || '').trim()).filter(e => {
+    const k = e.toLowerCase();
+    if (!e || !/@/.test(e) || seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
+  try {                                          // older browsers
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand('copy'); ta.remove(); return ok;
+  } catch (e) { return false; }
+}
+async function copyEmails(people, what) {
+  const list = emailList(people);
+  if (!list.length) { showToast('No emails to copy', 'err'); return; }
+  const ok = await copyText(list.join(', '));
+  showToast(ok ? 'Copied ' + list.length + (list.length === 1 ? ' email' : ' emails') + (what ? ' \u00B7 ' + what : '')
+               : 'Couldn\u2019t copy \u2014 your browser blocked it', ok ? 'ok' : 'err');
+}
+// Opens the mail app with everyone in BCC, so no one sees the others' addresses.
+function emailAll(people) {
+  const list = emailList(people);
+  if (!list.length) { showToast('No emails to send to', 'err'); return; }
+  const me = (typeof S !== 'undefined' && S.user && S.user.email) || '';
+  window.TD_EMAILS.open('mailto:' + encodeURIComponent(me) + '?bcc=' + list.map(encodeURIComponent).join(','));
+}
+window.TD_EMAILS = { copy: copyEmails, emailAll, list: emailList, open: url => { window.location.href = url; } };
+
+function rosterAthletes() {
+  const q = rosterQuery.trim().toLowerCase();
+  return (window.PROFILES || []).filter(u => u.role !== 'coach' &&
+    (!q || ((u.name || '') + ' ' + (u.email || '')).toLowerCase().includes(q)));
+}
+function renderRosterBar() {
+  const bar = document.getElementById('ros-mail');
+  if (!bar) return;
+  const n = emailList(rosterAthletes()).length;
+  const filtered = !!rosterQuery.trim();
+  bar.hidden = !n;
+  bar.querySelector('[data-mail="copy"]').textContent = 'Copy ' + (filtered ? n + ' ' : 'all ') + (n === 1 ? 'email' : 'emails');
+  bar.querySelector('.ros-mail-note').textContent = n + (n === 1 ? ' email' : ' emails') + (filtered ? ' \u00B7 matching search' : '');
+}
+
 function renderRoster() {
+  renderRosterBar();
   const box = document.getElementById('td-roster');
   if (!box) return;
   const all = (window.PROFILES || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -1931,9 +1987,19 @@ function setupRoster() {
   const hd = panel.querySelector('.users-hd');
   const holder = document.createElement('div');
   holder.innerHTML = '<input type="search" class="ros-search" placeholder="Search athletes" autocomplete="off" aria-label="Search athletes">' +
+                     '<div class="ros-mail" id="ros-mail" hidden><span class="ros-mail-note"></span>' +
+                       '<button type="button" class="btn-sm" data-mail="copy">Copy all emails</button>' +
+                       '<button type="button" class="btn-sm" data-mail="send">Email all</button></div>' +
                      '<div id="td-roster"></div>';
   if (hd) hd.after(...holder.childNodes); else panel.prepend(...holder.childNodes);
   panel.querySelector('.ros-search').addEventListener('input', e => { rosterQuery = e.target.value; renderRoster(); });
+  panel.querySelector('#ros-mail').addEventListener('click', e => {
+    const b = e.target.closest('[data-mail]');
+    if (!b) return;
+    const people = rosterAthletes();
+    if (b.dataset.mail === 'copy') copyEmails(people);
+    else emailAll(people);
+  });
 
   document.body.insertAdjacentHTML('beforeend',
     '<div class="modal-bg" id="m-ros"><div class="modal" style="max-width:420px">' +
