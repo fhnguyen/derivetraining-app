@@ -2248,20 +2248,15 @@ function _openDay(iso) {
     const labelIdx = r.label && /^[A-Z]$/.test(r.label) ? r.label.charCodeAt(0) - 65 : i;
     S.secResults[labelIdx >= 0 ? labelIdx : i] = r.content;
   });
-  // Restore any unsaved draft from localStorage (survives refresh)
+  // Put back anything the athlete typed on this phone that hasn't reached
+  // the sheet yet. The sheet is the source of truth for everything else.
+  S.dirty = {}; S.dirtyFeel = false;
   const draft = loadDraft(iso);
-  if (draft) {
-    // New-style drafts are genuinely unsaved, so they win. Older drafts
-    // (from before this fix) only fill sections the sheet has nothing for.
-    const unsynced = draft.v === 2;
-    let used = false;
-    if (draft.secResults) Object.keys(draft.secResults).forEach(k => {
-      const v = draft.secResults[k];
-      if (!v || !String(v).trim()) return;
-      if (unsynced || !(S.secResults[k] || '').trim()) { S.secResults[k] = v; used = true; }
-    });
-    if (draft.feel && !S.feel) { S.feel = draft.feel; used = true; }
-    if (!unsynced) { if (used) saveDraft(iso); else clearDraft(iso); }
+  if (draft && draft.v === 3) {
+    Object.keys(draft.dirty || {}).forEach(k => { S.secResults[k] = draft.dirty[k]; S.dirty[k] = draft.dirty[k]; });
+    if (draft.feel != null) { S.feel = draft.feel; S.dirtyFeel = true; }
+  } else if (draft) {
+    clearDraft(iso);   // older drafts held whole copies of the day, stale results included
   }
 
   const dateObj = new Date(iso + 'T12:00:00');
@@ -2376,6 +2371,7 @@ function buildSecCard(text, idx, blockLabel, secIdx) {
   let _autoTimer=null;
   ta.addEventListener('input', e => {
     S.secResults[idx] = e.target.value;
+    (S.dirty = S.dirty || {})[idx] = e.target.value;   // typed here, not yet in the sheet
     growTa();
     clearTimeout(_autoTimer);
     secSt.textContent='Unsaved…'; secSt.className='sec-save-st saving';
@@ -2740,6 +2736,7 @@ function updateSecSummary(idx) {
 
 function pickFeel(n){
   S.feel=n;
+  S.dirtyFeel = true;
   document.querySelectorAll('.feel-btn').forEach(b=>b.classList.toggle('sel',parseInt(b.dataset.v)===n));
   // Auto-save immediately when feel is picked + persist draft
   if (S.selDate) saveDraft(S.selDate);
@@ -2749,13 +2746,30 @@ function pickFeel(n){
 // Draft persistence keys
 function draftKey(userId, isoDate) { return 'bloc_draft_' + userId + '_' + isoDate; }
 
-// A draft is what's been typed on this device but not yet saved to the
-// sheet. It's cleared as soon as a save to the sheet succeeds, so an old
-// draft can never overwrite a newer result from the sheet.
+// A draft holds ONLY what the athlete typed on this phone that hasn't
+// reached the sheet yet — never results loaded from the sheet or the
+// saved copy of the program. It's cleared once a save succeeds, so
+// nothing old can come back after it's changed or erased in the sheet.
 function saveDraft(isoDate) {
-  if (!S.user) return;
-  const draft = { v: 2, secResults: S.secResults, feel: S.feel, savedAt: Date.now() };
-  localStorage.setItem(draftKey(S.user.id, isoDate), JSON.stringify(draft));
+  if (!S.user || isoDate !== S.selDate) return;
+  const dirty = S.dirty || {};
+  if (!Object.keys(dirty).length && !S.dirtyFeel) { clearDraft(isoDate); return; }
+  const draft = { v: 3, dirty, feel: S.dirtyFeel ? S.feel : null, savedAt: Date.now() };
+  try { localStorage.setItem(draftKey(S.user.id, isoDate), JSON.stringify(draft)); } catch (e) {}
+}
+
+// One-time cleanup of drafts saved by older versions of the app.
+function purgeOldDrafts() {
+  try {
+    const old = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || k.indexOf('bloc_draft_') !== 0) continue;
+      let d = null; try { d = JSON.parse(localStorage.getItem(k)); } catch (e) {}
+      if (!d || d.v !== 3) old.push(k);
+    }
+    old.forEach(k => localStorage.removeItem(k));
+  } catch (e) {}
 }
 
 function loadDraft(isoDate) {
@@ -2805,6 +2819,7 @@ async function autoSaveAll(silent=false) {
   const day=S.dayMap[S.selDate]; if(!day) return false;
   const totalSecs=day.blocks.reduce((n,b)=>n+b.sections.length,0);
   const secArr=Array.from({length:totalSecs},(_,i)=>S.secResults[i]||'');
+  const sentDirty = Object.assign({}, S.dirty || {}), sentFeel = S.dirtyFeel, sentDate = S.selDate;
   day.feel=String(S.feel||'');
   day.results=secArr.map((c,i)=>({label:toAlpha(i),content:c}));
   saveDraft(S.selDate);
@@ -2833,7 +2848,15 @@ async function autoSaveAll(silent=false) {
   });
 
   if (r.ok) {
-    clearDraft(S.selDate);   // it's in the sheet now
+    // It's in the sheet now. Anything typed while this save was on its
+    // way stays marked as unsaved.
+    if (S.selDate === sentDate) {
+      Object.keys(sentDirty).forEach(k => { if (S.dirty && S.dirty[k] === sentDirty[k]) delete S.dirty[k]; });
+      if (sentFeel) S.dirtyFeel = false;
+      saveDraft(sentDate);
+    } else {
+      clearDraft(sentDate);
+    }
     if (!silent) {
       const stEl=document.getElementById('save-st');
       if (stEl) { stEl.textContent='Synced ✓'; stEl.className='save-st ok'; }
@@ -2857,7 +2880,6 @@ async function saveResults(){
     showToast('Could not save to the sheet — your entry is kept here','err');
     return;   // keep the draft so nothing is lost
   }
-  if (S.selDate) clearDraft(S.selDate);
   showToast('Results saved!','ok');
   renderCal();
 }
@@ -3569,6 +3591,7 @@ async function refreshDayView() {
   document.getElementById('s-loading').classList.add('active');
 
   initTextSize();
+  purgeOldDrafts();   // drafts from older versions held stale copies of results
 
   await window._sbReady;
   SB = window.SB;
@@ -3620,7 +3643,7 @@ if ('serviceWorker' in navigator) {
 
   <!-- Add-ons: bottom bars, timer, athlete list (athlete-tabs.js), then teams + chat (td-chat.js).
        Bump the ?v= number whenever a file changes so phones fetch the new copy. -->
-  <script src="athlete-tabs.js?v=11"></script>
+  <script src="athlete-tabs.js?v=13"></script>
   <script src="td-chat.js?v=3"></script>
 </body>
 </html>
