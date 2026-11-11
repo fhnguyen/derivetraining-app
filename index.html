@@ -503,18 +503,6 @@ button, input, select, textarea { font-family:inherit; color:inherit; }
 .sec-card.open .sec-sum { display:none; }
 .sec-sum:empty { display:none; }
 
-/* "Last time" — the most recent day this section was logged */
-.last-time {
-  display:block; width:100%; text-align:left; cursor:pointer;
-  background:var(--wash); border:1px solid var(--line); border-radius:4px;
-  padding:9px 11px; margin-top:12px; font:inherit; transition:border-color .15s;
-}
-.last-time:hover { border-color:var(--blue); }
-.lt-lbl {
-  display:block; font-size:9px; font-weight:800; letter-spacing:1.6px;
-  text-transform:uppercase; color:var(--ink-3); margin-bottom:4px;
-}
-.lt-txt { display:block; font-size:calc(13px * var(--read-scale, 1)); line-height:1.55; color:var(--ink-2); white-space:pre-wrap; }
 
 /* Search */
 .hd-icon {
@@ -2382,17 +2370,6 @@ function buildSecCard(text, idx, blockLabel, secIdx) {
 
   body.appendChild(pre);
 
-  // What they did the last time this came up
-  const lt = findLastTime(title, S.selDate || isoToday());
-  if (lt) {
-    const ltEl=document.createElement('button');
-    ltEl.type='button'; ltEl.className='last-time';
-    ltEl.innerHTML='<span class="lt-lbl">Last time · '+escH(shortDate(lt.iso))+'</span>' +
-      '<span class="lt-txt">'+escH(lt.content.split('\n').slice(0,3).join('\n'))+'</span>';
-    ltEl.onclick=()=>navTo('day',{date:lt.iso});
-    body.appendChild(ltEl);
-  }
-
   body.appendChild(rl); body.appendChild(ta);
   body.appendChild(secSt);
   card.appendChild(hd); card.appendChild(body);
@@ -2503,9 +2480,8 @@ async function moveDay(from, to) {
 // ═══════════════════════════════════════════════════════════════
 
 // ── Which sections count as lifts ────────────────────────────────
-// History is deliberately limited to named lifts. Everything else —
-// bike intervals, mobility, accessory circuits — produced a "last time"
-// line on nearly every section, which buried the useful ones.
+// Used by the % calculator to remember each athlete's max per lift, so
+// "Back Squat 5x3" and "Back Squat — heavy single" share one number.
 //
 // EDIT THIS LIST to match how you name things. Longer names win, so
 // "Back Squat" is kept apart from "Front Squat" rather than both
@@ -2555,33 +2531,6 @@ function liftKey(title) {
   return null;
 }
 
-function shortDate(iso) {
-  return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' });
-}
-
-// The most recent earlier day where this section was logged.
-function findLastTime(title, beforeISO) {
-  const key = liftKey(title);
-  if (!key) return null;                 // not a lift — no history line
-  const dates = Object.keys(S.dayMap).filter(d => d < beforeISO).sort().reverse();
-  for (const iso of dates) {
-    const day = S.dayMap[iso];
-    if (!day || day.isRestDay || !day.results || !day.results.length) continue;
-    let gi = 0, hit = null;
-    for (const b of day.blocks) {
-      for (const sec of b.sections) {
-        if (!hit && liftKey(sec.trim().split('\n')[0]) === key) {
-          const r = day.results.find(r => r.label === toAlpha(gi));
-          if (r && r.content && r.content.trim()) hit = { iso, content: r.content.trim() };
-        }
-        gi++;
-      }
-    }
-    if (hit) return hit;
-  }
-  return null;
-}
-
 // ── Search ──────────────────────────────────────────────────────
 function highlight(text, term) {
   const esc = escH(text);
@@ -2592,7 +2541,7 @@ function highlight(text, term) {
 
 // ── Text size ───────────────────────────────────────────────────
 // A reading-size control, the way Safari and Kindle do it. It scales
-// the programming text, the daily note, the "last time" line and the
+// the programming text, the daily note and the
 // results box — not the chrome, so nothing reflows awkwardly. The
 // choice is remembered on this device.
 const TEXT_SCALES = [0.87, 1, 1.15, 1.32];
@@ -2659,8 +2608,7 @@ function openSearch() {
 }
 
 // Search covers everything programmed — section titles, the body of the
-// section, and whatever was logged. The lifts-only rule applies to the
-// "last time" lines, not here.
+// section, and whatever was logged.
 function runSearch(q) {
   const term = (q || '').trim().toLowerCase();
   const out  = document.getElementById('srch-results');
