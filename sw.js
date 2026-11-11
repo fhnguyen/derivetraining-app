@@ -10,7 +10,7 @@
        it, and that is live data that must never be served from a cache.
    ============================================================================ */
 importScripts('push-sw.js');
-const CACHE = 'trainderive-v20';         // ← bump this on every deploy
+const CACHE = 'trainderive-v19';         // ← bump this on every deploy
 
 const SHELL = [
   './',
