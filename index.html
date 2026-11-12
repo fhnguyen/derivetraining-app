@@ -1694,6 +1694,34 @@ async function loadTabList(athleteId = null) {
   return r.tabs || [];
 }
 
+// ── Which tabs hold an athlete's programming ─────────────────────
+// The tabs named on their profile; or, when that's left blank, every
+// tab in their spreadsheet that has dated training on it (anything
+// else — notes, templates without dates, exports — is skipped).
+//
+// All tabs are fetched at once, then read in sheet order into `into`,
+// so the same date in two tabs always resolves the same way.
+async function loadProgramTabs(names, athleteId, cutoff, into) {
+  const scanning = !(names && names.length);
+  const tabs = scanning
+    ? (await loadTabList(athleteId)).map(t => t.title || t.name).filter(Boolean)
+    : names;
+  const got = await Promise.all(tabs.map(name =>
+    loadCSVForTab(name, athleteId).then(csv => ({ name, csv }), err => ({ name, err }))));
+
+  const saved = S.dayMap;
+  S.dayMap = into;                       // parseSheetCSV writes to S.dayMap
+  let used = 0, failed = null;
+  try {
+    got.forEach(({ name, csv, err }) => {
+      if (err) { failed = err; console.warn('Could not load', name, '—', err.message); return; }
+      if (csv && csvHasTrainingBlock(csv)) { parseSheetCSV(csv, name, cutoff); used++; }
+      else if (!scanning) console.warn('No training block found in', name);
+    });
+  } finally { S.dayMap = saved; }
+  return { used, scanned: tabs.length, scanning, failed };
+}
+
 // ═══════════════════════════════════════════════════════════════
 // LOADING THE PROGRAM
 //
@@ -1836,25 +1864,14 @@ async function loadAllSheets(opts = {}) {
   setStatus('Loading your program…');
 
   // Parse into a fresh map so a failed fetch never empties what is on screen.
+  // No tab names on the profile → every tab with dated training is used.
   const previous = S.dayMap;
-  S.dayMap = {};
   let fresh = {};
   let failed = null;
 
   try {
-    if (tabNames) {
-      await Promise.all(tabNames.map(async tabName => {
-        try {
-          const csv = await loadCSVForTab(tabName);
-          if (csv && csvHasTrainingBlock(csv)) parseSheetCSV(csv, tabName, cutoff);
-          else console.warn('No training block found in', tabName);
-        } catch (err) {
-          failed = err;
-          console.warn('Could not load', tabName, '—', err.message);
-        }
-      }));
-    }
-    fresh = S.dayMap;
+    const r = await loadProgramTabs(tabNames, null, cutoff, fresh);
+    failed = r.failed;
   } catch (err) {
     failed = err;
     fresh = {};
@@ -3210,24 +3227,10 @@ async function loadUserSheets(u) {
   if (!u.spreadsheetId) return dayMap;
 
   const tabNames = u.sheetTabNames && u.sheetTabNames.length ? u.sheetTabNames : null;
-
-  if (tabNames) {
-    await Promise.all(tabNames.map(async tabName => {
-      try {
-        const csv = await loadCSVForTab(tabName, u.id);
-        if (!csv || !csvHasTrainingBlock(csv)) {
-          console.warn('Coach view: no training block in', tabName);
-          return;
-        }
-        const savedMap = S.dayMap; S.dayMap = dayMap;
-        parseSheetCSV(csv, tabName, null);
-        S.dayMap = savedMap;
-      } catch(e) { console.warn('Coach view: tab failed:', tabName, e.message); }
-    }));
-    if (Object.keys(dayMap).length) return dayMap;
-  }
-
-    return dayMap;
+  // Same rule as the athlete's app: blank tab names → scan every tab.
+  try { await loadProgramTabs(tabNames, u.id, null, dayMap); }
+  catch (e) { console.warn('Coach view: could not read the spreadsheet:', e.message); }
+  return dayMap;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3624,7 +3627,7 @@ if ('serviceWorker' in navigator) {
 
   <!-- Add-ons: bottom bars, timer, athlete list (athlete-tabs.js), then teams + chat (td-chat.js).
        Bump the ?v= number whenever a file changes so phones fetch the new copy. -->
-  <script src="athlete-tabs.js?v=20"></script>
-  <script src="td-chat.js?v=20"></script>
+  <script src="athlete-tabs.js?v=15"></script>
+  <script src="td-chat.js?v=3"></script>
 </body>
 </html>
