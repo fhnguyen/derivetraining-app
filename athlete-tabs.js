@@ -24,7 +24,7 @@
 
 // Shown at the bottom of the Account tab, so it's easy to check which
 // version of this file a phone is running. Bump it with every change.
-const TD_BUILD = '16';
+const TD_BUILD = '17';
 
 let chatOn = false;   // td-chat.js switches this on via TD_TABS.enableChat()
 
@@ -202,7 +202,7 @@ body:has(#s-app.active) .toast { bottom:calc(var(--tb-h) + var(--tb-pad) + 14px)
 .tm-chip.on { background:var(--blue-soft); border-color:var(--blue); color:var(--blue); }
 .tm-sum { font-size:12.5px; line-height:1.5; color:var(--ink-3); text-align:center; padding:12px 0 10px; border-top:1px solid var(--line); }
 
-.tm-laps-hd { display:flex; justify-content:space-between; padding:12px 0 8px; }
+.tm-laps-hd { display:flex; justify-content:space-between; align-items:center; padding:10px 0 8px; }
 .tm-big {
   position:fixed; inset:0; z-index:400; display:none; align-items:center; justify-content:center;
   pointer-events:none; background:rgba(20,22,28,.55);
@@ -1432,10 +1432,42 @@ function lapsHTML() {
   let prev = 0;
   const rows = TM.laps.map((l, i) => { const split = l.t - prev; prev = l.t;
     return { n: l.kind ? (l.kind === 'rest' ? 'Rest' : 'Rd ' + l.round) : i + 1, rest: l.kind === 'rest', split, at: l.t, tag: l.tag }; }).reverse();
-  return '<div class="tm-laps-hd"><span class="tm-lbl">' + (TM.restOn ? 'Rounds' : 'Splits') + '</span><span class="tm-lbl">' +
-    (TM.restOn ? TM.laps.filter(l => l.kind === 'work').length : TM.laps.length) + '</span></div>' +
+  return '<div class="tm-laps-hd"><span class="tm-lbl">' + (TM.restOn ? 'Rounds' : 'Splits') + ' \u00B7 ' +
+    (TM.restOn ? TM.laps.filter(l => l.kind === 'work').length : TM.laps.length) + '</span>' +
+    '<button type="button" class="btn-sm tm-copy" data-copy-splits>Copy</button></div>' +
     rows.map(r => '<div class="tm-lap' + (r.rest ? ' rest' : '') + '"><span class="tm-lap-n">' + r.n + '</span>' +
       '<span class="tm-lap-split">' + fmt(r.split) + '</span><span class="tm-lap-at">at ' + fmt(r.at) + (r.tag ? ' \u00B7 ' + r.tag : '') + '</span></div>').join('');
+}
+
+// The workout as text for the results box:
+//   Round 1: 3:30
+//   Round 2: 3:34, rest 1:29      ← rests only when they weren't all the same
+//   Total: 12:40
+// When the clock was paused or finished without a last split, that last
+// stretch counts as the final round.
+function splitsText() {
+  const lead = TM.phases ? leadOf(TM.phases) : 0;
+  const end = Math.max(0, tmElapsed() - lead);
+  const stopped = TM.state !== 'running';
+  const rounds = [];
+  let prev = 0;
+  if (TM.restOn) {
+    TM.laps.forEach(l => {
+      const d = l.t - prev; prev = l.t;
+      if (l.kind === 'work') rounds.push({ work: d, rest: null });
+      else if (rounds.length) rounds[rounds.length - 1].rest = d;
+    });
+    if (stopped && !TM.inRest && end - prev >= 1) rounds.push({ work: end - prev, rest: null });
+  } else {
+    TM.laps.forEach(l => { rounds.push({ work: l.t - prev, rest: null }); prev = l.t; });
+    if (stopped && end - prev >= 1) rounds.push({ work: end - prev, rest: null });
+  }
+  const rests = rounds.filter(r => r.rest != null).map(r => Math.round(r.rest));
+  const showRest = new Set(rests).size > 1;
+  const lines = rounds.map((r, i) => 'Round ' + (i + 1) + ': ' + fmt(r.work) +
+    (showRest && r.rest != null ? ', rest ' + fmt(r.rest) : ''));
+  if (lines.length) lines.push('Total: ' + fmt(end));
+  return lines.join('\n');
 }
 
 function tmRender() {
@@ -1550,6 +1582,11 @@ function wireTimer() {
       return;
     }
     if (t.closest('#tm-reset')) { tmReset(); return; }
+    if (t.closest('[data-copy-splits]')) {
+      const text = splitsText();
+      copyText(text).then(ok => showToast(ok ? 'Splits copied \u2014 paste them into your results' : 'Couldn\u2019t copy \u2014 your browser blocked it', ok ? 'ok' : 'err'));
+      return;
+    }
     if (t.closest('#tm-round')) { tmRound(); return; }
     if (t.closest('#tm-snd'))   {
       TM.cfg.sound = !TM.cfg.sound; saveCfg();
