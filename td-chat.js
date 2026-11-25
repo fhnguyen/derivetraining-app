@@ -3,8 +3,8 @@
    ───────────────────────────────────────────────────────────────
    Load AFTER athlete-tabs.js, just above </body>:
 
-       <script src="athlete-tabs.js?v=5"></script>
-       <script src="td-chat.js?v=1"></script>
+       <script src="athlete-tabs.js?v=22"></script>
+       <script src="td-chat.js?v=22"></script>
 
    Needs chat-setup.sql run once in Supabase first.
 
@@ -512,7 +512,10 @@ function renderInbox() {
 
   if (isCoach() && !q) {
     // Active conversations first, then everyone you haven't messaged yet.
-    const active = rows.filter(r => r.last_at), quiet = rows.filter(r => !r.last_at);
+    // Archived athletes you've never messaged aren't listed; a conversation
+    // that's already going stays put.
+    const arch = new Set((window.PROFILES || []).filter(p => p.archivedAt).map(p => p.id));
+    const active = rows.filter(r => r.last_at), quiet = rows.filter(r => !r.last_at && !(r.kind === 'dm' && arch.has(r.athlete_id)));
     v.list.innerHTML =
       (active.length ? '<div class="ch-sec">Recent</div>' + active.map(itemHTML).join('') : '') +
       (quiet.length ? '<div class="ch-sec">' + (active.length ? 'Everyone else' : 'Teams and athletes') + '</div>' + quiet.map(itemHTML).join('') : '');
@@ -836,8 +839,10 @@ function viewForCache(mode) { return C.view && C.view.mode === mode ? C.view : n
 /* ───────────────────────────────────────────────────────────────
    TEAMS (coach)
    ─────────────────────────────────────────────────────────────── */
+// Archived athletes stay out of the picker, unless they're already on the
+// team being edited, so they can still be taken off it.
 function athletes() {
-  return (window.PROFILES || []).filter(p => p.role !== 'coach').slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  return (window.PROFILES || []).filter(p => p.role !== 'coach' && (!p.archivedAt || pickSel.has(p.id))).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 }
 
 async function loadTeams() {
@@ -902,7 +907,7 @@ function renderPicker() {
   const pick = document.getElementById('m-team-pick');
   pick.innerHTML = shown.length ? shown.map(a =>
     '<label><input type="checkbox" value="' + esc(a.id) + '"' + (pickSel.has(a.id) ? ' checked' : '') + '>' +
-    '<div style="min-width:0"><div class="tm-pick-name">' + esc(a.name || 'Unnamed') + '</div>' +
+    '<div style="min-width:0"><div class="tm-pick-name">' + esc(a.name || 'Unnamed') + (a.archivedAt ? ' <span class="tm-pick-arch">Archived</span>' : '') + '</div>' +
     '<div class="tm-pick-mail">' + esc(a.email || '') + '</div></div></label>').join('')
     : '<div class="ch-empty-th">' + (list.length ? 'No athletes match.' : 'No athletes yet — add them on the Users tab.') + '</div>';
   document.getElementById('m-team-count').textContent = pickSel.size + ' selected';
@@ -987,7 +992,7 @@ function wireTeams() {
     const ml = e.target.closest('[data-team-mail]');
     if (ml && window.TD_EMAILS) {
       const t = C.teams.find(x => x.id === ml.dataset.teamMail);
-      const people = (window.PROFILES || []).filter(p => t && t.members.includes(p.id));
+      const people = (window.PROFILES || []).filter(p => t && t.members.includes(p.id) && !p.archivedAt);
       window.TD_EMAILS.copy(people, t ? t.name : '');
     }
   });
