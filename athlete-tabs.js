@@ -24,7 +24,7 @@
 
 // Shown at the bottom of the Account tab, so it's easy to check which
 // version of this file a phone is running. Bump it with every change.
-const TD_BUILD = '22';
+const TD_BUILD = '25';
 
 let chatOn = false;   // td-chat.js switches this on via TD_TABS.enableChat()
 
@@ -2356,21 +2356,27 @@ window.TD_TABS = {
    the one number the coach sets on their profile: a threshold pace,
    single (7:10) or a range (7:05-7:15), per mile or per km.
 
-   Zones are Joe Friel's run pace zones, TrainingPeaks' default: each
-   zone is a share of threshold pace *time*, so a bigger share is slower.
+   Zones are % of threshold speed, matching the coach's TrainingPeaks.
+   Tags like &92-96%& work the same way as TrainingPeaks' "% Threshold Pace".
    Race paces use Riegel's formula, t2 = t1 × (d2/d1)^1.06, treating
    threshold pace as the pace a runner could hold for about an hour.
    ─────────────────────────────────────────────────────────────── */
 const PZ_TAG = /&(?=[^\s&])([^&\n]{1,40}?)(?<=[^\s&])&/g;
-const PZ_ZONE = {          // [fastest, slowest] share of threshold pace time
-  z1:  [1.29, null],       // slower than 129%
-  z2:  [1.14, 1.29],
-  z3:  [1.06, 1.13],
-  z4:  [0.99, 1.05],
-  z5a: [0.97, 1.00],
-  z5b: [0.90, 0.96],
-  z5c: [null, 0.90],       // faster than 90%
+// Zones as % of threshold *speed*, the way TrainingPeaks shows "% Threshold
+// Pace": pace = threshold pace ÷ (% / 100), so 96% is a little slower than
+// threshold and 105% a little faster. Z1–Z4 match the coach's TrainingPeaks.
+const PZ_SPEED = {         // [lowest %, highest %] of threshold speed
+  z1:  [72, 77],
+  z2:  [77, 87],
+  z3:  [87, 92],
+  z4:  [92, 96],
+  z5a: [100, 103],         // Friel 97–100% of pace time
+  z5b: [104, 111],         // Friel 90–96% of pace time (VO2)
+  z5c: [115, 120],
 };
+// → [fastest, slowest] as a share of threshold pace time
+const PZ_ZONE = {};
+Object.keys(PZ_SPEED).forEach(z => { const [lo, hi] = PZ_SPEED[z]; PZ_ZONE[z] = [100 / hi, 100 / lo]; });
 const PZ_NAMES = {};
 function pzName(names, def) { names.forEach(n => { PZ_NAMES[n] = def; }); }
 pzName(['threshold', 'thresh', 'thr', 'ftp', 'ftpa', 'lt', 't'], { k: 'thr', w: 'threshold pace', lbl: 'Threshold' });
@@ -2486,7 +2492,24 @@ function pzShow(r, unit) {
 
 // The inside of one tag → { ok, text } (ok false: no pace set, words instead),
 // or null when it isn't a pace tag at all.
+// "&92-96%&", "&85%&", "&105%&": % of threshold speed, like TrainingPeaks.
+function pzPct(inner) {
+  const m = String(inner).trim().match(/^(\d{2,3}(?:\.\d+)?)\s*%?\s*(?:-|\u2013|to|\.\.)\s*(\d{2,3}(?:\.\d+)?)\s*%$|^(\d{2,3}(?:\.\d+)?)\s*%$/i);
+  if (!m) return null;
+  const a = parseFloat(m[1] || m[3]), b = parseFloat(m[2] || m[3]);
+  const lo = Math.min(a, b), hi = Math.max(a, b);
+  if (lo < 40 || hi > 200) return null;
+  return { lo, hi };
+}
 function pzResolve(inner, p, unit) {
+  const pct = pzPct(inner);
+  if (pct) {
+    const words = (pct.lo === pct.hi ? pct.lo : pct.lo + '\u2013' + pct.hi) + '% of threshold pace';
+    if (!p) return { ok: false, text: words };
+    const mid = (p.fast + p.slow) / 2, out = unit || p.unit;
+    const r = { fast: mid * 100 / pct.hi, slow: mid * 100 / pct.lo };
+    return { ok: true, text: pzShow({ fast: pzConvert(r.fast, p.unit, out), slow: pzConvert(r.slow, p.unit, out) }, out), what: words };
+  }
   const parts = String(inner).split(/\s*(?:\.\.|~|\bto\b)\s*/i);
   if (parts.length > 2) return null;
   const sides = parts.map(pzSide);
