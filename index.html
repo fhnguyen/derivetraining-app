@@ -1014,6 +1014,14 @@ mark { background:rgba(220,142,9,.3); color:inherit; border-radius:2px; padding:
         <div class="url-preview" id="m-sheet-preview" style="display:none"></div>
         <div class="form-hint">Paste the full share link or just the spreadsheet ID. Must be shared as "Anyone with the link can view". Tabs are auto-discovered.</div>
       </div>
+      <div class="fld">
+        <label>Run threshold pace <span style="font-weight:400;opacity:.6">(optional)</span></label>
+        <input type="text" id="m-run-pace" placeholder="e.g. 4:25-4:30  or  7:05-7:15/mi" autocomplete="off" oninput="previewRunPace()">
+        <div class="form-hint">One pace or a range, per km. Add /mi for a pace per mile. Tags in the sheet like &amp;threshold&amp;, &amp;easy&amp;, &amp;5k&amp; or &amp;threshold+5%&amp; turn into these paces for this athlete.</div>
+        <div class="fld" style="margin:10px 0 0"><label>Show their paces per</label>
+          <select id="m-pace-unit" onchange="previewRunPace()"><option value="">Same as the pace above</option><option value="km">Kilometre (/km)</option><option value="mi">Mile (/mi)</option></select></div>
+        <div id="m-run-pace-prev"></div>
+      </div>
       <details class="adv-sheet" id="m-adv">
       <summary>Advanced sheet settings</summary>
       <div class="fld">
@@ -1161,6 +1169,8 @@ function toAppUser(p) {
     createdAt:     p.data_from || '2024-01-01',
     scriptUrl:     p.script_url || '',
     lastSynced:    p.last_synced ? new Date(p.last_synced).getTime() : null,
+    runPace:       p.run_pace || '',
+    paceUnit:      p.pace_unit || '',
   };
 }
 
@@ -1510,7 +1520,8 @@ let editingUserId = null;
 function openAddUser() {
   editingUserId = null;
   document.getElementById('m-user-title').textContent = 'Add User';
-  ['m-name','m-email','m-sheet-url','m-sheet-gid','m-script-url','m-script-secret'].forEach(id => document.getElementById(id).value = '');
+  ['m-name','m-email','m-sheet-url','m-sheet-gid','m-script-url','m-script-secret','m-run-pace','m-pace-unit'].forEach(id => document.getElementById(id).value = '');
+  previewRunPace();
   document.getElementById('m-created-at').value = isoToday();  // new athletes default to today
   document.getElementById('m-role').value = 'athlete';
   document.getElementById('m-user-err').textContent = '';
@@ -1533,6 +1544,9 @@ function openEditUser(id) {
   document.getElementById('m-script-url').value    = u.scriptUrl    || '';
   document.getElementById('m-script-secret').value = '';   // write-only; never read back
   document.getElementById('m-created-at').value    = u.createdAt    || '2024-01-01';
+  document.getElementById('m-run-pace').value      = u.runPace      || '';
+  document.getElementById('m-pace-unit').value     = u.paceUnit     || '';
+  previewRunPace();
   // Populate tab names field
   const tabNamesArr = u.sheetTabNames || [];
   document.getElementById('m-sheet-gid').value = tabNamesArr.join(', ');
@@ -1540,6 +1554,15 @@ function openEditUser(id) {
   document.getElementById('m-adv').open = false;
   previewSheetId();
   openModal('m-user');
+}
+
+// The pace table this athlete will get, under the Run threshold pace box.
+function previewRunPace() {
+  const el = document.getElementById('m-run-pace-prev'); if (!el) return;
+  const v = document.getElementById('m-run-pace').value.trim();
+  if (!v || !window.TD_PACE) { el.innerHTML = ''; return; }
+  el.innerHTML = TD_PACE.parse(v) ? TD_PACE.table(v, document.getElementById('m-pace-unit').value)
+    : '<div class="form-hint" style="color:var(--magenta)">Type it like 4:28 or 4:25-4:30</div>';
 }
 
 function previewSheetId() {
@@ -1572,6 +1595,10 @@ async function saveUser() {
   const tabRaw       = document.getElementById('m-sheet-gid').value.trim();
   const tabNames     = tabRaw ? tabRaw.split(',').map(t=>t.trim()).filter(Boolean) : [];
 
+  const runRaw  = document.getElementById('m-run-pace').value.trim();
+  const runPace = runRaw && window.TD_PACE ? TD_PACE.normalize(runRaw) : null;
+  if (runRaw && !runPace) { errEl.textContent = 'Could not read the run pace. Type it like 4:28 or 4:25-4:30 (add /mi for miles).'; return; }
+
   if (!name)  { errEl.textContent = 'Name is required.'; return; }
   if (!email) { errEl.textContent = 'Email is required.'; return; }
   const spreadsheetId = sheetRaw ? extractSheetId(sheetRaw) : '';
@@ -1584,6 +1611,13 @@ async function saveUser() {
     data_from:      dataFrom,
     script_url:     scriptUrl || null,
   };
+  // Only sent when it's set or changing, so saving still works before the
+  // run_pace column has been added in Supabase.
+  const before = editingUserId ? ((PROFILES.find(u => u.id === editingUserId) || {}).runPace || '') : '';
+  if (runPace || before) fields.run_pace = runPace;
+  const paceUnit = document.getElementById('m-pace-unit').value || null;
+  const unitBefore = editingUserId ? ((PROFILES.find(u => u.id === editingUserId) || {}).paceUnit || null) : null;
+  if (paceUnit !== unitBefore) fields.pace_unit = paceUnit;
 
   const btn = document.querySelector('#m-user .btn-confirm');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
@@ -1598,7 +1632,7 @@ async function saveUser() {
       fields.email = email;
     }
     const { error } = await SB.from('profiles').update(fields).eq('id', editingUserId);
-    if (error) { errEl.textContent = error.message; if (btn) { btn.disabled=false; btn.textContent='Save User'; } return; }
+    if (error) { errEl.textContent = /run_pace|pace_unit/.test(error.message) ? 'Add the run pace columns in Supabase first (pace-setup.sql).' : error.message; if (btn) { btn.disabled=false; btn.textContent='Save User'; } return; }
   } else {
     // New athlete: create the account and email them an invite to set a password.
     const r = await fnCall('manage-users', { action: 'invite', email, name, role });
@@ -2334,7 +2368,7 @@ function renderDayContent(day) {
   if (day.dailyNote) {
     const n=document.createElement('div'); n.className='daily-note';
     n.innerHTML='<div class="daily-note-label">📋 Today\'s Training Note</div>' +
-      '<div class="daily-note-text">'+richText(escH(day.dailyNote))+'</div>';
+      '<div class="daily-note-text">'+paceH(richText(escH(paceT(day.dailyNote, S.user))))+'</div>';
     el.appendChild(n);
   }
   let gIdx = 0;
@@ -2379,17 +2413,17 @@ function buildSecCard(text, idx, blockLabel, secIdx) {
   // data-block and data-si drive CSS color palette
   card.dataset.block = blockLabel || 'Training';
   card.dataset.si    = String((secIdx !== undefined ? secIdx : idx) % 8);
-  const lines=text.trim().split('\n'), title=lines[0].trim();
+  const lines=paceT(text, S.user).trim().split('\n'), title=lines[0].trim();
   // The first line is the card's title, so it isn't repeated in the body.
   const bodyText=lines.slice(1).join('\n').replace(/^\n+/, '').trimEnd();
   const hd=document.createElement('div'); hd.className='sec-hd';
   const sumText=(S.secResults[idx]||'').trim().split('\n')[0];
-  hd.innerHTML='<span class="sec-n">'+toAlpha(idx)+'</span><span class="sec-t">'+escH(stripInline(title))+'</span>'+
+  hd.innerHTML='<span class="sec-n">'+toAlpha(idx)+'</span><span class="sec-t">'+paceH(escH(stripInline(title)))+'</span>'+
     '<span class="sec-sum">'+escH(sumText.length>26?sumText.slice(0,26)+'…':sumText)+'</span>'+
     '<span class="sec-ch">▼</span>';
   hd.addEventListener('click',()=>card.classList.toggle('open'));
   const body=document.createElement('div'); body.className='sec-body';
-  const pre=document.createElement('div'); pre.className='t-text'; pre.innerHTML=richText(escH(bodyText));
+  const pre=document.createElement('div'); pre.className='t-text'; pre.innerHTML=paceH(richText(escH(bodyText)));
   if (!bodyText) pre.style.display='none';   // title-only section
   const rl=document.createElement('div'); rl.className='res-lbl'; rl.textContent='Your Results';
   const ta=document.createElement('textarea'); ta.className='res-ta';
@@ -2675,7 +2709,7 @@ function runSearch(q) {
       const r = (day.results || []).find(r => r.label === toAlpha(gi));
       const result = r && r.content ? r.content.trim() : '';
       if ((sec + ' ' + result).toLowerCase().includes(term)) {
-        hits.push({ iso, title: stripInline(sec.trim().split('\n')[0]), result });
+        hits.push({ iso, title: stripInline(paceT(sec, S.user).replace(/[\u0001\u0003\u0004]([^\u0002]*)\u0002/g, '$1').trim().split('\n')[0]), result });
       }
       gi++;
     }));
@@ -2946,6 +2980,12 @@ function toAlpha(i){
 }
 function isoFmt(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function escH(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// Run paces: &threshold&, &easy&, &5k& … in the sheet become this runner's own
+// paces (worked out in athlete-tabs.js). paceT marks them in the raw text,
+// paceH turns the marks into styled spans once the text is HTML.
+function paceT(text, user) { return window.TD_PACE ? TD_PACE.text(text, user) : text; }
+function paceH(html, coach) { return window.TD_PACE ? TD_PACE.html(html, coach) : html; }
+function adminDetailUser() { return (typeof ADM !== 'undefined' && PROFILES.find(p => p.id === ADM.detailUserId)) || null; }
 function getVideoEmbed(url) {
   // YouTube — handles youtu.be, youtube.com/watch, youtube.com/shorts
   const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([\w-]+)/);
@@ -3471,7 +3511,7 @@ function adminRenderDayContent(day) {
   if (day.dailyNote) {
     const n=document.createElement('div'); n.className='daily-note';
     n.innerHTML='<div class="daily-note-label">📋 Today\'s Training Note</div>' +
-      '<div class="daily-note-text">'+richText(escH(day.dailyNote))+'</div>';
+      '<div class="daily-note-text">'+paceH(richText(escH(paceT(day.dailyNote, adminDetailUser()))), true)+'</div>';
     el.appendChild(n);
   }
   let gIdx = 0;
@@ -3499,20 +3539,20 @@ function adminBuildSecCard(text, idx, blockLabel, secIdx, day) {
   card.dataset.block = blockLabel || 'Training';
   card.dataset.si = String(secIdx % 8);
 
-  const lines = text.trim().split('\n');
+  const lines = paceT(text, adminDetailUser()).trim().split('\n');
   const title = lines[0].trim();
   const bodyText = lines.slice(1).join('\n').replace(/^\n+/, '').trimEnd();
 
   const hd = document.createElement('div'); hd.className = 'sec-hd';
   hd.innerHTML = '<span class="sec-n">' + toAlpha(idx) + '</span>' +
-    '<span class="sec-t">' + escH(stripInline(title)) + '</span><span class="sec-ch">▼</span>';
+    '<span class="sec-t">' + paceH(escH(stripInline(title)), true) + '</span><span class="sec-ch">▼</span>';
   hd.addEventListener('click', () => card.classList.toggle('open'));
 
   const body = document.createElement('div'); body.className = 'sec-body';
 
   // Training text, minus the first line, which is the card's title
   const pre = document.createElement('div'); pre.className = 't-text';
-  pre.innerHTML = richText(escH(bodyText));
+  pre.innerHTML = paceH(richText(escH(bodyText)), true);
   if (!bodyText) pre.style.display = 'none';
   body.appendChild(pre);
 
@@ -3627,7 +3667,7 @@ if ('serviceWorker' in navigator) {
 
   <!-- Add-ons: bottom bars, timer, athlete list (athlete-tabs.js), then teams + chat (td-chat.js).
        Bump the ?v= number whenever a file changes so phones fetch the new copy. -->
-  <script src="athlete-tabs.js?v=17"></script>
+  <script src="athlete-tabs.js?v=19"></script>
   <script src="td-chat.js?v=3"></script>
 </body>
 </html>
