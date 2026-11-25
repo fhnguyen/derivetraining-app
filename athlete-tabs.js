@@ -24,7 +24,7 @@
 
 // Shown at the bottom of the Account tab, so it's easy to check which
 // version of this file a phone is running. Bump it with every change.
-const TD_BUILD = '20';
+const TD_BUILD = '22';
 
 let chatOn = false;   // td-chat.js switches this on via TD_TABS.enableChat()
 
@@ -514,6 +514,13 @@ button.acc-row:hover { background:var(--wash); }
 .ros-mail[hidden] { display:none; }
 .ros-mail-note { flex:1; min-width:0; font-size:9px; font-weight:800; letter-spacing:1.6px; text-transform:uppercase; color:var(--ink-3);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ros-row.archived .ros-av { background:var(--line); color:var(--ink-3); }
+.ros-row.archived .ros-name { color:var(--ink-2); }
+.ros-arch-hd { display:flex; align-items:center; gap:6px; width:100%; color:var(--ink-3); background:none; border:0; padding:4px 2px; cursor:pointer; text-align:left; font-family:var(--sans); }
+.ros-arch-hd:hover { color:var(--ink); }
+.ros-arch-ch { font-size:14px; transition:transform .15s; }
+.ros-arch-hd.open .ros-arch-ch { transform:rotate(90deg); }
+.tm-pick-arch { font-size:9px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase; color:var(--ink-3); border:1px solid var(--line); border-radius:3px; padding:1px 5px; margin-left:4px; vertical-align:2px; }
 .ros-none { padding:28px 16px; text-align:center; font-size:13.5px; color:var(--ink-3); }
 .ros-acts { display:flex; flex-direction:column; gap:8px; padding-bottom:12px; }
 .ros-act {
@@ -2019,17 +2026,18 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitTitles)
    working; Edit still has every detail, spreadsheet included.
    ─────────────────────────────────────────────────────────────── */
 let rosterQuery = '';
+let rosterShowArchived = false;
 let rosterActId = null;
 
 function rosterRow(u) {
   const isCoachRow = u.role === 'coach';
   const row = document.createElement('div');
-  row.className = 'ros-row' + (isCoachRow ? ' coach' : '');
+  row.className = 'ros-row' + (isCoachRow ? ' coach' : '') + (u.archivedAt ? ' archived' : '');
   row.innerHTML =
     '<button type="button" class="ros-main"><span class="ros-av"></span>' +
       '<span class="ros-mid"><span class="ros-name"></span><span class="ros-sub"></span></span>' +
       (isCoachRow ? '<span class="ros-tag coach">Coach</span>'
-                  : (u.spreadsheetId ? '' : '<span class="ros-tag">No sheet</span>') + '<span class="ros-chev">&#8250;</span>') +
+                  : (u.spreadsheetId || u.archivedAt ? '' : '<span class="ros-tag">No sheet</span>') + '<span class="ros-chev">&#8250;</span>') +
     '</button>' +
     '<button type="button" class="ros-more" aria-label="More options">&#8943;</button>';
   row.querySelector('.ros-av').textContent = (u.name || '?').trim().charAt(0).toUpperCase() || '?';
@@ -2081,7 +2089,7 @@ window.TD_EMAILS = { copy: copyEmails, emailAll, list: emailList, open: url => {
 
 function rosterAthletes() {
   const q = rosterQuery.trim().toLowerCase();
-  return (window.PROFILES || []).filter(u => u.role !== 'coach' &&
+  return (window.PROFILES || []).filter(u => u.role !== 'coach' && !u.archivedAt &&
     (!q || ((u.name || '') + ' ' + (u.email || '')).toLowerCase().includes(q)));
 }
 function renderRosterBar() {
@@ -2101,11 +2109,12 @@ function renderRoster() {
   const all = (window.PROFILES || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   const q = rosterQuery.trim().toLowerCase();
   const match = u => !q || ((u.name || '') + ' ' + (u.email || '')).toLowerCase().includes(q);
-  const athletes = all.filter(u => u.role !== 'coach' && match(u));
+  const athletes = all.filter(u => u.role !== 'coach' && !u.archivedAt && match(u));
+  const archived = all.filter(u => u.role !== 'coach' && u.archivedAt && match(u));
   const coaches = all.filter(u => u.role === 'coach' && match(u));
   box.innerHTML = '';
   if (!all.length) { box.innerHTML = '<div class="ros-list"><div class="ros-none">No athletes yet — tap + Add User.</div></div>'; return; }
-  if (!athletes.length && !coaches.length) {
+  if (!athletes.length && !coaches.length && !archived.length) {
     const none = document.createElement('div');
     none.className = 'ros-list';
     none.innerHTML = '<div class="ros-none"></div>';
@@ -2125,6 +2134,38 @@ function renderRoster() {
   };
   section('Athletes', athletes);
   section(coaches.length === 1 ? 'Coach' : 'Coaches', coaches);
+  if (archived.length) {
+    // Folded away unless opened, or a search finds someone in it.
+    const open = rosterShowArchived || !!q;
+    const h = document.createElement('button');
+    h.type = 'button'; h.className = 'ros-sec ros-arch-hd' + (open ? ' open' : '');
+    h.innerHTML = '<span></span><span class="ros-arch-ch">&#8250;</span>';
+    h.firstChild.textContent = 'Archived \u00B7 ' + archived.length;
+    h.addEventListener('click', () => { rosterShowArchived = !rosterShowArchived; renderRoster(); });
+    box.appendChild(h);
+    if (open) {
+      const list = document.createElement('div');
+      list.className = 'ros-list';
+      archived.forEach(u => list.appendChild(rosterRow(u)));
+      box.appendChild(list);
+    }
+  }
+}
+
+// Archiving only tidies your side: the athlete keeps their login and program.
+async function setArchived(id, on) {
+  const u = (window.PROFILES || []).find(p => p.id === id);
+  if (!u || typeof SB === 'undefined' || !SB) return;
+  const stamp = on ? new Date().toISOString() : null;
+  const { error } = await SB.from('profiles').update({ archived_at: stamp }).eq('id', id);
+  if (error) {
+    showToast(/archived_at/.test(error.message) ? 'Run archive-setup.sql in Supabase first' : 'Couldn\u2019t ' + (on ? 'archive' : 'restore') + ': ' + error.message, 'err');
+    return;
+  }
+  u.archivedAt = stamp;
+  renderRoster();
+  if (window.TD_CHAT && window.TD_CHAT.refresh) { try { window.TD_CHAT.refresh(); } catch (e) {} }
+  showToast(on ? (u.name || 'Athlete') + ' archived \u2014 under Archived at the bottom' : (u.name || 'Athlete') + ' is back on your list', 'ok');
 }
 
 function openRosterActions(id) {
@@ -2138,6 +2179,8 @@ function openRosterActions(id) {
   show('[data-ros="view"]', !isCoachRow);
   show('[data-ros="msg"]', !isCoachRow && !!(window.TD_CHAT && window.TD_CHAT.open));
   show('[data-ros="del"]', !self);
+  show('[data-ros="arch"]', !isCoachRow);
+  document.querySelector('[data-ros="arch"]').textContent = u.archivedAt ? 'Restore to athlete list' : 'Archive';
   openModal('m-ros');
 }
 
@@ -2169,6 +2212,7 @@ function setupRoster() {
         '<button type="button" class="ros-act" data-ros="view">View program</button>' +
         '<button type="button" class="ros-act" data-ros="msg">Message</button>' +
         '<button type="button" class="ros-act" data-ros="edit">Edit details &amp; spreadsheet</button>' +
+        '<button type="button" class="ros-act" data-ros="arch">Archive</button>' +
         '<button type="button" class="ros-act danger" data-ros="del">Delete</button>' +
       '</div></div></div></div>');
   const sheet = document.getElementById('m-ros');
@@ -2181,6 +2225,7 @@ function setupRoster() {
     if (b.dataset.ros === 'view') adminViewUser(id);
     else if (b.dataset.ros === 'msg') window.TD_CHAT.open('d:' + id);
     else if (b.dataset.ros === 'edit') openEditUser(id);
+    else if (b.dataset.ros === 'arch') { const u = (window.PROFILES || []).find(p => p.id === id); if (u) setArchived(id, !u.archivedAt); }
     else if (b.dataset.ros === 'del') openDeleteUser(id);
   });
 
