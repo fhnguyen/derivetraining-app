@@ -24,7 +24,7 @@
 
 // Shown at the bottom of the Account tab, so it's easy to check which
 // version of this file a phone is running. Bump it with every change.
-const TD_BUILD = '17';
+const TD_BUILD = '20';
 
 let chatOn = false;   // td-chat.js switches this on via TD_TABS.enableChat()
 
@@ -548,6 +548,65 @@ button.acc-row:hover { background:var(--wash); }
 .chat-empty { text-align:center; padding:48px 20px; background:var(--paper); border:1px solid var(--line); border-radius:4px; }
 .chat-empty h2 { font-family:var(--display); font-weight:400; font-size:30px; line-height:1; color:var(--ink); margin-bottom:8px; }
 .chat-empty p { font-size:13.5px; line-height:1.6; color:var(--ink-2); }
+/* Run paces */
+.pz { font-weight:700; color:var(--blue); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.pz-none { color:var(--ink-2); font-weight:600; }
+.pz-bad { color:var(--magenta); border-bottom:1px dashed currentColor; }
+.pz-hd { border-bottom:none; padding-bottom:4px; align-items:center; }
+.pz-units { display:flex; flex:none; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+.pz-units button { border:none; background:none; padding:7px 11px; font:700 12px var(--sans); color:var(--ink-3); cursor:pointer; }
+.pz-units button + button { border-left:1px solid var(--line); }
+.pz-units button.on { background:var(--blue); color:#fff; }
+.pz-tbl { padding:0 16px 12px; }
+.pz-row { display:flex; justify-content:space-between; gap:12px; padding:7px 0; border-top:1px solid var(--line); font-size:13.5px; }
+.pz-row:first-child { border-top:none; }
+.pz-k { color:var(--ink-2); }
+.pz-v { font-weight:700; font-variant-numeric:tabular-nums; color:var(--ink); white-space:nowrap; }
+.pz-thr .pz-k, .pz-thr .pz-v { color:var(--blue); }
+#m-user .pz-tbl { padding:4px 0 0; }
+/* Full screen while the clock runs: just the clock and the buttons,
+   the time as big as the screen allows. */
+.tm-fs {
+  position:absolute; top:12px; left:10px; width:38px; height:38px;
+  display:grid; place-items:center; background:none; border:0; border-radius:3px;
+  color:var(--ink-3); cursor:pointer;
+}
+.tm-fs[hidden] { display:none; }
+.tm-fs:hover { background:var(--wash); color:var(--ink); }
+.tm-fs svg { width:20px; height:20px; }
+html.tm-full, html.tm-full body { overflow:hidden; overscroll-behavior:none; }
+html.tm-full .app-hd, html.tm-full #s-app .tabbar, html.tm-full #v-timer .hero,
+html.tm-full #tm-modes, html.tm-full #tm-setup, html.tm-full #tm-laps { display:none !important; }
+html.tm-full #v-timer .tb-col {
+  position:fixed; inset:0; z-index:300; width:auto; max-width:none; margin:0;
+  display:flex; flex-direction:column; background:var(--paper);
+  padding:calc(env(safe-area-inset-top, 0px) + 8px) 12px calc(env(safe-area-inset-bottom, 0px) + 12px);
+}
+html.tm-full .tm-face {
+  flex:1; min-height:0; display:flex; flex-direction:column; justify-content:center;
+  margin:0 -12px 12px; border:0; border-radius:0; padding:56px 8px 20px; background:transparent;
+}
+html.tm-full .tm-face::before { height:8px; }
+html.tm-full .tm-face[data-ph="rest"] { background:#FFF7E8; }
+html.tm-full .tm-fs, html.tm-full .tm-snd { top:calc(env(safe-area-inset-top, 0px) + 14px); width:46px; height:46px; }
+html.tm-full .tm-fs svg, html.tm-full .tm-snd svg { width:24px; height:24px; }
+html.tm-full .tm-phase { font-size:clamp(13px, 2.2vh, 18px); letter-spacing:5px; }
+html.tm-full .tm-time { margin:2vh 0 1.5vh; line-height:.84; }
+html.tm-full .tm-time .d { width:.44em; }
+html.tm-full .tm-time .c { width:.2em; }
+html.tm-full .tm-live { margin:0 0 1vh; }
+html.tm-full .tm-live-lbl, html.tm-full .tm-count-lbl { font-size:12px; }
+html.tm-full .tm-live-t { font-size:min(13vh, 25vw); }
+html.tm-full .tm-count-n { font-size:min(14vh, 26vw); }
+html.tm-full .tm-sub { font-size:clamp(14px, 2.2vh, 19px); }
+html.tm-full .tm-bar { height:6px; margin:2.5vh 12px 0; }
+html.tm-full .tm-ctrls { margin:0; gap:10px; }
+html.tm-full .tm-btn { height:clamp(64px, 10vh, 86px); font-size:13px; }
+@media (orientation:landscape) and (max-height:500px) {
+  html.tm-full .tm-face { padding-top:14px; padding-bottom:8px; margin-bottom:8px; }
+  html.tm-full .tm-fs, html.tm-full .tm-snd { top:8px; }
+  html.tm-full .tm-btn { height:56px; }
+}
 `;
 
 /* ───────────────────────────────────────────────────────────────
@@ -606,6 +665,7 @@ function injectMarkup() {
         '</div>' +
         '<div class="tm-face" id="tm-face" data-ph="idle">' +
           '<button class="tm-snd" id="tm-snd" type="button" aria-label="Sound on"></button>' +
+          '<button class="tm-fs" id="tm-fs" type="button" aria-label="Exit full screen" hidden></button>' +
           '<div class="tm-phase" id="tm-phase"></div>' +
           '<div class="tm-time" id="tm-time" aria-live="off"></div>' +
           '<div class="tm-live" id="tm-live" hidden><span class="tm-live-lbl"></span><span class="tm-live-t"></span></div>' +
@@ -643,6 +703,14 @@ function injectMarkup() {
               '<div class="tt-level"></div>' +
               '<button class="tt-step" onclick="stepTextSize(1)" aria-label="Larger text"><span style="font-size:22px">T</span></button>' +
             '</div></div>' +
+        '</div>' +
+        '<div class="acc-card" id="acc-paces" hidden>' +
+          '<div class="acc-row pz-hd"><div><div class="acc-row-lbl">Your run paces</div>' +
+            '<div class="acc-row-desc">Set by your coach from your threshold pace</div></div>' +
+            '<div class="pz-units" role="group" aria-label="Pace units">' +
+              '<button type="button" data-pz-unit="km">/km</button><button type="button" data-pz-unit="mi">/mi</button>' +
+            '</div></div>' +
+          '<div id="acc-paces-tbl"></div>' +
         '</div>' +
         '<button class="acc-out" type="button" onclick="doLogout()">Sign Out</button>' +
         '<div class="acc-foot">Trainderive &middot; By Frank Nguyen &middot; Build ' + TD_BUILD + '</div>' +
@@ -798,6 +866,7 @@ function renderAccount() {
   set('acc-email', u.email || '');
   set('acc-av',    (u.name || '?').charAt(0).toUpperCase());
   if (typeof applyTextScale === 'function') applyTextScale();
+  renderAccountPaces();
 }
 
 /* ───────────────────────────────────────────────────────────────
@@ -935,7 +1004,7 @@ function tmElapsed() {
 }
 
 function fmt(sec) {
-  sec = Math.max(0, Math.floor(sec));
+  sec = Math.max(0, Math.floor(sec + 1e-6));   // 89.99999 from float maths is still 1:30
   const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = sec % 60;
   return h ? h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0')
            : m + ':' + String(s).padStart(2, '0');
@@ -1329,6 +1398,46 @@ function renderLiveSplit() {
   box.querySelector('.tm-live-t').textContent = fmt(since);
 }
 
+// Full screen: on while the clock is going (running, paused or just finished)
+// and the Timer tab is showing, unless the athlete has shrunk it.
+const FS_ICON = {
+  exit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>',
+  enter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
+};
+function tmFullOn() {
+  const v = document.getElementById('v-timer'), app = document.getElementById('s-app');
+  return !!v && v.classList.contains('active') && !!app && app.classList.contains('active') &&
+         TM.state !== 'idle' && !TM.small;
+}
+function syncFull() {
+  const on = tmFullOn(), root = document.documentElement;
+  if (root.classList.contains('tm-full') !== on) {
+    root.classList.toggle('tm-full', on);
+    if (on) window.scrollTo(0, 0);
+  }
+  const b = document.getElementById('tm-fs');
+  if (b) {
+    b.hidden = TM.state === 'idle';
+    b.innerHTML = on ? FS_ICON.exit : FS_ICON.enter;
+    b.setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen');
+  }
+  fitTime();
+}
+// The biggest the time can be: as wide as the screen, without crowding
+// out the round count or the buttons.
+function fitTime() {
+  const t = document.getElementById('tm-time');
+  if (!t) return;
+  if (!document.documentElement.classList.contains('tm-full')) { if (t.style.fontSize) t.style.fontSize = ''; return; }
+  const em = t.querySelectorAll('.d').length * 0.44 + t.querySelectorAll('.c').length * 0.2 || 1.96;   // the slot widths set for full screen
+  const face = document.getElementById('tm-face');
+  const W = (face ? face.clientWidth : window.innerWidth) - 20;
+  const extra = !document.getElementById('tm-live').hidden || !document.getElementById('tm-count').hidden;
+  const H = window.innerHeight * (extra ? 0.34 : 0.46);
+  const px = Math.max(60, Math.floor(Math.min(W / (em + 0.06), H)));
+  if (t.style.fontSize !== px + 'px') t.style.fontSize = px + 'px';
+}
+
 function tmRenderFace() {
   const f = faceState();
   const face = document.getElementById('tm-face');
@@ -1345,6 +1454,7 @@ function tmRenderFace() {
   }
   document.getElementById('tm-bar').style.width = (f.bar === null ? 0 : Math.min(1, Math.max(0, f.bar)) * 100) + '%';
   renderLiveSplit();
+  fitTime();
 }
 
 // While the clock runs, the Timer tab shows it — handy when flipping
@@ -1501,6 +1611,9 @@ function tmRender() {
   snd.innerHTML = c.sound ? ICON.sound : ICON.muted;
   snd.setAttribute('aria-label', c.sound ? 'Sound on' : 'Sound off');
 
+  if (idle) TM.small = false;   // the next start opens full screen again
+  syncFull();
+
   const laps = document.getElementById('tm-laps');
   const lh = lapsHTML();
   laps.hidden = !lh;
@@ -1533,11 +1646,21 @@ function commitField(input) {
 function wireTimer() {
   const view = document.getElementById('v-timer');
   if (!view) return;
+  // Leaving the Timer tab (or signing out) drops full screen; coming back restores it.
+  const watch = new MutationObserver(() => syncFull());
+  watch.observe(view, { attributes: true, attributeFilter: ['class'] });
+  const app = document.getElementById('s-app');
+  if (app) watch.observe(app, { attributes: true, attributeFilter: ['class'] });
+  let fitT = null;
+  const refit = () => { clearTimeout(fitT); fitT = setTimeout(fitTime, 80); };
+  window.addEventListener('resize', refit);
+  window.addEventListener('orientationchange', refit);
 
   view.addEventListener('click', e => {
     const t = e.target;
     // Tapping the clock face records a split / round (not the sound button).
     if (t.closest('#tm-count-undo')) { countRound(-1); return; }
+    if (t.closest('#tm-fs')) { TM.small = tmFullOn(); syncFull(); return; }
     if (t.closest('#tm-face') && !t.closest('#tm-snd')) {
       if (TM.state === 'running') { if (TM.counterOn) countRound(1); else tmRound(); }
       return;
@@ -1662,7 +1785,7 @@ function pcSave(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catc
 // Percentages written in a section: "60-65%", "60 to 65%", "60%-65%", "72%".
 function pcFind(text) {
   const out = { pcts: [], ranges: [] };
-  const s = String(text || '');
+  const s = String(text || '').replace(PZ_TAG, ' ');   // &threshold+5%& is a pace, not a lift %
   const re = /(\d{1,3}(?:\.\d+)?)\s*%?\s*(?:-|–|—|to)\s*(\d{1,3}(?:\.\d+)?)\s*%|(\d{1,3}(?:\.\d+)?)\s*%/gi;
   let m;
   while ((m = re.exec(s))) {
@@ -2180,6 +2303,223 @@ window.TD_TABS = {
   },
   go: tabGo,
 };
+
+/* ───────────────────────────────────────────────────────────────
+   RUN PACES
+   The coach writes tags like &threshold&, &easy& or &5k-10s& in the
+   sheet. Each runner sees their own pace in its place, worked out from
+   the one number the coach sets on their profile: a threshold pace,
+   single (7:10) or a range (7:05-7:15), per mile or per km.
+
+   Zones are Joe Friel's run pace zones, TrainingPeaks' default: each
+   zone is a share of threshold pace *time*, so a bigger share is slower.
+   Race paces use Riegel's formula, t2 = t1 × (d2/d1)^1.06, treating
+   threshold pace as the pace a runner could hold for about an hour.
+   ─────────────────────────────────────────────────────────────── */
+const PZ_TAG = /&(?=[^\s&])([^&\n]{1,40}?)(?<=[^\s&])&/g;
+const PZ_ZONE = {          // [fastest, slowest] share of threshold pace time
+  z1:  [1.29, null],       // slower than 129%
+  z2:  [1.14, 1.29],
+  z3:  [1.06, 1.13],
+  z4:  [0.99, 1.05],
+  z5a: [0.97, 1.00],
+  z5b: [0.90, 0.96],
+  z5c: [null, 0.90],       // faster than 90%
+};
+const PZ_NAMES = {};
+function pzName(names, def) { names.forEach(n => { PZ_NAMES[n] = def; }); }
+pzName(['threshold', 'thresh', 'thr', 'ftp', 'ftpa', 'lt', 't'], { k: 'thr', w: 'threshold pace', lbl: 'Threshold' });
+pzName(['recovery', 'rec', 'z1', 'zone1'],                       { k: 'zone', z: 'z1', w: 'recovery pace', lbl: 'Recovery \u00B7 Z1' });
+pzName(['easy', 'aerobic', 'endurance', 'z2', 'zone2'],          { k: 'zone', z: 'z2', w: 'easy pace', lbl: 'Easy \u00B7 Z2' });
+pzName(['tempo', 'z3', 'zone3'],                                 { k: 'zone', z: 'z3', w: 'tempo pace', lbl: 'Tempo \u00B7 Z3' });
+pzName(['subthreshold', 'sub', 'z4', 'zone4'],                   { k: 'zone', z: 'z4', w: 'sub-threshold pace', lbl: 'Sub-threshold \u00B7 Z4' });
+pzName(['z5a', 'zone5a'],                                        { k: 'zone', z: 'z5a', w: 'zone 5a pace', lbl: 'Z5a' });
+pzName(['vo2', 'vo2max', 'z5b', 'zone5b'],                       { k: 'zone', z: 'z5b', w: 'VO2 max pace', lbl: 'VO2 max \u00B7 Z5b' });
+pzName(['anaerobic', 'speed', 'z5c', 'zone5c'],                  { k: 'zone', z: 'z5c', w: 'speed pace', lbl: 'Speed \u00B7 Z5c' });
+pzName(['mile', '1mi', '1mile'],                                 { k: 'race', d: 1609.344, w: 'mile pace', lbl: 'Mile' });
+pzName(['3k', '3km'],                                            { k: 'race', d: 3000, w: '3k pace', lbl: '3k' });
+pzName(['5k', '5km'],                                            { k: 'race', d: 5000, w: '5k pace', lbl: '5k' });
+pzName(['8k', '8km'],                                            { k: 'race', d: 8000, w: '8k pace', lbl: '8k' });
+pzName(['10k', '10km'],                                          { k: 'race', d: 10000, w: '10k pace', lbl: '10k' });
+pzName(['15k', '15km'],                                          { k: 'race', d: 15000, w: '15k pace', lbl: '15k' });
+pzName(['10mi', '10mile', '10miler'],                            { k: 'race', d: 16093.44, w: '10 mile pace', lbl: '10 mile' });
+pzName(['half', 'hm', 'hmp', 'halfmarathon', 'half-marathon'],   { k: 'race', d: 21097.5, w: 'half marathon pace', lbl: 'Half marathon' });
+pzName(['marathon', 'mar', 'mp'],                                { k: 'race', d: 42195, w: 'marathon pace', lbl: 'Marathon' });
+// The order a runner's pace table is listed in.
+const PZ_TABLE = ['recovery', 'easy', 'tempo', 'marathon', 'half', 'z4', 'threshold', '10k', '5k', 'vo2', 'mile', 'speed'];
+
+// "4:25-4:30", "4:28" (per km), "7:05–7:15/mi", "7:05 - 7:15 per mile" → seconds per unit.
+function pzParse(str) {
+  const s = String(str || '').trim().toLowerCase();
+  if (!s) return null;
+  const unit = /mi\b|mile/.test(s) ? 'mi' : 'km';   // per km unless it says /mi
+  const hits = s.match(/\d{1,2}:\d{2}/g) || [];
+  if (!hits.length || hits.length > 2 || hits.some(t => Number(t.split(':')[1]) >= 60)) return null;
+  const times = hits.map(t => { const [m, x] = t.split(':').map(Number); return m * 60 + x; });
+  if (times.some(t => t < 120 || t > 1200)) return null;
+  if (/\d:\d{2}\d/.test(s)) return null;
+  const fast = Math.min(...times), slow = Math.max(...times);
+  return { fast, slow, unit };
+}
+function pzFmt(sec) {
+  const r = Math.round(sec);
+  return Math.floor(r / 60) + ':' + String(r % 60).padStart(2, '0');
+}
+function pzNormalize(str) {
+  const p = pzParse(str);
+  if (!p) return null;
+  return (p.fast === p.slow ? pzFmt(p.fast) : pzFmt(p.fast) + '-' + pzFmt(p.slow)) + ' /' + p.unit;
+}
+
+// One side of a tag: "threshold+5%", "5k - 10s", "easy", "z2+0:15".
+function pzSide(raw) {
+  const m = String(raw).toLowerCase().match(/^\s*([a-z0-9][a-z0-9 _-]*?)\s*(?:([+-])\s*(\d+(?:\.\d+)?|\d+:\d{2})\s*(%|s|sec|secs|seconds)?)?\s*$/);
+  if (!m) return null;
+  let name = m[1].replace(/[\s_-]+/g, '');
+  if (!PZ_NAMES[name]) name = name.replace(/pace$/, '');
+  const def = PZ_NAMES[name];
+  if (!def) return null;
+  let mod = null;
+  if (m[2]) {
+    const sign = m[2] === '-' ? -1 : 1;
+    if (m[4] === '%') mod = { pct: sign * parseFloat(m[3]) };
+    else {
+      const v = m[3].includes(':') ? m[3].split(':').reduce((a, b) => a * 60 + Number(b), 0) : parseFloat(m[3]);
+      mod = { sec: sign * v };
+    }
+  }
+  return { def, mod };
+}
+function pzModText(mod) {
+  if (!mod) return '';
+  if (mod.pct != null) return ' ' + (mod.pct < 0 ? '\u2212' : '+') + Math.abs(mod.pct) + '%';
+  const a = Math.abs(mod.sec);
+  return ' ' + (mod.sec < 0 ? '\u2212' : '+') + (a >= 60 ? pzFmt(a) : a + 's');
+}
+
+// → { fast, slow } in seconds per unit. slow may be Infinity, fast may be 0.
+function pzCompute(side, p) {
+  const { def, mod } = side;
+  let fast, slow;
+  if (def.k === 'thr') { fast = p.fast; slow = p.slow; }
+  else if (def.k === 'zone') {
+    const mid = (p.fast + p.slow) / 2, [lo, hi] = PZ_ZONE[def.z];
+    fast = lo == null ? 0 : mid * lo;
+    slow = hi == null ? Infinity : mid * hi;
+  } else {
+    const unitM = p.unit === 'km' ? 1000 : 1609.344;
+    const race = pace => pace * Math.pow(def.d / (3600 / pace * unitM), 0.06);
+    fast = race(p.fast); slow = race(p.slow);
+  }
+  const adj = v => {
+    if (!isFinite(v) || v === 0 || !mod) return v;
+    return mod.pct != null ? v * (1 + mod.pct / 100) : v + mod.sec;
+  };
+  return { fast: adj(fast), slow: adj(slow) };
+}
+// Paces are worked out in the unit the threshold was entered in, then shown
+// in the runner's unit: a pace per mile is 1.609344 × the pace per km.
+const PZ_KM_PER_MI = 1.609344;
+function pzConvert(sec, from, to) {
+  if (!to || from === to || !isFinite(sec) || !sec) return sec;
+  return from === 'mi' ? sec / PZ_KM_PER_MI : sec * PZ_KM_PER_MI;
+}
+function pzUnit(user, p) {
+  if (user && typeof S !== 'undefined' && user === S.user && user.role !== 'coach') {
+    const local = pzLocalUnit();
+    if (local === 'km' || local === 'mi') return local;
+  }
+  return user && (user.paceUnit === 'km' || user.paceUnit === 'mi') ? user.paceUnit : p.unit;
+}
+function pzShow(r, unit) {
+  const u = '/' + unit;
+  if (!isFinite(r.slow)) return 'slower than ' + pzFmt(r.fast) + u;
+  if (!r.fast) return 'faster than ' + pzFmt(r.slow) + u;
+  const a = pzFmt(r.fast), b = pzFmt(r.slow);
+  return (a === b ? a : a + '\u2013' + b) + u;
+}
+
+// The inside of one tag → { ok, text } (ok false: no pace set, words instead),
+// or null when it isn't a pace tag at all.
+function pzResolve(inner, p, unit) {
+  const parts = String(inner).split(/\s*(?:\.\.|~|\bto\b)\s*/i);
+  if (parts.length > 2) return null;
+  const sides = parts.map(pzSide);
+  if (sides.some(x => !x)) return null;
+  const words = sides.map(x => x.def.w + pzModText(x.mod));
+  if (!p) return { ok: false, text: words.join(' to ') };
+  const rs = sides.map(x => pzCompute(x, p));
+  const r = { fast: Math.min(...rs.map(x => x.fast)), slow: Math.max(...rs.map(x => x.slow)) };
+  const out = unit || p.unit;
+  return { ok: true, text: pzShow({ fast: pzConvert(r.fast, p.unit, out), slow: pzConvert(r.slow, p.unit, out) }, out), what: words.join(' to ') };
+}
+
+// Raw programming text → the same text with each tag swapped for a marked
+// pace (\u0001 pace, \u0003 words when no pace is set, \u0004 not a tag
+// we know), closed by \u0002. The marks survive escaping and are turned into
+// styled spans by pzHTML once the text has been made into HTML.
+function pzText(raw, user) {
+  const p = user ? pzParse(user.runPace) : null;
+  return String(raw == null ? '' : raw).replace(PZ_TAG, (m, inner) => {
+    const r = pzResolve(inner, p, p && pzUnit(user, p));
+    if (!r) return '\u0004' + m + '\u0002';
+    return (r.ok ? '\u0001' : '\u0003') + r.text + '\u0002';
+  });
+}
+function pzHTML(html, coach) {
+  return String(html)
+    .replace(/\u0001([^\u0002]*)\u0002/g, '<span class="pz">$1</span>')
+    .replace(/\u0003([^\u0002]*)\u0002/g, coach
+      ? '<span class="pz pz-none" title="No threshold pace set for this athlete">$1</span>'
+      : '<span class="pz pz-none">$1</span>')
+    .replace(/\u0004([^\u0002]*)\u0002/g, coach ? '<span class="pz-bad" title="Not a pace tag the app knows">$1</span>' : '$1');
+}
+function pzPlain(raw, user) {
+  return pzText(raw, user).replace(/[\u0001\u0003\u0004]([^\u0002]*)\u0002/g, '$1');
+}
+
+// A runner's pace table, from a threshold string.
+function pzTable(runPace, unit) {
+  const p = pzParse(runPace);
+  if (!p) return '';
+  return '<div class="pz-tbl">' + PZ_TABLE.map(n => {
+    const r = pzResolve(n, p, unit || p.unit), d = PZ_NAMES[n];
+    return '<div class="pz-row' + (n === 'threshold' ? ' pz-thr' : '') + '"><span class="pz-k">' + d.lbl +
+      '</span><span class="pz-v">' + r.text.replace(/^(slower|faster) than /, (x, w) => (w === 'slower' ? '> ' : '< ')) + '</span></div>';
+  }).join('') + '</div>';
+}
+
+function renderAccountPaces() {
+  const box = document.getElementById('acc-paces');
+  if (!box) return;
+  const u = S.user, p = u ? pzParse(u.runPace) : null;
+  box.hidden = !p;
+  if (!p) return;
+  const unit = pzUnit(u, p);
+  document.getElementById('acc-paces-tbl').innerHTML = pzTable(u.runPace, unit);
+  box.querySelectorAll('[data-pz-unit]').forEach(b => b.classList.toggle('on', b.dataset.pzUnit === unit));
+}
+// The runner picks /km or /mi. It's kept on this phone straight away and
+// saved to their profile, so other devices and the coach's view follow.
+const PZ_UNIT_KEY = () => 'td_pace_unit_' + (S.user && S.user.id);
+function pzLocalUnit() { try { return localStorage.getItem(PZ_UNIT_KEY()) || ''; } catch (e) { return ''; } }
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('[data-pz-unit]');
+  if (!b || !S.user) return;
+  const unit = b.dataset.pzUnit;
+  if (unit === pzUnit(S.user, pzParse(S.user.runPace) || { unit })) return;
+  S.user.paceUnit = unit;
+  try { localStorage.setItem(PZ_UNIT_KEY(), unit); } catch (err) {}
+  renderAccountPaces();
+  // Redraw the open workout so it shows the new unit when they go back to Train.
+  try { if (S.selDate && S.dayMap && typeof renderDayContent === 'function') renderDayContent(S.dayMap[S.selDate]); } catch (err) {}
+  if (typeof showToast === 'function') showToast('Paces now shown per ' + (unit === 'km' ? 'km' : 'mile'), 'ok');
+  if (typeof SB !== 'undefined' && SB) {
+    const { error } = await SB.rpc('td_set_pace_unit', { p_unit: unit });
+    if (error) console.warn('Pace unit kept on this phone only:', error.message);
+  }
+});
+window.TD_PACE = { parse: pzParse, normalize: pzNormalize, resolve: pzResolve, text: pzText, html: pzHTML, plain: pzPlain, table: pzTable, unitOf: pzUnit };
 
 // For testing in the console.
 window.TD_TIMER = { buildPhases, locate, fmt, state: () => TM };
