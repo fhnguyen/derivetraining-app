@@ -5,7 +5,7 @@
    above </body>:
 
        <script src="athlete-tabs.js?v=25"></script>
-       <script src="td-media.js?v=1"></script>
+       <script src="td-media.js?v=2"></script>
        <script src="td-chat.js?v=3"></script>
 
    Needs media-setup.sql run once in Supabase first.
@@ -19,6 +19,9 @@
      dropped connection picks up where it stopped. The screen is kept
      awake while a video uploads.
    • A section with only a photo or video counts as logged.
+   • While something uploads and its section is off screen (another
+     tab, another day, scrolled away), a thin strip above the bottom
+     bar shows "Uploading video · 42%". Tap it to go to the section.
 
    Coach (athlete → day)
    • The photo or video sits under the athlete's result, with
@@ -100,6 +103,30 @@ const CSS = `
   position:absolute; top:calc(env(safe-area-inset-top, 0px) + 10px); right:10px; width:44px; height:44px;
   border:0; border-radius:3px; background:rgba(255,255,255,.12); color:#fff; font-size:18px; cursor:pointer;
 }
+
+/* Upload strip: a whisper above the bottom bar while something uploads
+   off screen. Tap it to go back to the section. */
+.md-strip {
+  position:fixed; left:0; right:0; z-index:199; bottom:calc(var(--tb-h, 50px) + var(--tb-pad, 0px));
+  display:flex; justify-content:center; pointer-events:none;
+  background:rgba(255,255,255,.9); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  opacity:0; transform:translateY(6px); transition:opacity .25s, transform .25s;
+}
+.md-strip.on { opacity:1; transform:none; pointer-events:auto; }
+.md-strip-in {
+  position:relative; width:100%; max-width:560px; height:22px; padding:0 14px;
+  display:flex; align-items:center; justify-content:center; gap:7px;
+  background:none; border:0; cursor:pointer; font-family:var(--sans);
+  font-size:8.5px; font-weight:800; letter-spacing:1.6px; text-transform:uppercase; color:var(--ink-3);
+}
+.md-strip-dot { width:5px; height:5px; border-radius:50%; background:var(--blue); flex-shrink:0; animation:pulse 2s ease-in-out infinite; }
+.md-strip-line { position:absolute; left:0; bottom:0; height:2px; width:0; background:var(--blue); transition:width .3s; }
+.md-strip[data-st="retry"] .md-strip-dot, .md-strip[data-st="retry"] .md-strip-line { background:var(--gold); }
+.md-strip[data-st="err"] .md-strip-in { color:var(--magenta); }
+.md-strip[data-st="err"] .md-strip-dot { background:var(--magenta); animation:none; }
+.md-strip[data-st="err"] .md-strip-line { display:none; }
+body.ch-typing .md-strip, html.tm-full .md-strip, #s-app:has(#v-chat.active.ch-open) .md-strip { display:none; }
+body.md-strip-on:has(#s-app.active) .toast { bottom:calc(var(--tb-h, 50px) + var(--tb-pad, 0px) + 36px); }
 
 /* Coach: a section with only a photo or video isn't "no result" */
 .sec-card.md-has-media .adm-no-result { display:none; }
@@ -235,8 +262,8 @@ function makeSlot(mode, a, iso, idx) {
 }
 function slotsFor(sel) { return [...document.querySelectorAll('.md-slot' + sel)]; }
 function paintDay(a, iso) { slotsFor('[data-day="' + dk(a, iso) + '"]').forEach(paint); }
-function paintKey(k) { slotsFor('[data-k="' + k + '"]').forEach(paint); syncWake(); }
-function paintBarKey(k) { const j = MD.jobs[k]; if (j) slotsFor('[data-k="' + k + '"]').forEach(s => paintBar(s, j)); }
+function paintKey(k) { slotsFor('[data-k="' + k + '"]').forEach(paint); syncWake(); syncStrip(); }
+function paintBarKey(k) { const j = MD.jobs[k]; if (j) slotsFor('[data-k="' + k + '"]').forEach(s => paintBar(s, j)); syncStrip(); }
 
 function paint(slot) {
   const { a, iso, sec, mode } = slot.dataset;
@@ -722,6 +749,87 @@ async function syncWake() {
 }
 function uploading() { return Object.values(MD.jobs).some(j => j.state !== 'err'); }
 
+/* ── Upload strip ─────────────────────────────────── */
+// Shown only while the section being uploaded to is off screen: another
+// tab, another day, or scrolled away. Its own card already shows progress.
+let strip = null, stripQueued = false;
+function stripEl() {
+  if (strip) return strip;
+  const app = document.getElementById('s-app');
+  if (!app) return null;
+  strip = document.createElement('div');
+  strip.className = 'md-strip';
+  strip.setAttribute('role', 'status');
+  strip.innerHTML = '<button type="button" class="md-strip-in"><span class="md-strip-dot"></span>' +
+    '<span class="md-strip-txt"></span><span class="md-strip-line"></span></button>';
+  strip.addEventListener('click', () => { if (strip.job) goToJob(strip.job); });
+  app.appendChild(strip);
+  return strip;
+}
+function slotOnScreen(job) {
+  const app = document.getElementById('s-app'), day = document.getElementById('v-day');
+  if (!app || !app.classList.contains('active') || !day || !day.classList.contains('active')) return false;
+  if (typeof S === 'undefined' || S.selDate !== job.iso) return false;
+  const s = slotsFor('[data-k="' + job.k + '"]')[0];
+  if (!s) return false;
+  const r = s.getBoundingClientRect();
+  return r.height > 0 && r.bottom > 60 && r.top < window.innerHeight - 70;
+}
+function syncStrip() {
+  if (stripQueued) return;
+  stripQueued = true;
+  requestAnimationFrame(() => { stripQueued = false; drawStrip(); });
+}
+function drawStrip() {
+  const u = me();
+  const jobs = Object.values(MD.jobs).filter(j => u && j.a === u.id);
+  jobs.forEach(j => { if (j.state === 'err' && slotOnScreen(j)) j.seen = true; });   // a failure, once seen, stops nagging
+  const active = jobs.filter(j => j.state !== 'err');
+  const failed = jobs.filter(j => j.state === 'err' && !j.seen);
+  const show = (active.length && !active.every(slotOnScreen)) || failed.length;
+  const el = show ? stripEl() : strip;
+  document.body.classList.toggle('md-strip-on', !!show);
+  if (!el) return;
+  el.classList.toggle('on', !!show);
+  if (!show) { el.job = null; return; }
+
+  let st, txt, pct = 0;
+  if (active.length) {
+    const what = active.length > 1 ? active.length + ' files' : active[0].kind;
+    const bytes = active.reduce((n, j) => n + (j.file ? j.file.size : 0), 0) || 1;
+    pct = active.reduce((n, j) => n + (j.file ? j.file.size : 0) * (j.state === 'save' ? 1 : j.pct || 0), 0) / bytes;
+    st = active.some(j => j.state === 'retry') ? 'retry' : 'up';
+    txt = st === 'retry' ? 'Reconnecting…'
+        : active.every(j => j.state === 'save') ? 'Saving ' + what + '…'
+        : active.every(j => j.state === 'prep') ? 'Preparing ' + what + '…'
+        : 'Uploading ' + what + (pct > 0.01 ? ' · ' + Math.floor(pct * 100) + '%' : '');
+    el.job = active[0];
+  } else {
+    st = 'err';
+    txt = (failed[0].kind === 'video' ? 'Video' : 'Photo') + ' not added · Tap to see why';
+    el.job = failed[0];
+  }
+  el.dataset.st = st;
+  el.querySelector('.md-strip-txt').textContent = txt;
+  el.querySelector('.md-strip-line').style.width = Math.round(Math.max(0.02, pct) * 100) + '%';
+}
+function goToJob(job) {
+  const reveal = () => {
+    const s = slotsFor('[data-k="' + job.k + '"]')[0];
+    if (!s) return;
+    const card = s.closest('.sec-card');
+    if (card) card.classList.add('open');
+    s.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    syncStrip();
+  };
+  const day = document.getElementById('v-day');
+  if (day && day.classList.contains('active') && S.selDate === job.iso) { reveal(); return; }
+  // Back to the day as it was left (typing included) if that's where it was, else open it.
+  if (S.lastTrain && S.lastTrain.route === 'day' && S.lastTrain.date === job.iso && !S.trainStale && window.TD_TABS) window.TD_TABS.go('train');
+  else if (typeof navTo === 'function') navTo('day', { date: job.iso });
+  setTimeout(reveal, 150);
+}
+
 /* ───────────────────────────────────────────────────────────────
    REMOVE + KEEP
    ─────────────────────────────────────────────────────────────── */
@@ -975,8 +1083,14 @@ function hook() {
   window.applyRoute = function (route) {
     const r = _route.apply(this, arguments);
     if (route === 'admin') setTimeout(sweep, 4000);
+    syncStrip();
     return r;
   };
+
+  // The strip follows the athlete around: scrolling, switching tabs.
+  window.addEventListener('scroll', syncStrip, { passive: true });
+  window.addEventListener('resize', syncStrip);
+  document.addEventListener('click', () => setTimeout(syncStrip, 60), true);
 
   // Signing out drops everything, uploads included.
   ['doLogout', 'doAdminLogout'].forEach(fn => {
@@ -995,6 +1109,7 @@ function hook() {
     if (document.visibilityState !== 'visible') return;
     Object.values(MD.jobs).forEach(j => { if (j.wake) j.wake(); });
     syncWake();
+    syncStrip();
     refreshLinks();
   });
   window.addEventListener('online', () => Object.values(MD.jobs).forEach(j => { if (j.wake) j.wake(); }));
