@@ -5,14 +5,15 @@
    above </body>:
 
        <script src="athlete-tabs.js?v=25"></script>
-       <script src="td-media.js?v=2"></script>
+       <script src="td-media.js?v=4"></script>
        <script src="td-chat.js?v=3"></script>
 
    Needs media-setup.sql run once in Supabase first.
 
    Athlete
-   • Under "Your Results" in each section: Add photo or video.
-     One per section — adding another replaces it.
+   • A paperclip in the corner of each results box attaches a photo
+     or video. One per section; Replace and Remove sit under it once
+     it's attached.
    • Photos are shrunk on the phone (about 300 KB, location data
      removed) before they upload.
    • Videos: up to 30 seconds. They upload in 6 MB pieces, so a
@@ -57,15 +58,17 @@ const CSS = `
 .md-slot { margin-top:12px; }
 .md-slot:empty { display:none; }
 
-.md-add {
-  display:flex; align-items:center; gap:12px; width:100%; text-align:left; cursor:pointer;
-  background:none; border:1.5px dashed var(--line); border-radius:4px; padding:11px 12px;
-  font:inherit; color:var(--blue); transition:border-color .15s, background .15s;
+/* The paperclip, tucked into the results box's bottom-right corner */
+.md-ta-wrap { position:relative; }
+.md-ta-wrap .res-ta { padding-right:46px; }
+.md-clip {
+  position:absolute; right:5px; bottom:9px; width:36px; height:36px;
+  display:grid; place-items:center; padding:0; border:0; border-radius:3px;
+  background:none; color:var(--ink-3); cursor:pointer; transition:color .15s, background .15s;
 }
-.md-add:hover { border-color:var(--blue); background:var(--blue-soft); }
-.md-add svg { width:22px; height:22px; flex-shrink:0; }
-.md-add-lbl { display:block; font-size:9.5px; font-weight:800; letter-spacing:1.8px; text-transform:uppercase; }
-.md-add-sub { display:block; font-size:12px; color:var(--ink-3); margin-top:2px; }
+.md-clip:hover { color:var(--blue); background:var(--blue-soft); }
+.md-clip svg { width:20px; height:20px; }
+.md-clip[hidden] { display:none; }
 
 .md-lbl { font-size:9px; font-weight:800; letter-spacing:2px; text-transform:uppercase; color:var(--blue); margin:0 0 7px 2px; }
 .md-media { position:relative; max-width:440px; border-radius:4px; overflow:hidden; background:#0d0f14; }
@@ -149,6 +152,7 @@ body.md-strip-on:has(#s-app.active) .toast { bottom:calc(var(--tb-h, 50px) + var
 const svg = inner => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + inner + '</svg>';
 const ICON = {
+  clip:  svg('<path d="M20.5 11.4l-8.3 8.3a5.2 5.2 0 0 1-7.4-7.4l8.6-8.6a3.5 3.5 0 0 1 4.9 4.9l-8.6 8.6a1.7 1.7 0 0 1-2.5-2.5l7.9-7.9"/>'),
   cam:   svg('<path d="M3.5 8h3.2l1.8-2.6h7l1.8 2.6h3.2v11.2H3.5z"/><circle cx="12" cy="13.3" r="3.6"/>'),
   video: svg('<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3z"/>'),
   photo: svg('<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M20.5 16l-5-5-8.5 8.5"/>'),
@@ -181,6 +185,8 @@ function mbText(bytes) { const m = bytes / 1048576; return m < 10 ? m.toFixed(1)
 function shortDate(ts) { return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
 function clock(sec) { const s = Math.round(+sec || 0); return Math.floor(s / 60) + ':' + pad(s % 60); }
 function userErr(msg) { const e = new Error(msg); e.user = true; return e; }
+// A problem with the file itself (too long, too big, wrong kind): trying the same file again won't help.
+function fileErr(msg) { const e = userErr(msg); e.pickAnother = true; return e; }
 function friendly(err) {
   const m = String((err && (err.message || err.error_description || err.error)) || err || '');
   if (/td_media_|td_result_media|schema cache|does not exist|Bucket not found/i.test(m)) return 'Photos and videos aren’t set up yet. Run media-setup.sql in Supabase.';
@@ -280,11 +286,12 @@ function paint(slot) {
   } else if (row) {
     sig = ['row', row.id, row.expires_at, urlOf(row.path) || '', urlOf(row.poster_path) || ''].join('|');
     html = rowHTML(row, mode);
-  } else if (mode === 'athlete' && day && day.list) {
-    sig = 'add'; html = addHTML();
   } else {
     sig = 'none'; html = '';
   }
+  // The paperclip shows once we know the section is empty, and nothing's uploading.
+  const clip = mode === 'athlete' && card && card.querySelector('.md-clip');
+  if (clip) clip.hidden = !(day && day.list && !row && !job);
   if (slot.dataset.sig !== sig) {
     const playing = slot.querySelector('video');
     if (playing && !playing.paused && !job && row && sig.indexOf('row|' + row.id + '|') === 0) return;   // don't yank a video someone is watching
@@ -294,12 +301,6 @@ function paint(slot) {
   if (job) paintBar(slot, job);
   if (row && card && !slot.dataset.opened) { slot.dataset.opened = '1'; card.classList.add('open'); }
   if (mode === 'athlete') athleteSummary(slot, row);
-}
-
-function addHTML() {
-  return '<button type="button" class="md-add" data-md="add">' + ICON.cam +
-    '<span><span class="md-add-lbl">Add photo or video</span>' +
-    '<span class="md-add-sub">One per section · videos up to ' + MAX_VIDEO_SEC + ' seconds</span></span></button>';
 }
 
 function rowHTML(row, mode) {
@@ -352,7 +353,9 @@ function jobHTML(job) {
     : '<div class="md-up-thumb">' + (vid ? ICON.video : ICON.photo) + '</div>';
   const err = job.state === 'err';
   const acts = err
-    ? '<button type="button" class="btn-sm" data-md="retry">Try again</button><button type="button" class="btn-sm" data-md="cancel">Dismiss</button>'
+    ? (job.pickAnother ? '<button type="button" class="btn-sm" data-md="add">Choose another</button>'
+                       : '<button type="button" class="btn-sm" data-md="retry">Try again</button>') +
+      '<button type="button" class="btn-sm" data-md="cancel">Dismiss</button>'
     : job.state === 'save' ? '' : '<button type="button" class="btn-sm" data-md="cancel">Cancel</button>';
   return '<div class="md-up' + (err ? ' err' : '') + '" data-st="' + job.state + '">' + thumb +
     '<div class="md-up-mid"><div class="md-up-lbl">' + esc(lbl) + '<span class="md-pct"></span></div>' +
@@ -428,12 +431,12 @@ async function startUpload(info, file) {
 
   const uploaded = [];
   try {
-    if (!kind) throw userErr('That file can’t be added. Pick a photo or a video.');
+    if (!kind) throw fileErr('That file can’t be added. Pick a photo or a video.');
     const base = a + '/' + iso + '/' + sec + '-' + rid();
     let params;
 
     if (kind === 'photo') {
-      if (file.size > MAX_PHOTO_MB * 1048576) throw userErr('That photo is ' + mbText(file.size) + ' MB — too big to open. Try a screenshot of it instead.');
+      if (file.size > MAX_PHOTO_MB * 1048576) throw fileErr('That photo is ' + mbText(file.size) + ' MB — too big to open. Try a screenshot of it instead.');
       const out = await shrinkPhoto(file);
       if (job.cancelled) throw CANCEL;
       job.preview = URL.createObjectURL(out.blob);
@@ -445,14 +448,13 @@ async function startUpload(info, file) {
                  p_duration: null, p_width: out.w, p_height: out.h };
     } else {
       if (file.size > MAX_VIDEO_MB * 1048576) {
-        throw userErr('That video is ' + mbText(file.size) + ' MB — the limit is ' + MAX_VIDEO_MB +
+        throw fileErr('That video is ' + mbText(file.size) + ' MB — the limit is ' + MAX_VIDEO_MB +
           ' MB. Trim it shorter, or film in 1080p instead of 4K.');
       }
       const meta = await videoMeta(file);
       if (job.cancelled) throw CANCEL;
       if (meta.duration && meta.duration > MAX_VIDEO_SEC + 0.5) {
-        throw userErr('That video is ' + Math.round(meta.duration) + ' seconds. Videos can be up to ' + MAX_VIDEO_SEC +
-          ' seconds — trim it in your Photos app (Edit, then drag the ends in) and add it again.');
+        throw fileErr('Please trim video to less than ' + MAX_VIDEO_SEC + ' seconds');
       }
       if (meta.poster) job.preview = URL.createObjectURL(meta.poster);
       const vt = videoType(file);
@@ -491,6 +493,7 @@ async function startUpload(info, file) {
     if (!err.user) console.warn('Results media upload failed:', err);
     job.state = 'err';
     job.err = err.user ? err.message : friendly(err);
+    job.pickAnother = !!err.pickAnother;
     paintKey(k);
   }
 }
@@ -536,7 +539,7 @@ function loadImage(file) {
     img.onload = () => resolve({ img, url });
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(userErr('Couldn’t open that photo. Try a JPEG or PNG — or take a screenshot of it and add that.'));
+      reject(fileErr('Couldn’t open that photo. Try a JPEG or PNG — or take a screenshot of it and add that.'));
     };
     img.src = url;
   });
@@ -548,7 +551,7 @@ async function shrinkPhoto(file) {
   const { img, url } = await loadImage(file);
   try {
     const w0 = img.naturalWidth, h0 = img.naturalHeight;
-    if (!w0 || !h0) throw userErr('Couldn’t open that photo.');
+    if (!w0 || !h0) throw fileErr('Couldn’t open that photo.');
     const s = Math.min(1, PHOTO_PX / Math.max(w0, h0));
     const w = Math.max(1, Math.round(w0 * s)), h = Math.max(1, Math.round(h0 * s));
     const c = document.createElement('canvas');
@@ -882,7 +885,8 @@ function arm(btn, text) {
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('[data-md]');
   if (!b) return;
-  const slot = b.closest('.md-slot');
+  const card = b.closest('.sec-card');
+  const slot = b.closest('.md-slot') || (card && card.querySelector('.md-slot'));
   if (!slot) return;
   const { a, iso, sec, mode, k } = slot.dataset;
   const act = b.dataset.md;
@@ -989,7 +993,22 @@ function hook() {
       const u = me();
       if (u && !isCoach() && S.selDate) {
         const body = card.querySelector('.sec-body');
-        if (body) { const slot = makeSlot('athlete', u.id, S.selDate, idx); body.appendChild(slot); paint(slot); }
+        if (body) {
+          // Paperclip inside the results box: wrap the box so it can sit in its corner.
+          const ta = body.querySelector('.res-ta');
+          if (ta) {
+            const wrap = document.createElement('div');
+            wrap.className = 'md-ta-wrap';
+            ta.parentNode.insertBefore(wrap, ta);
+            wrap.appendChild(ta);
+            wrap.insertAdjacentHTML('beforeend',
+              '<button type="button" class="md-clip" data-md="add" hidden aria-label="Attach a photo or video" ' +
+              'title="Attach a photo or video (videos up to ' + MAX_VIDEO_SEC + ' seconds)">' + ICON.clip + '</button>');
+          }
+          const slot = makeSlot('athlete', u.id, S.selDate, idx);
+          body.appendChild(slot);
+          paint(slot);
+        }
       }
     } catch (e) { console.warn('Results media:', e); }
     return card;
