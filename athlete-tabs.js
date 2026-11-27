@@ -24,7 +24,7 @@
 
 // Shown at the bottom of the Account tab, so it's easy to check which
 // version of this file a phone is running. Bump it with every change.
-const TD_BUILD = '25';
+const TD_BUILD = '28';
 
 let chatOn = false;   // td-chat.js switches this on via TD_TABS.enableChat()
 
@@ -609,10 +609,56 @@ html.tm-full .tm-sub { font-size:clamp(14px, 2.2vh, 19px); }
 html.tm-full .tm-bar { height:6px; margin:2.5vh 12px 0; }
 html.tm-full .tm-ctrls { margin:0; gap:10px; }
 html.tm-full .tm-btn { height:clamp(64px, 10vh, 86px); font-size:13px; }
-@media (orientation:landscape) and (max-height:500px) {
-  html.tm-full .tm-face { padding-top:14px; padding-bottom:8px; margin-bottom:8px; }
-  html.tm-full .tm-fs, html.tm-full .tm-snd { top:8px; }
-  html.tm-full .tm-btn { height:56px; }
+
+/* ── Taps on the timer ──────────────────────────────
+   The clock face is one tap target. The text inside it is redrawn
+   every second, and a tap that starts on a piece of text that is
+   then replaced gets dropped by the phone, so the text ignores taps
+   and they land on the face itself. The corner buttons sit above
+   everything and reach a little past their edges, so a near miss
+   still hits the button instead of recording a split. Nothing on the
+   timer can be selected or long-pressed into a menu: a selection left
+   on the screen swallows the next taps. */
+.tm-face, .tm-ctrls { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+.tm-face .tm-phase, .tm-face .tm-time, .tm-face .tm-live, .tm-face .tm-count,
+.tm-face .tm-sub, .tm-face .tm-bar { pointer-events:none; }
+.tm-face .tm-count-undo { pointer-events:auto; position:relative; }
+.tm-snd, .tm-fs { z-index:3; }
+.tm-snd svg, .tm-fs svg { pointer-events:none; }
+.tm-snd::after, .tm-fs::after, .tm-count-undo::after { content:''; position:absolute; inset:-10px; }
+.tm-btn, .tm-snd, .tm-fs, .tm-count-undo { touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+.tm-btn:active:not(:disabled), .tm-snd:active, .tm-fs:active { filter:brightness(.92); }
+html.tm-full .tm-snd::after, html.tm-full .tm-fs::after { inset:-14px; }
+html.tm-full .tm-fs { color:var(--ink-2); }
+html.tm-full .tm-snd { color:var(--ink-2); }
+
+/* Landscape phone: the buttons move to a column on the right, so the
+   clock gets the full height of the screen. */
+@media (orientation:landscape) and (max-height:600px) {
+  html.tm-full #v-timer .tb-col {
+    --cw:clamp(132px, 21vw, 190px);
+    flex-direction:row; align-items:stretch; gap:12px;
+    padding:calc(env(safe-area-inset-top, 0px) + 8px) calc(env(safe-area-inset-right, 0px) + 10px)
+            calc(env(safe-area-inset-bottom, 0px) + 8px) calc(env(safe-area-inset-left, 0px) + 10px);
+  }
+  /* The face lets go of the corner buttons, which sit at the top of the
+     button column instead of over the clock. */
+  html.tm-full .tm-face { position:static; margin:0; padding:14px 0 6px; }
+  html.tm-full .tm-face::before { height:6px; }
+  html.tm-full .tm-fs, html.tm-full .tm-snd { top:calc(env(safe-area-inset-top, 0px) + 10px); width:48px; height:48px; }
+  html.tm-full .tm-snd { right:calc(env(safe-area-inset-right, 0px) + 10px); }
+  html.tm-full .tm-fs  { left:auto; right:calc(env(safe-area-inset-right, 0px) + 10px + var(--cw) - 48px); }
+  html.tm-full .tm-snd::after, html.tm-full .tm-fs::after { inset:-8px; }
+  html.tm-full .tm-ctrls { flex:0 0 var(--cw); flex-direction:column; gap:8px; padding-top:60px; }
+  html.tm-full .tm-btn { flex:1; height:auto; min-height:0; }
+  html.tm-full .tm-btn.go { flex:1.5; }
+  html.tm-full .tm-phase { font-size:clamp(12px, 3.4vh, 17px); letter-spacing:4px; }
+  html.tm-full .tm-time { margin:1.5vh 0 1vh; }
+  html.tm-full .tm-live { margin:0 0 .5vh; }
+  html.tm-full .tm-live-t { font-size:min(12vh, 9vw); }
+  html.tm-full .tm-count-n { font-size:min(13vh, 10vw); }
+  html.tm-full .tm-sub { font-size:clamp(12px, 3.6vh, 16px); }
+  html.tm-full .tm-bar { margin:1.5vh 8px 0; }
 }
 `;
 
@@ -1425,23 +1471,51 @@ function syncFull() {
   const b = document.getElementById('tm-fs');
   if (b) {
     b.hidden = TM.state === 'idle';
-    b.innerHTML = on ? FS_ICON.exit : FS_ICON.enter;
+    // Only swap the icon when it changes: replacing it under a finger
+    // can make the phone drop the tap.
+    const want = on ? 'exit' : 'enter';
+    if (b.dataset.icon !== want) { b.dataset.icon = want; b.innerHTML = FS_ICON[want]; }
     b.setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen');
   }
-  fitTime();
+  fitTime(true);
 }
-// The biggest the time can be: as wide as the screen, without crowding
-// out the round count or the buttons.
-function fitTime() {
-  const t = document.getElementById('tm-time');
-  if (!t) return;
-  if (!document.documentElement.classList.contains('tm-full')) { if (t.style.fontSize) t.style.fontSize = ''; return; }
-  const em = t.querySelectorAll('.d').length * 0.44 + t.querySelectorAll('.c').length * 0.2 || 1.96;   // the slot widths set for full screen
-  const face = document.getElementById('tm-face');
-  const W = (face ? face.clientWidth : window.innerWidth) - 20;
-  const extra = !document.getElementById('tm-live').hidden || !document.getElementById('tm-count').hidden;
-  const H = window.innerHeight * (extra ? 0.34 : 0.46);
-  const px = Math.max(60, Math.floor(Math.min(W / (em + 0.06), H)));
+// The biggest the time can be: as wide as the face, and as tall as the
+// space left once the label, live split, round count and progress bar
+// have theirs. Measured rather than guessed, so it fills a phone held
+// sideways as well as upright. Only re-measured when something that
+// changes the answer changes (not on every tick).
+let fitKey = '';
+function fitTime(force) {
+  const t = document.getElementById('tm-time'), face = document.getElementById('tm-face');
+  if (!t || !face) return;
+  if (!document.documentElement.classList.contains('tm-full')) {
+    if (t.style.fontSize) t.style.fontSize = '';
+    fitKey = '';
+    return;
+  }
+  const nd = t.querySelectorAll('.d').length, nc = t.querySelectorAll('.c').length;
+  const live = document.getElementById('tm-live'), cnt = document.getElementById('tm-count');
+  const sub = document.getElementById('tm-sub');
+  const key = [nd, nc, live.hidden, cnt.hidden, sub.textContent, window.innerWidth, window.innerHeight].join('|');
+  if (!force && key === fitKey) return;
+  fitKey = key;
+
+  const em = (nd * 0.44 + nc * 0.2) || 1.96;   // the slot widths set for full screen
+  const fs = getComputedStyle(face);
+  const innerW = face.clientWidth - parseFloat(fs.paddingLeft) - parseFloat(fs.paddingRight);
+  const innerH = face.clientHeight - parseFloat(fs.paddingTop) - parseFloat(fs.paddingBottom);
+  let others = 0;
+  for (const el of face.children) {
+    if (el === t) continue;
+    const s = getComputedStyle(el);
+    if (s.display === 'none' || s.position === 'absolute' || s.position === 'fixed') continue;
+    others += el.offsetHeight + parseFloat(s.marginTop) + parseFloat(s.marginBottom);
+  }
+  const ts = getComputedStyle(t);
+  const tMargin = parseFloat(ts.marginTop) + parseFloat(ts.marginBottom);
+  const byW = (innerW - 8) / (em + 0.06);
+  const byH = (innerH - others - tMargin) / 0.88;   // line-height .84, plus a little air
+  const px = Math.max(60, Math.floor(Math.min(byW, byH)));
   if (t.style.fontSize !== px + 'px') t.style.fontSize = px + 'px';
 }
 
@@ -1615,7 +1689,8 @@ function tmRender() {
   renderCount();
 
   const snd = document.getElementById('tm-snd');
-  snd.innerHTML = c.sound ? ICON.sound : ICON.muted;
+  const sndIcon = c.sound ? 'sound' : 'muted';
+  if (snd.dataset.icon !== sndIcon) { snd.dataset.icon = sndIcon; snd.innerHTML = ICON[sndIcon]; }
   snd.setAttribute('aria-label', c.sound ? 'Sound on' : 'Sound off');
 
   if (idle) TM.small = false;   // the next start opens full screen again
@@ -1659,19 +1734,96 @@ function wireTimer() {
   const app = document.getElementById('s-app');
   if (app) watch.observe(app, { attributes: true, attributeFilter: ['class'] });
   let fitT = null;
-  const refit = () => { clearTimeout(fitT); fitT = setTimeout(fitTime, 80); };
+  const refit = () => { clearTimeout(fitT); fitT = setTimeout(() => fitTime(true), 80); };
   window.addEventListener('resize', refit);
   window.addEventListener('orientationchange', refit);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitTime(true));
+
+  /* ── Taps while the clock runs ─────────────────────
+     The buttons that matter mid-workout answer to the finger itself
+     (pointer events), not to the "click" the phone makes afterwards.
+     A phone can hold back or drop that click while the screen is busy
+     redrawing the clock ten times a second, which is why taps needed
+     repeating. The click that follows a handled tap is then ignored,
+     so nothing happens twice. */
+  const LIVE = '#tm-go, #tm-reset, #tm-round, #tm-snd, #tm-fs, #tm-count-undo';
+  const SLOP = 14;          // px a finger can drift and still count as a tap
+  let tap = null;           // the press in progress
+  let quietUntil = 0;       // clicks before this are leftovers from a handled tap
+
+  function liveAction(b) {
+    if (!b || b.disabled) return;
+    switch (b.id) {
+      case 'tm-go':
+        if (TM.state === 'idle') tmStart();
+        else if (TM.state === 'running') tmPause();
+        else if (TM.state === 'paused') tmResume();
+        else { tmReset(); tmStart(); }
+        break;
+      case 'tm-reset': tmReset(); break;
+      case 'tm-round': tmRound(); break;
+      case 'tm-fs': TM.small = tmFullOn(); syncFull(); break;
+      case 'tm-count-undo': countRound(-1); break;
+      case 'tm-snd':
+        TM.cfg.sound = !TM.cfg.sound; saveCfg();
+        if (TM.cfg.sound) { unlockAudio(); tone(880, 0.08); setTimeout(sleepAudio, 600); }
+        tmRender();
+        break;
+    }
+  }
+  // Tapping the clock records a split, or a round with the counter on.
+  function faceTap() {
+    if (TM.state !== 'running') return;
+    if (TM.counterOn) countRound(1); else tmRound();
+  }
+  const quiet = ms => { quietUntil = Date.now() + ms; };
+
+  if (window.PointerEvent) {
+    view.addEventListener('pointerdown', e => {
+      if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      const b = e.target.closest(LIVE);
+      if (b) { tap = { b, id: e.pointerId, x: e.clientX, y: e.clientY }; return; }
+      if (!e.target.closest('#tm-face')) { tap = null; return; }
+      if (document.documentElement.classList.contains('tm-full')) {
+        // Full screen: the split lands the moment the finger touches,
+        // like a stopwatch. Nothing scrolls here, so it can't misfire.
+        faceTap();
+        quiet(700);
+        tap = { face: true, done: true, id: e.pointerId };
+      } else {
+        // On the scrolling page, wait for the finger to lift so a
+        // scroll that starts on the clock isn't taken as a split.
+        tap = { face: true, id: e.pointerId, x: e.clientX, y: e.clientY };
+      }
+    });
+    // On the document, so the lift is caught even if the finger has slid
+    // off the button, or the press started on something that was redrawn.
+    document.addEventListener('pointerup', e => {
+      if (!tap || e.pointerId !== tap.id) return;
+      const p = tap; tap = null;
+      if (p.done) { quiet(500); return; }
+      if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > SLOP) return;
+      quiet(700);
+      if (p.b) liveAction(p.b); else faceTap();
+    });
+    document.addEventListener('pointercancel', e => {
+      if (tap && e.pointerId === tap.id) { if (tap.done) quiet(500); tap = null; }
+    });
+    // Swallow the leftover click from a tap already handled above, wherever
+    // it lands — including on whatever has just appeared under the finger
+    // (the setup panel after Reset, the tab bar after leaving full screen).
+    document.addEventListener('click', e => {
+      if (Date.now() < quietUntil) { e.preventDefault(); e.stopPropagation(); }
+    }, true);
+  }
 
   view.addEventListener('click', e => {
     const t = e.target;
-    // Tapping the clock face records a split / round (not the sound button).
-    if (t.closest('#tm-count-undo')) { countRound(-1); return; }
-    if (t.closest('#tm-fs')) { TM.small = tmFullOn(); syncFull(); return; }
-    if (t.closest('#tm-face') && !t.closest('#tm-snd')) {
-      if (TM.state === 'running') { if (TM.counterOn) countRound(1); else tmRound(); }
-      return;
-    }
+    // Reaches here from a keyboard, the space bar, or a browser without
+    // pointer events. Taps on a phone were handled above.
+    const live = t.closest(LIVE);
+    if (live) { liveAction(live); return; }
+    if (t.closest('#tm-face')) { faceTap(); return; }
     const mode = t.closest('[data-mode]');
     if (mode && TM.state === 'idle') { TM.cfg.mode = mode.dataset.mode; saveCfg(); tmRender(); return; }
 
@@ -1704,24 +1856,10 @@ function wireTimer() {
     const lead = t.closest('[data-lead]');
     if (lead) { TM.cfg.lead = +lead.dataset.lead; saveCfg(); tmRender(); return; }
 
-    if (t.closest('#tm-go')) {
-      if (TM.state === 'idle') tmStart();
-      else if (TM.state === 'running') tmPause();
-      else if (TM.state === 'paused') tmResume();
-      else { tmReset(); tmStart(); }
-      return;
-    }
-    if (t.closest('#tm-reset')) { tmReset(); return; }
     if (t.closest('[data-copy-splits]')) {
       const text = splitsText();
       copyText(text).then(ok => showToast(ok ? 'Splits copied \u2014 paste them into your results' : 'Couldn\u2019t copy \u2014 your browser blocked it', ok ? 'ok' : 'err'));
       return;
-    }
-    if (t.closest('#tm-round')) { tmRound(); return; }
-    if (t.closest('#tm-snd'))   {
-      TM.cfg.sound = !TM.cfg.sound; saveCfg();
-      if (TM.cfg.sound) { unlockAudio(); tone(880, 0.08); setTimeout(sleepAudio, 600); }
-      tmRender();
     }
   });
 
