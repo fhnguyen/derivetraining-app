@@ -24,7 +24,7 @@
 
 // Shown at the bottom of the Account tab, so it's easy to check which
 // version of this file a phone is running. Bump it with every change.
-const TD_BUILD = '28';
+const TD_BUILD = '29';
 
 let chatOn = false;   // td-chat.js switches this on via TD_TABS.enableChat()
 
@@ -582,6 +582,9 @@ button.acc-row:hover { background:var(--wash); }
 .tm-fs:hover { background:var(--wash); color:var(--ink); }
 .tm-fs svg { width:20px; height:20px; }
 html.tm-full, html.tm-full body { overflow:hidden; overscroll-behavior:none; }
+/* Pinned, so turning the phone can't leave the page scrolled under the
+   clock (which makes taps land in the wrong place on iPhone). */
+html.tm-full body { position:fixed; inset:0; width:100%; height:100%; }
 html.tm-full .app-hd, html.tm-full #s-app .tabbar, html.tm-full #v-timer .hero,
 html.tm-full #tm-modes, html.tm-full #tm-setup, html.tm-full #tm-laps { display:none !important; }
 html.tm-full #v-timer .tb-col {
@@ -1733,10 +1736,28 @@ function wireTimer() {
   watch.observe(view, { attributes: true, attributeFilter: ['class'] });
   const app = document.getElementById('s-app');
   if (app) watch.observe(app, { attributes: true, attributeFilter: ['class'] });
-  let fitT = null;
-  const refit = () => { clearTimeout(fitT); fitT = setTimeout(() => fitTime(true), 80); };
+  // After the phone is turned: put the page back at the top, and rebuild
+  // the full-screen layer so the phone recalculates where everything is.
+  // iPhones settle a rotation in stages, so this runs a few times.
+  function settle() {
+    if (document.documentElement.classList.contains('tm-full')) {
+      if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0; document.body.scrollTop = 0;
+      const col = view.querySelector('.tb-col');
+      if (col) { col.style.display = 'none'; void col.offsetHeight; col.style.display = ''; }
+    }
+    fitTime(true);
+  }
+  let settleTs = [];
+  const refit = () => {
+    settleTs.forEach(clearTimeout);
+    tap = null;                          // a press cut short by the turn is forgotten
+    settleTs = [60, 250, 600, 1200].map(ms => setTimeout(settle, ms));
+  };
   window.addEventListener('resize', refit);
   window.addEventListener('orientationchange', refit);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', refit);
+  if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', refit);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitTime(true));
 
   /* ── Taps while the clock runs ─────────────────────
@@ -1778,13 +1799,45 @@ function wireTimer() {
   }
   const quiet = ms => { quietUntil = Date.now() + ms; };
 
+  const isFull = () => document.documentElement.classList.contains('tm-full');
+
+  // Full screen: work out what was tapped from where the finger is,
+  // measured fresh, rather than from what the phone reports was touched.
+  // After the phone is turned, iPhone home-screen apps can keep using the
+  // old positions to decide what a finger hit — the screen looks right,
+  // but taps land on the wrong thing. The finger's position is still
+  // right, so the timer checks it against where its buttons are now.
+  function hitAt(x, y) {
+    let best = null, bestD = Infinity;
+    view.querySelectorAll(LIVE).forEach(b => {
+      if (!b.getClientRects().length) return;              // hidden
+      const r = b.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const pad = (b.id === 'tm-snd' || b.id === 'tm-fs') ? 14 : (b.id === 'tm-count-undo' ? 10 : 4);
+      if (x < r.left - pad || x > r.right + pad || y < r.top - pad || y > r.bottom + pad) return;
+      const d = Math.hypot(x - (r.left + r.right) / 2, y - (r.top + r.bottom) / 2);
+      if (d < bestD) { bestD = d; best = b; }
+    });
+    if (best) return { b: best };
+    const f = document.getElementById('tm-face').getBoundingClientRect();
+    if (x >= f.left && x <= f.right && y >= f.top && y <= f.bottom) return { face: true };
+    return null;
+  }
+
   if (window.PointerEvent) {
-    view.addEventListener('pointerdown', e => {
+    // On the document, capturing: in full screen the timer covers the whole
+    // screen, so every touch is the timer's, wherever the phone thinks it went.
+    document.addEventListener('pointerdown', e => {
       if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
-      const b = e.target.closest(LIVE);
-      if (b) { tap = { b, id: e.pointerId, x: e.clientX, y: e.clientY }; return; }
-      if (!e.target.closest('#tm-face')) { tap = null; return; }
-      if (document.documentElement.classList.contains('tm-full')) {
+      let hit;
+      if (isFull()) hit = hitAt(e.clientX, e.clientY);
+      else if (view.contains(e.target)) {
+        const b = e.target.closest(LIVE);
+        hit = b ? { b } : (e.target.closest('#tm-face') ? { face: true } : null);
+      } else { tap = null; return; }
+      if (!hit) { tap = null; return; }
+      if (hit.b) { tap = { b: hit.b, id: e.pointerId, x: e.clientX, y: e.clientY }; return; }
+      if (isFull()) {
         // Full screen: the split lands the moment the finger touches,
         // like a stopwatch. Nothing scrolls here, so it can't misfire.
         faceTap();
@@ -1795,7 +1848,7 @@ function wireTimer() {
         // scroll that starts on the clock isn't taken as a split.
         tap = { face: true, id: e.pointerId, x: e.clientX, y: e.clientY };
       }
-    });
+    }, true);
     // On the document, so the lift is caught even if the finger has slid
     // off the button, or the press started on something that was redrawn.
     document.addEventListener('pointerup', e => {
@@ -1820,7 +1873,10 @@ function wireTimer() {
   view.addEventListener('click', e => {
     const t = e.target;
     // Reaches here from a keyboard, the space bar, or a browser without
-    // pointer events. Taps on a phone were handled above.
+    // pointer events. Taps on a phone were handled above; in full screen
+    // the phone's own click is never trusted, since after a turn it can
+    // name the wrong button (e.detail is 0 for keyboard and .click()).
+    if (window.PointerEvent && isFull() && e.detail !== 0) return;
     const live = t.closest(LIVE);
     if (live) { liveAction(live); return; }
     if (t.closest('#tm-face')) { faceTap(); return; }
